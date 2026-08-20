@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "InspectionActivity": {
+      "title": "Inspection Activity",
+      "description": "Log entry of a QA inspection action performed by an inspector",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "moduleCode": { "type": "string" },
+        "moduleTitleTh": { "type": "string" },
+        "moduleTitleEn": { "type": "string" },
+        "inspector": { "type": "string" },
+        "batchLot": { "type": "string" },
+        "result": { "type": "string", "enum": ["PASS", "FAIL", "PENDING", "REJECT"] },
+        "defectCount": { "type": "number" },
+        "remarks": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "moduleCode", "inspector", "batchLot", "result"]
+    },
+    "BilletInspection": {
+      "title": "Billet Incoming Inspection",
+      "description": "IQC inspection record for aluminum billets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "heat_number": { "type": "string" },
+        "billet_size": { "type": "string" },
+        "grade": { "type": "string" },
+        "supplier_name": { "type": "string" },
+        "inspector_name": { "type": "string" },
+        "batch_no": { "type": "string" },
+        "invoice_no": { "type": "string" },
+        "judgement": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["heat_number", "grade", "supplier_name", "inspector_name"]
+    },
+    "InstrumentRecord": {
+      "title": "Instrument Metrology Record",
+      "description": "Calibration and tool record for QC lab equipment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "brand": { "type": "string" },
+        "model": { "type": "string" },
+        "serialNo": { "type": "string" },
+        "location": { "type": "string" },
+        "spec": { "type": "number" },
+        "frequency": { "type": "number" },
+        "lastResult": { "type": "string" }
+      },
+      "required": ["id", "name", "spec", "frequency"]
+    }
+  },
+  "firestore": {
+    "/inspection_activities/{activityId}": {
+      "schema": { "$ref": "#/entities/InspectionActivity" },
+      "description": "Collection of global inspection activities"
+    },
+    "/billet_inspections/{billetId}": {
+      "schema": { "$ref": "#/entities/BilletInspection" },
+      "description": "Collection of billet incoming quality inspection logs"
+    },
+    "/instruments/{instrumentId}": {
+      "schema": { "$ref": "#/entities/InstrumentRecord" },
+      "description": "Collection of calibration instruments and tools"
+    }
+  }
+}

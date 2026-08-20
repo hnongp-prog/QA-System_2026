@@ -1,0 +1,10 @@
+{
+  "name": "QA Inspection System",
+  "description": "Main menu portal and hub for Quality Assurance Inspection modules, tracking, and management.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
