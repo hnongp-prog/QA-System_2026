@@ -209,8 +209,8 @@ export async function callGeminiVisionClientSide(
     );
   }
 
-  // Clean model names without any 'models/' prefix
-  const models = ["gemini-1.5-flash", "gemini-2.0-flash"];
+  // Clean model names without any 'models/' prefix (Supports current Gemini API versions)
+  const models = ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-1.5-flash"];
   let lastError: any = null;
 
   // 1. Try with GoogleGenAI SDK
