@@ -48,6 +48,7 @@ import {
   Language, 
   InspectionActivity 
 } from '../types';
+import { analyzeBilletCertClient, getGeminiApiKey } from '../services/geminiClient';
 
 interface BilletIncomingAppProps {
   onBackToPortal?: () => void;
@@ -389,7 +390,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
     });
   };
 
-  // Extract via Gemini Backend API
+  // Extract via Client-side Gemini API (Frontend Direct)
   const extractData = async () => {
     if (!base64Image) {
       alert(isTh ? 'กรุณาอัปโหลดรูปภาพหรือไฟล์เอกสาร Certificate ก่อนทำการสแกน' : 'Please upload a Certificate document before analyzing.');
@@ -397,72 +398,28 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
     }
 
     setIsProcessing(true);
-    setStatus({ type: 'info', message: isTh ? 'AI กำลังวิเคราะห์เอกสาร Certificate...' : 'AI analyzing Mill Test Certificate...' });
+    setStatus({ type: 'info', message: isTh ? 'AI (Client-side) กำลังวิเคราะห์เอกสาร Certificate...' : 'AI (Client-side) analyzing Mill Test Certificate...' });
 
     try {
-      const response = await fetch('/api/analyze-cert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base64Image, mimeType: imageMimeType })
-      });
-
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || 'Failed server response');
-      }
-
-      const resData = await response.json();
-      if (resData.items && Array.isArray(resData.items) && resData.items.length > 0) {
-        // Sanitize chemical composition numbers if needed
-        const sanitizedItems: BilletInspectionItem[] = resData.items.map((item: any) => {
-          const chem = item.chemical_composition || {};
-          const cleanChem: Record<string, number> = {};
-          chemElements.forEach(el => {
-            if (chem[el] !== undefined && chem[el] !== null) {
-              const strVal = String(chem[el]).trim().replace(/,/g, '.');
-              const numVal = parseFloat(strVal);
-              cleanChem[el] = isNaN(numVal) ? 0 : numVal;
-            }
-          });
-
-          return {
-            heat_number: String(item.heat_number || '').trim(),
-            billet_size: String(item.billet_size || '6 inch (152 mm)').trim(),
-            grade: String(item.grade || '6063').trim(),
-            supplier_name: String(item.supplier_name || '').trim(),
-            inspector_name: String(item.inspector_name || '').trim(),
-            batch_no: String(item.batch_no || '').trim(),
-            invoice_no: String(item.invoice_no || '').trim(),
-            diameter: String(item.diameter || '').trim(),
-            length: String(item.length || '').trim(),
-            bending: String(item.bending || '').trim(),
-            appearance: String(item.appearance || 'Passed').trim(),
-            xrf: String(item.xrf || 'Pass').trim(),
-            quantity_pcs: Number(item.quantity_pcs || 0),
-            weight_kg: Number(item.weight_kg || 0),
-            cutting_surface_lt2: item.cutting_surface_lt2 !== undefined ? Boolean(item.cutting_surface_lt2) : true,
-            billet_slid_lt25: item.billet_slid_lt25 !== undefined ? Boolean(item.billet_slid_lt25) : true,
-            defect_2x50x100: item.defect_2x50x100 !== undefined ? Boolean(item.defect_2x50x100) : false,
-            chemical_composition: cleanChem
-          };
-        });
-
+      const sanitizedItems = await analyzeBilletCertClient(base64Image, imageMimeType);
+      
+      if (sanitizedItems && sanitizedItems.length > 0) {
         setExtractedItems(sanitizedItems);
         setSelectedIndices(sanitizedItems.map((_, i) => i));
         setStatus({
           type: 'success',
-          message: isTh ? `สกัดข้อมูลสำเร็จ พบ Heat Numbers ทั้งหมด ${sanitizedItems.length} รายการ` : `Successfully extracted ${sanitizedItems.length} Heat Numbers`
+          message: isTh ? `สกัดข้อมูลสำเร็จ (Client-side) พบ Heat Numbers ทั้งหมด ${sanitizedItems.length} รายการ` : `Successfully extracted ${sanitizedItems.length} Heat Numbers (Client-side)`
         });
       } else {
         throw new Error(isTh ? 'ไม่พบข้อมูล Heat Number ในเอกสารนี้' : 'No Heat Number items detected in this document');
       }
     } catch (err: any) {
-      console.error('API extraction error:', err);
+      console.error('Client-side API extraction error:', err);
       setStatus({
         type: 'error',
         message: isTh ? `เกิดข้อผิดพลาดในการสกัดข้อมูล: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}` : `Extraction error: ${err.message || 'Please try again'}`
       });
-      alert(isTh ? `ไม่สามารถสกัดข้อมูลจากเอกสารได้: ${err.message || 'โปรดตรวจสอบความชัดเจนของไฟล์เอกสาร'}` : `Could not extract data: ${err.message}`);
+      alert(isTh ? `ไม่สามารถสกัดข้อมูลจากเอกสารได้: ${err.message || 'โปรดตรวจสอบความชัดเจนของไฟล์เอกสาร หรือตรวจสอบ API Key'}` : `Could not extract data: ${err.message}`);
     } finally {
       setIsProcessing(false);
     }

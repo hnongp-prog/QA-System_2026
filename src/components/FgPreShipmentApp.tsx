@@ -36,6 +36,7 @@ import {
   Language, 
   InspectionActivity 
 } from '../types';
+import { analyzeFgPreShipmentLabelClient } from '../services/geminiClient';
 
 interface FgPreShipmentAppProps {
   onBackToPortal?: () => void;
@@ -515,7 +516,7 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
     setQuickScanText('');
   };
 
-  // 2-Step AI Analysis Function
+  // 2-Step AI Analysis Function (Client-side)
   const runTwoStepProcess = async () => {
     if (!testImage) {
       setStatusMsg({
@@ -526,7 +527,7 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
     }
 
     setIsAnalyzing(true);
-    setLoadingStepText(isTh ? 'Step 1: AI กำลังอ่านและดึงข้อมูลจาก Test Image...' : 'Step 1: AI extracting info from Test Image...');
+    setLoadingStepText(isTh ? 'Step 1: AI (Client-side) กำลังอ่านและดึงข้อมูลจาก Test Image...' : 'Step 1: AI (Client-side) extracting info from Test Image...');
 
     const testBase64 = testImage.includes(',') ? testImage.split(',')[1] : testImage;
     const refBase64 = refImage ? (refImage.includes(',') ? refImage.split(',')[1] : refImage) : null;
@@ -535,48 +536,17 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
     const refMime = refImage ? (refImage.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/)?.[1] || 'image/png') : 'image/png';
 
     try {
-      // Call Server Endpoint
-      const response = await fetch('/api/analyze-label-2step', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ testBase64, refBase64, testMime, refMime })
-      });
-
-      if (response.ok) {
-        const jsonRes = await response.json();
-        if (jsonRes.success && jsonRes.data) {
-          const data = jsonRes.data;
-          populateFormWithData(data);
-          setIsAnalyzing(false);
-          return;
-        }
+      if (refBase64) {
+        setLoadingStepText(isTh ? 'Step 2: AI เปรียบเทียบข้อมูล Reference vs Test Label...' : 'Step 2: AI comparing Reference with Test Image...');
       }
 
-      // Local fallback with Master Spec matching
-      setLoadingStepText(isTh ? 'Step 2: เปรียบเทียบข้อมูล Reference vs Test Label...' : 'Step 2: Comparing Reference with Test Image...');
-      await new Promise(r => setTimeout(r, 1000));
+      const data = await analyzeFgPreShipmentLabelClient(testBase64, refBase64, testMime, refMime);
+      if (data) {
+        populateFormWithData(data);
+        return;
+      }
 
-      const matchedProfile = profileSpecs.length > 0 ? profileSpecs[0] : null;
-
-      const extractedData = {
-        destinationTo: matchedProfile?.destinationTo || 'BANGKOK / THAILAND',
-        profileName: matchedProfile?.profileName || 'General Coated Profile',
-        partNo: matchedProfile?.partNo || 'P-SCANNED-01',
-        drawing: matchedProfile?.drawing || 'DWG-SCAN-01',
-        colorTag: 'Green Tag',
-        boxNo: `BOX-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-        description: matchedProfile?.description || 'Scanned Label Item Description',
-        dimW: matchedProfile?.dimW || '120.0',
-        dimH: matchedProfile?.dimH || '45.0',
-        dimL: matchedProfile?.dimL || '2500',
-        coils: [
-          { no: `COIL-${Math.floor(1000 + Math.random() * 9000)}`, qty: 20, coatingDate: new Date().toISOString().split('T')[0], expireDate: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0] }
-        ],
-        isMatch: true,
-        reasonThai: 'ผลการวิเคราะห์ AI OCR: ดึงข้อมูลจากป้าย Tag สำเร็จ และสอดคล้องกับมาตรฐาน'
-      };
-
-      populateFormWithData(extractedData);
+      throw new Error('No data returned from AI extraction');
     } catch (err: any) {
       console.error('2-Step AI Analysis Error:', err);
       const matchedProfile = profileSpecs.length > 0 ? profileSpecs[0] : null;

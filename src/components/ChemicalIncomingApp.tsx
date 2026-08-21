@@ -46,6 +46,7 @@ import {
   Language, 
   InspectionActivity 
 } from '../types';
+import { analyzeChemicalCertClient } from '../services/geminiClient';
 
 interface ChemicalIncomingAppProps {
   onBackToPortal?: () => void;
@@ -381,7 +382,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     });
   };
 
-  // Process Document via Gemini AI
+  // Process Document via Gemini AI (Client-side)
   const processDocument = async () => {
     if (!base64Image) {
       alert(isTh ? 'กรุณาอัปโหลดรูปภาพหรือไฟล์เอกสาร Certificate ก่อนทำการสแกน' : 'Please upload a Certificate document before analyzing.');
@@ -391,24 +392,14 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     setIsProcessing(true);
     setStatus({
       type: 'info',
-      message: isTh ? 'กำลังสแกนวิเคราะห์เอกสาร Chemical Certificate ด้วย AI...' : 'Scanning & analyzing Chemical Certificate document with AI...'
+      message: isTh ? 'กำลังสแกนวิเคราะห์เอกสาร Chemical Certificate ด้วย AI (Client-side)...' : 'Scanning & analyzing Chemical Certificate document with AI (Client-side)...'
     });
 
     try {
-      const response = await fetch('/api/analyze-chemical-cert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base64Image, mimeType: imageMimeType })
-      });
-
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || 'Server error');
-      }
-
-      const resJson = await response.json();
-      if (resJson.data) {
-        const h = resJson.data.header || {};
+      const resJson = await analyzeChemicalCertClient(base64Image, imageMimeType);
+      
+      if (resJson) {
+        const h: any = resJson.header || {};
         const chemCode = (h.coating_chemical || 'A-001').toUpperCase();
         
         setHeader({
@@ -423,7 +414,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
           supplier: h.supplier || 'Siam Chemical Specialty Ltd.'
         });
 
-        let tableList = Array.isArray(resJson.data.table) ? resJson.data.table : [];
+        let tableList = Array.isArray(resJson.table) ? resJson.table : [];
         if (tableList.length === 0) {
           // If no measurement rows extracted from scan, generate spec test rows based on chemical
           const specRows = specs[chemCode] || DEFAULT_SPECS[chemCode] || DEFAULT_SPECS['A-001'] || [];
@@ -440,7 +431,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
         setStatus({
           type: 'success',
-          message: isTh ? `สกัดข้อมูล Chemical COA สำเร็จ! พบ ${tableList.length} รายการวิเคราะห์` : `Successfully extracted Chemical COA data with ${tableList.length} parameters`
+          message: isTh ? `สกัดข้อมูล Chemical COA สำเร็จ! (Client-side) พบ ${tableList.length} รายการวิเคราะห์` : `Successfully extracted Chemical COA data (Client-side) with ${tableList.length} parameters`
         });
       } else {
         throw new Error(isTh ? 'ไม่พบข้อมูลในเอกสารนี้' : 'No valid data extracted from document');

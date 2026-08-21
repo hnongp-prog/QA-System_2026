@@ -44,6 +44,7 @@ import {
   Language, 
   InspectionActivity 
 } from '../types';
+import { analyzeZnWireCertClient } from '../services/geminiClient';
 
 interface ZnWireIncomingAppProps {
   onBackToPortal?: () => void;
@@ -385,61 +386,52 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
     setIsProcessing(true);
     setStatus({
       type: 'info',
-      message: isTh ? 'กำลังใช้ AI Gemini วิเคราะห์ข้อมูล Mill Test Certificate...' : 'AI Gemini is extracting Mill Test Cert data...'
+      message: isTh ? 'กำลังใช้ AI Gemini (Client-side) วิเคราะห์ข้อมูล Mill Test Certificate...' : 'AI Gemini (Client-side) is extracting Mill Test Cert data...'
     });
 
     if (base64Image) {
       try {
-        const response = await fetch('/api/analyze-zn-wire-cert', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ base64Image, mimeType: imageMimeType })
-        });
+        const items = await analyzeZnWireCertClient(base64Image, imageMimeType);
 
-        if (response.ok) {
-          const resData = await response.json();
-          if (resData.success && Array.isArray(resData.items) && resData.items.length > 0) {
-            const formatted: ZnWireInspectionRecord[] = resData.items.map((item: any, idx: number) => ({
-              id: `scan-${Date.now()}-${idx}`,
-              heat_number: item.heat_number || `H2026-ZN-${900 + idx}`,
-              grade: item.grade || 'ZN-99.99',
-              supplier: item.supplier || 'Siam Zinc Wire Metallic Co., Ltd.',
-              inspector_name: item.inspector_name || '',
-              drum: item.drum || `DRUM-${idx + 1}`,
-              batch_no: item.batch_no || '',
-              po_no: item.po_no || '',
-              diameter: item.diameter || '2.0 mm',
-              appearance: item.appearance || 'Clean & Bright Surface',
-              quantity_pcs: String(item.quantity_pcs || '10'),
-              weight_kg: String(item.weight_kg || '200'),
-              tensile_strength: String(item.tensile_strength || ''),
-              elongation: String(item.elongation || ''),
-              chemical_composition: {
-                Pb: String(item.chemical_composition?.Pb ?? ''),
-                Fe: String(item.chemical_composition?.Fe ?? ''),
-                Cd: String(item.chemical_composition?.Cd ?? ''),
-                Sn: String(item.chemical_composition?.Sn ?? ''),
-                Cu: String(item.chemical_composition?.Cu ?? ''),
-                Zn: String(item.chemical_composition?.Zn ?? '')
-              }
-            }));
+        if (items && items.length > 0) {
+          const formatted: ZnWireInspectionRecord[] = items.map((item: any, idx: number) => ({
+            id: `scan-${Date.now()}-${idx}`,
+            heat_number: item.heat_number || `H2026-ZN-${900 + idx}`,
+            grade: item.grade || 'ZN-99.99',
+            supplier: item.supplier || 'Siam Zinc Wire Metallic Co., Ltd.',
+            inspector_name: item.inspector_name || '',
+            drum: item.drum || `DRUM-${idx + 1}`,
+            batch_no: item.batch_no || '',
+            po_no: item.po_no || '',
+            diameter: item.diameter || '2.0 mm',
+            appearance: item.appearance || 'Clean & Bright Surface',
+            quantity_pcs: String(item.quantity_pcs || '10'),
+            weight_kg: String(item.weight_kg || '200'),
+            tensile_strength: String(item.tensile_strength || ''),
+            elongation: String(item.elongation || ''),
+            chemical_composition: {
+              Pb: String(item.chemical_composition?.Pb ?? ''),
+              Fe: String(item.chemical_composition?.Fe ?? ''),
+              Cd: String(item.chemical_composition?.Cd ?? ''),
+              Sn: String(item.chemical_composition?.Sn ?? ''),
+              Cu: String(item.chemical_composition?.Cu ?? ''),
+              Zn: String(item.chemical_composition?.Zn ?? '')
+            }
+          }));
 
-            setExtractedItems(formatted);
-            setSelectedIndices(formatted.map((_, i) => i));
-            setIsProcessing(false);
-            setStatus({
-              type: 'success',
-              message: isTh ? `สกัดข้อมูลสำเร็จด้วย AI พบ ${formatted.length} รายการ` : `Extracted ${formatted.length} items with AI`
-            });
-            return;
-          } else {
-            throw new Error(isTh ? 'ไม่พบข้อมูลในเอกสารนี้' : 'No valid items found in document');
-          }
+          setExtractedItems(formatted);
+          setSelectedIndices(formatted.map((_, i) => i));
+          setIsProcessing(false);
+          setStatus({
+            type: 'success',
+            message: isTh ? `สกัดข้อมูลสำเร็จด้วย AI (Client-side) พบ ${formatted.length} รายการ` : `Extracted ${formatted.length} items with AI (Client-side)`
+          });
+          return;
         } else {
-          throw new Error('Failed response from server');
+          throw new Error(isTh ? 'ไม่พบข้อมูลในเอกสารนี้' : 'No valid items found in document');
         }
       } catch (err: any) {
-        console.error('Error scanning Zn wire cert:', err);
+        console.error('Error scanning Zn wire cert (client-side):', err);
         setIsProcessing(false);
         setStatus({
           type: 'error',

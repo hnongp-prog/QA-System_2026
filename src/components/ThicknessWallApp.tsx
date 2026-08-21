@@ -36,6 +36,7 @@ import {
   Language, 
   InspectionActivity 
 } from '../types';
+import { extractThicknessWallClient } from '../services/geminiClient';
 
 interface ThicknessWallAppProps {
   onBackToPortal?: () => void;
@@ -358,7 +359,7 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
     return { b64, mime: 'image/svg+xml' };
   };
 
-  // AI Data Extraction
+  // AI Data Extraction (Client-side)
   const processFileWithAI = async () => {
     if (!currentFileBase64) {
       alert(isTh ? 'กรุณาเลือกหรืออัปโหลดเอกสาร IPQC-07 ก่อนทำการสกัดข้อมูล' : 'Please upload or select an IPQC-07 document before scanning.');
@@ -368,22 +369,14 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
     setIsScanning(true);
 
     try {
-      const res = await fetch('/api/extract-thickness-wall', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileBase64: currentFileBase64, mimeType: fileMimeType })
-      });
+      const data = await extractThicknessWallClient(currentFileBase64, fileMimeType);
 
-      if (res.ok) {
-        const jsonRes = await res.json();
-        if (jsonRes.success && jsonRes.data) {
-          const data = jsonRes.data;
-          
-          let rootObj = data;
-          if (data.report) rootObj = data.report;
-          else if (data.document) rootObj = data.document;
-          else if (data.ipqc07) rootObj = data.ipqc07;
-          else if (data.inspection) rootObj = data.inspection;
+      if (data) {
+        let rootObj = data;
+        if (data.report) rootObj = data.report;
+        else if (data.document) rootObj = data.document;
+        else if (data.ipqc07) rootObj = data.ipqc07;
+        else if (data.inspection) rootObj = data.inspection;
 
           // Extract Header Metadata
           let inspector = '';
@@ -488,7 +481,7 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
           } else {
             if (inspector || coil || profile || sample || process) {
               setHasResults(true);
-              alert(isTh ? 'สกัดข้อมูลส่วนหัวสำเร็จแล้ว แต่ไม่พบตารางรายการวัด สามารถเพิ่มรายการย่อยเองได้' : 'Header metadata extracted successfully. You can add measurement items.');
+              alert(isTh ? 'สกัดข้อมูลส่วนหัวสำเร็จแล้ว (Client-side) แต่ไม่พบตารางรายการวัด สามารถเพิ่มรายการย่อยเองได้' : 'Header metadata extracted successfully. You can add measurement items.');
             } else {
               alert(isTh ? 'สกัดข้อมูลสำเร็จ แต่ไม่พบตารางรายการวัดในเอกสารนี้' : 'Document analyzed successfully, but no measurement table rows were detected.');
             }
@@ -496,9 +489,6 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
         } else {
           alert(isTh ? 'ไม่สามารถประมวลผลข้อมูล AI ได้ กรุณาตรวจสอบความชัดเจนของไฟล์เอกสาร' : 'Could not process AI data. Please check file clarity.');
         }
-      } else {
-        alert(isTh ? 'เกิดข้อผิดพลาดจากระบบเซิร์ฟเวอร์ในการสกัดข้อมูล' : 'Server error occurred during extraction.');
-      }
     } catch (err: any) {
       console.error('Extraction Error:', err);
       alert(isTh ? 'เกิดข้อผิดพลาด: ' + (err.message || 'Error') : 'Error: ' + (err.message || 'Error'));
