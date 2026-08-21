@@ -209,13 +209,15 @@ export async function callGeminiVisionClientSide(
     );
   }
 
-  const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  // Clean model names without any 'models/' prefix
+  const models = ["gemini-1.5-flash", "gemini-2.0-flash"];
   let lastError: any = null;
 
   // 1. Try with GoogleGenAI SDK
   try {
     const ai = new GoogleGenAI({ apiKey });
-    for (const model of models) {
+    for (const rawModel of models) {
+      const model = rawModel.replace(/^models\//, '');
       try {
         const parts: any[] = [{ text: prompt }];
         for (const img of images) {
@@ -253,7 +255,8 @@ export async function callGeminiVisionClientSide(
   }
 
   // 2. Direct REST API Fallback (Guaranteed to work in pure browser/Vercel SPA)
-  for (const model of models) {
+  for (const rawModel of models) {
+    const model = rawModel.replace(/^models\//, '');
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const parts: any[] = [{ text: prompt }];
