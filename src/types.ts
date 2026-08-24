@@ -1,8 +1,8 @@
 export type QACategory = 
   | 'ALL'
-  | 'IQC'        // Incoming Quality Control
-  | 'IPQC'       // In-Process Quality Control
-  | 'OQC'        // Outgoing Quality Control
+  | 'IQA'        // Incoming Quality Assurance
+  | 'IPQA'       // In-Process Quality Assurance
+  | 'OQA'        // Outgoing Quality Assurance
   | 'EQUIPMENT'  // Metrology & Calibration
   | 'NCR'        // Non-Conformance Report & CAPA
   | 'ANALYTICS'  // QA Dashboard & Reports
@@ -116,7 +116,7 @@ export interface NcrRecord {
   inspectionResult: string;      // Out of spec / NG defect details
   status: NcrStatus;             // Quarantine / Open / CAPA / Closed
   severity: NcrSeverity;         // Critical / Major / Minor
-  sourceModuleCode: string;      // e.g. "IPQC-07", "IQC-01", "IPQC-01", "OQC-01", etc.
+  sourceModuleCode: string;      // e.g. "IPQA-07", "IQA-01", "IPQA-01", "OQA-01", etc.
   defectCount?: number;
   rootCause?: string;            // 5-Why / Fishbone Cause
   immediateAction?: string;      // Containment / Hold Action
@@ -700,6 +700,371 @@ export interface FgOqc02InspectionRecord {
   matchedMasterSpecCode?: string;
 }
 
+// ==========================================
+// COI-01 Certificate of Inspection (COI / COA) Types
+// ==========================================
+export type CoiInspectionCategory =
+  | 'CHEMICAL'         // Chemical Composition (IQA-01)
+  | 'MECHANICAL'       // Tensile, Yield, Elongation, Hardness (IPQA-01)
+  | 'SURFACE_COATING'  // Roughness, Coating Weight, Flux (IPQA-02, 03, 04)
+  | 'DIMENSION'        // Wall Thickness, Width, Height, Tolerances (IPQA-05, 07)
+  | 'VISUAL_PACKAGING' // Appearance, Defect Check, Tag (OQA-01)
+  | 'GEOMETRY_FORM'    // Warp, Curved, Twist, Undulation, Burr
+  | 'CUSTOM';          // Custom Criteria
 
+export type CoiDataSourceModule =
+  | 'IQA-01'   // Billet & Ingot Chemical Spectrometry
+  | 'IQA-02'   // Chemical Raw Material
+  | 'IPQA-01'  // Tensile & Mechanical
+  | 'IPQA-02'  // Surface Roughness Rz/Ra
+  | 'IPQA-03'  // X-Ray Zinc Coating
+  | 'IPQA-04'  // Flux Coating & Adhesion
+  | 'IPQA-05'  // Cutting Dimensions & Form Tolerances
+  | 'IPQA-07'  // Multi-Port Wall Thickness (T1..T4, Webs 1..12)
+  | 'OQA-01'   // Pre-Shipment & Visual Appearance
+  | 'MANUAL';  // Manual Key-in
 
+export interface CoiCustomerTemplate {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerAddress: string;
+  partNumber: string;
+  productName: string;
+  standardRef: string;
+  heatNoMaterialCode: string;
+  drawingNoRevision: string;
+  defaultLength: string;
+  coatingType: string;
+  cutEndType: string;
+  companyNameHeader: string;
+  sectionNameHeader: string;
+  documentControlNo: string;
+  updatedAt: string;
+
+  // 1. Chemical Specs (wt%) [Linked to IQA-01]
+  chemicalSpecs: {
+    si: { min?: number; max?: number; linkSource: CoiDataSourceModule };
+    fe: { min?: number; max?: number; linkSource: CoiDataSourceModule };
+    cu: { min?: number; max?: number; linkSource: CoiDataSourceModule };
+    mn: { min?: number; max?: number; linkSource: CoiDataSourceModule };
+    mg: { min?: number; max?: number; linkSource: CoiDataSourceModule };
+    cr: { min?: number; max?: number; linkSource: CoiDataSourceModule };
+    zn: { min?: number; max?: number; linkSource: CoiDataSourceModule };
+    ti: { min?: number; max?: number; linkSource: CoiDataSourceModule };
+    otherEach: { min?: number; max?: number; linkSource: CoiDataSourceModule };
+    otherTotal: { min?: number; max?: number; linkSource: CoiDataSourceModule };
+    alRemain: { text: string; linkSource: CoiDataSourceModule };
+  };
+
+  // 2. Mechanical & Roughness Specs [Linked to IPQA-01, IPQA-02]
+  mechanicalSpecs: {
+    tensileMin: number; // N/mm2 e.g. 78.0
+    yieldMin: number;   // N/mm2 e.g. 20.0
+    elongationMin: number; // % e.g. 10.0
+    eddyCurrentTest: string; // "OK"
+    roughnessRzTopMax: number; // µm e.g. 14.0
+    roughnessRzBottomMax: number; // µm e.g. 14.0
+    linkSourceMech: CoiDataSourceModule;
+    linkSourceRoughness: CoiDataSourceModule;
+  };
+
+  // 3. Zn Spray & Flux Coating Specs [Linked to IPQA-03, IPQA-04]
+  coatingSpecs: {
+    znAdhesionWeightSpec: string; // "11.5 ± 2 g/m² (9.5 - 13.5 g/m²)"
+    znAdhesionWeightMin: number;
+    znAdhesionWeightMax: number;
+    znAreaRatioSpec: string; // "≥ 58%"
+    znAreaRatioMin: number;
+    fluxLotMaterial: string; // "Material: Flux"
+    fluxAdhesionWeightSpec: string; // "5 ± 2 g/m² (3 - 7 g/m²)"
+    fluxAdhesionWeightMin: number;
+    fluxAdhesionWeightMax: number;
+    coatingAdhesionSpec: string; // "Pencil hardness test: 3B"
+    linkSourceZn: CoiDataSourceModule;
+    linkSourceFlux: CoiDataSourceModule;
+  };
+
+  // 4. Web Thickness Specs (mm) [Linked to IPQA-07]
+  webThicknessSpecs: {
+    outerWebT1Spec: string; // "0.225 ± 0.05 (0.175 - 0.275)"
+    outerWebT1Min: number;
+    outerWebT1Max: number;
+    outerWebT2Spec: string; // "0.225 ± 0.05 (0.175 - 0.275)"
+    outerWebT2Min: number;
+    outerWebT2Max: number;
+    sideWebT3Spec: string;  // "0.62 ± 0.05 (0.57 - 0.67)"
+    sideWebT3Min: number;
+    sideWebT3Max: number;
+    sideWebT4Spec: string;  // "0.62 ± 0.05 (0.57 - 0.67)"
+    sideWebT4Min: number;
+    sideWebT4Max: number;
+    innerWebSpec: string;   // "0.25 +0.07/-0.03 (0.22 - 0.32)"
+    innerWebMin: number;
+    innerWebMax: number;
+    innerWebSlotsCount: number; // 12
+    linkSource: CoiDataSourceModule;
+  };
+
+  // 5. Hole Geometry Specs [Linked to IPQA-05 / IPQA-07]
+  holeSpecs: {
+    innerHoleWidthSpec: string; // "11 x (1.06 mm)"
+    innerHoleWidthMin: number;
+    innerHoleWidthMax: number;
+    outerHoleWidthSpec: string; // "2 x (0.815 mm)"
+    outerHoleWidthMin: number;
+    outerHoleWidthMax: number;
+    innerHoleRadiusSpec: string; // "48 x (R 0.10 Min)"
+    innerHoleRadiusMin: number;
+    innerHoleRadiusMax: number;
+    linkSource: CoiDataSourceModule;
+  };
+
+  // 6. Geometry & Form Deviation Specs [Linked to IPQA-05 & OQA-01]
+  geometrySpecs: {
+    lengthToleranceMm: number; // e.g. ± 1.0 mm
+    portOpenAreaSpec: string; // "Port open area (over 50%) [After cutting cross section ≥ 6.45 mm²]"
+    portOpenAreaMin: number; // 6.45
+    widthAt5mmSpec: string; // "14.8 ± 0.05 mm (14.75 - 14.85 mm)"
+    widthMin: number;
+    widthMax: number;
+    heightAt5mmSpec: string; // "1.74 ± 0.015 mm (1.725 - 1.755 mm)"
+    heightMin: number;
+    heightMax: number;
+    warpMaxMm: number; // 1.0 mm (反り)
+    curvedMinMm: number; // -0.7 mm (湾曲)
+    curvedMaxMm: number; // 0.3 mm (湾曲)
+    twistMaxMm: number; // 1.7 mm (捩り)
+    undulationMaxMm: number; // 0.2 mm (うねり)
+    burrFreeRequirement: string; // "Cut End Tube Burr Free: OK"
+    linkSource: CoiDataSourceModule;
+  };
+}
+
+export interface DetailedCoiMeasuredData {
+  // General
+  workNo: string;
+  coilNo: string;
+  drawingNoRevision: string;
+  lengthMm: number | string;
+  coatingType: string;
+  cutEnd: string;
+  inspectionDimension: string; // "OK"
+  inspectionCoating: string;   // "OK"
+  inspectionAppearance: string; // "OK"
+
+  // Chemical composition
+  heatNo: string;
+  materialCode: string;
+  chemActual: {
+    si: number;
+    fe: number;
+    cu: number;
+    mn: number;
+    mg: number;
+    cr: number;
+    zn: number;
+    ti: number;
+    otherEach: number;
+    otherTotal: number;
+    alRemain: string;
+  };
+
+  // Mechanical & Roughness (POS H)
+  mechActual: {
+    tensileStrength: number;
+    yieldStress: number;
+    elongation: number;
+    eddyCurrent: string;
+    roughnessRzTop: number;
+    roughnessRzBottom: number;
+  };
+
+  // Zn Spray Coating & Flux Coating (POS H and T)
+  coatingActual: {
+    znSprayDate: string;
+    head: {
+      znAdhesionWeightTop: number;
+      znAdhesionWeightBottom: number;
+      znAdhesionAreaTop: number;
+      znAdhesionAreaBottom: number;
+      fluxAdhesionWeightTop: number;
+      fluxAdhesionWeightBottom: number;
+      coatingAdhesionTop: string;
+      coatingAdhesionBottom: string;
+    };
+    tail: {
+      znAdhesionWeightTop: number;
+      znAdhesionWeightBottom: number;
+      znAdhesionAreaTop: number;
+      znAdhesionAreaBottom: number;
+      fluxAdhesionWeightTop: number;
+      fluxAdhesionWeightBottom: number;
+      coatingAdhesionTop: string;
+      coatingAdhesionBottom: string;
+    };
+    paintLotNo: string;
+    coatingDate: string;
+    materialFlux: string;
+  };
+
+  // Web thickness (POS H and T)
+  webActual: {
+    head: {
+      t1: number;
+      t2: number;
+      t3: number;
+      t4: number;
+      innerWebs: number[]; // 12 numbers
+    };
+    tail: {
+      t1: number;
+      t2: number;
+      t3: number;
+      t4: number;
+      innerWebs: number[]; // 12 numbers
+    };
+  };
+
+  // Hole geometry (POS H and T)
+  holeActual: {
+    head: {
+      innerHoleWidthMin: number;
+      innerHoleWidthMax: number;
+      outerHoleWidthMin: number;
+      outerHoleWidthMax: number;
+      innerHoleRadiusMin: number;
+      innerHoleRadiusMax: number;
+    };
+    tail: {
+      innerHoleWidthMin: number;
+      innerHoleWidthMax: number;
+      outerHoleWidthMin: number;
+      outerHoleWidthMax: number;
+      innerHoleRadiusMin: number;
+      innerHoleRadiusMax: number;
+    };
+  };
+
+  // Geometry & Form deviation (POS H and T)
+  geometryActual: {
+    head: {
+      lengthMm: number;
+      portOpenAreaLeft: number;
+      portOpenAreaRight: number;
+      widthLeft: number;
+      widthRight: number;
+      heightLeft: number;
+      heightRight: number;
+      warpMm: number;
+      curvedMm: number;
+      twistMm: number;
+      undulationMm: number;
+      burrFreeLeft: string;
+      burrFreeRight: string;
+    };
+    tail: {
+      lengthMm: number;
+      portOpenAreaLeft: number;
+      portOpenAreaRight: number;
+      widthLeft: number;
+      widthRight: number;
+      heightLeft: number;
+      heightRight: number;
+      warpMm: number;
+      curvedMm: number;
+      twistMm: number;
+      undulationMm: number;
+      burrFreeLeft: string;
+      burrFreeRight: string;
+    };
+  };
+}
+
+export interface CoiTestItemDesign {
+  id: string;
+  category: CoiInspectionCategory;
+  parameterKey: string;
+  nameTh: string;
+  nameEn: string;
+  unit: string;
+  minVal?: number | string;
+  maxVal?: number | string;
+  targetVal?: number | string;
+  specText?: string;
+  testMethod: string;
+  isRequired: boolean;
+  sortOrder: number;
+  defaultValue?: number | string;
+  linkSource?: CoiDataSourceModule;
+}
+
+export interface CoiProfileDesign {
+  id: string;
+  profileCode: string;
+  profileName: string;
+  alloyGrade: string;
+  temper: string;
+  standardRef: string;
+  customerDefault?: string;
+  defaultLength?: string;
+  descriptionTh?: string;
+  testItems: CoiTestItemDesign[];
+  updatedAt: string;
+}
+
+export interface CoiTestItemResult {
+  id: string;
+  category: CoiInspectionCategory;
+  parameterKey: string;
+  nameTh: string;
+  nameEn: string;
+  unit: string;
+  specText: string;
+  actualValue: string | number;
+  testMethod: string;
+  isPass: boolean;
+  remarks?: string;
+  linkSource?: CoiDataSourceModule;
+}
+
+export interface CoiIssueRecord {
+  id: string;
+  coiNo: string;
+  issueDate: string;
+  productionDate: string;
+  customerName: string;
+  customerAddress?: string;
+  poNo: string;
+  invoiceDoNo: string;
+  profileCode: string;
+  profileName: string;
+  alloyGrade: string;
+  temper: string;
+  standardRef: string;
+  coilNo: string;
+  heatNo?: string;
+  length: string;
+  quantityPcs: number | string;
+  totalWeightKg: number | string;
+  inspectorName: string;
+  approverName: string;
+  overallResult: 'PASS' | 'CONFORMS' | 'REJECT';
+  remarks: string;
+  items: CoiTestItemResult[];
+  qrVerificationCode: string;
+  createdAt: string;
+  // Detailed full document layout data if applicable
+  customerTemplateId?: string;
+  detailedData?: DetailedCoiMeasuredData;
+  partNumber?: string;
+  productName?: string;
+  workNo?: string;
+  coatingType?: string;
+  cutEndType?: string;
+  drawingNoRevision?: string;
+  companyHeader?: string;
+  qaSectionHeader?: string;
+  docControlNo?: string;
+}
 

@@ -20,7 +20,7 @@ export const AddCustomModuleModal: React.FC<AddCustomModuleModalProps> = ({
   const isTh = language === 'th';
 
   const [code, setCode] = useState('QA-APP-01');
-  const [category, setCategory] = useState<QACategory>('IQC');
+  const [category, setCategory] = useState<QACategory>('IQA');
   const [titleTh, setTitleTh] = useState('');
   const [titleEn, setTitleEn] = useState('');
   const [descTh, setDescTh] = useState('');
@@ -123,9 +123,9 @@ export const AddCustomModuleModal: React.FC<AddCustomModuleModalProps> = ({
                 onChange={(e) => setCategory(e.target.value as QACategory)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-cyan-500"
               >
-                <option value="IQC">IQC - ตรวจรับวัตถุดิบ (Incoming)</option>
-                <option value="IPQC">IPQC - ตรวจระหว่างผลิต (In-Process)</option>
-                <option value="OQC">OQC - ตรวจจัดส่ง (Outgoing)</option>
+                <option value="IQA">IQA - ตรวจรับวัตถุดิบ (Incoming Assurance)</option>
+                <option value="IPQA">IPQA - ตรวจระหว่างผลิต (In-Process Assurance)</option>
+                <option value="OQA">OQA - ตรวจจัดส่ง (Outgoing Assurance)</option>
                 <option value="EQUIPMENT">EQUIPMENT - เครื่องมือ & สอบเทียบ</option>
                 <option value="NCR">NCR - จัดการของเสีย & CAPA</option>
                 <option value="ANALYTICS">ANALYTICS - วิเคราะห์คุณภาพ</option>

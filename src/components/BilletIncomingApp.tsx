@@ -57,7 +57,7 @@ interface BilletIncomingAppProps {
 }
 
 const chemElements: ChemElementKey[] = ["Si", "Fe", "Cu", "Mn", "Mg", "Cr", "Zn", "Ti", "Pb", "Cd", "Al"];
-const appId = "Billet Incoming Inspection (IQC-01)";
+const appId = "Billet Incoming Inspection (IQA-01)";
 
 const DEFAULT_GRADE_SPECS: GradeSpecMap = {
   "6063": {

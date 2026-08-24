@@ -98,8 +98,8 @@ export const Header: React.FC<HeaderProps> = ({
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={
                 isTh 
-                  ? 'ค้นหาระบบย่อย (เช่น IQC, IPQC, NCR, รหัสระบบ)...' 
-                  : 'Search sub-apps (e.g., IQC, IPQC, NCR, module code)...'
+                  ? 'ค้นหาระบบย่อย (เช่น IQA, IPQA, OQA, NCR, รหัสระบบ)...' 
+                  : 'Search sub-apps (e.g., IQA, IPQA, OQA, NCR, module code)...'
               }
               className="w-full pl-9 pr-4 py-2 bg-slate-800/90 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition shadow-inner"
             />

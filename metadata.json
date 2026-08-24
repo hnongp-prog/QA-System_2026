@@ -1,6 +1,6 @@
 {
   "name": "QA Inspection System",
-  "description": "Main menu portal and hub for Quality Assurance Inspection modules, tracking, and management.",
+  "description": "Comprehensive QA Inspection System with IQA, IPQA, OQA modules and COI-01 Customer Layout Designer with automated inspection data linkage.",
   "requestFramePermissions": [
     "camera"
   ],

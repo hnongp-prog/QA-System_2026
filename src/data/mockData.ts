@@ -2,13 +2,13 @@ import { QAModule, InspectionActivity, SystemMetrics, UserProfile, ShiftInfo } f
 
 export const INITIAL_MODULES: QAModule[] = [
   {
-    id: 'mod-iqc-01',
-    code: 'IQC-01',
+    id: 'mod-iqa-01',
+    code: 'IQA-01',
     titleTh: 'ตรวจรับวัตถุดิบ Billet (Billet Incoming Inspection)',
     titleEn: 'Billet Incoming Inspection',
     descriptionTh: 'สแกนใบรับรอง Mill Test Cert, สกัดค่าส่วนผสมเคมี (Si, Fe, Cu, Mg ฯลฯ), ตรวจสอบเกณฑ์มาตรฐานเกรด และพิมพ์ QR Label',
     descriptionEn: 'Scan Mill Test Certs, AI extract chemical compositions, match grade specs (PASS/FAIL), and print QR tags.',
-    category: 'IQC',
+    category: 'IQA',
     iconName: 'PackageCheck',
     status: 'ACTIVE',
     pinned: true,
@@ -21,12 +21,12 @@ export const INITIAL_MODULES: QAModule[] = [
       { labelTh: 'อัตราผ่าน (AQL)', labelEn: 'AQL Pass Rate', value: '98.5%', trend: '+0.5%', trendUp: true },
     ],
     specs: {
-      targetUsersTh: 'วิศวกร IQC, เจ้าหน้าที่ตรวจรับวัตถุดิบ',
-      targetUsersEn: 'IQC Inspector, Material Control Officer',
+      targetUsersTh: 'วิศวกร IQA, เจ้าหน้าที่ตรวจรับวัตถุดิบ',
+      targetUsersEn: 'IQA Inspector, Material Control Officer',
       checklistItemsCount: 15,
       estimatedTimeMin: 10,
-      outputReportTypeTh: 'IQC Lot Acceptance Certificate (PDF)',
-      outputReportTypeEn: 'IQC Lot Acceptance Certificate (PDF)',
+      outputReportTypeTh: 'IQA Lot Acceptance Certificate (PDF)',
+      outputReportTypeEn: 'IQA Lot Acceptance Certificate (PDF)',
       keyFeaturesTh: [
         'ระบบสุ่มตัวอย่างตามมาตรฐาน MIL-STD-105E / ISO 2859-1',
         'การสแกน QR Code/Barcode ลอตวัตถุดิบและเทียบ COA',
@@ -42,13 +42,13 @@ export const INITIAL_MODULES: QAModule[] = [
     }
   },
   {
-    id: 'mod-iqc-02',
-    code: 'IQC-02',
+    id: 'mod-iqa-02',
+    code: 'IQA-02',
     titleTh: 'ตรวจรับเคมีเคลือบผิว (Chemical Incoming Inspection)',
     titleEn: 'Chemical Incoming Inspection & COA AI OCR',
     descriptionTh: 'สกัดข้อมูลรายงาน COA จาก PDF/ภาพถ่าย ด้วย AI Gemini-2.5-Flash, ตรวจสอบเกณฑ์ Spec สารเคมีเคลือบผิว และบันทึกประวัติการตรวจรับ',
     descriptionEn: 'AI-powered COA extraction, chemical property spec verification, and Cloud history inspection tracking.',
-    category: 'IQC',
+    category: 'IQA',
     iconName: 'FlaskConical',
     status: 'ACTIVE',
     pinned: true,
@@ -60,8 +60,8 @@ export const INITIAL_MODULES: QAModule[] = [
       { labelTh: 'อัตราผ่าน (Spec Pass)', labelEn: 'Spec Pass Rate', value: '100%', trend: '0%', trendUp: true }
     ],
     specs: {
-      targetUsersTh: 'เจ้าหน้าที่ QC Chemist, เจ้าหน้าที่ IQC ตรวจรับวัตถุดิบเคมี',
-      targetUsersEn: 'QA Chemist, IQC Chemical Incoming Officer',
+      targetUsersTh: 'เจ้าหน้าที่ QC Chemist, เจ้าหน้าที่ IQA ตรวจรับวัตถุดิบเคมี',
+      targetUsersEn: 'QA Chemist, IQA Chemical Incoming Officer',
       checklistItemsCount: 12,
       estimatedTimeMin: 5,
       outputReportTypeTh: 'รายงานผลการตรวจรับเคมีเคลือบผิว (Chemical Incoming COA Cert)',
@@ -81,13 +81,13 @@ export const INITIAL_MODULES: QAModule[] = [
     }
   },
   {
-    id: 'mod-iqc-03',
-    code: 'IQC-03',
+    id: 'mod-iqa-03',
+    code: 'IQA-03',
     titleTh: 'ตรวจรับลวดสังกะสี (Zn Wire Incoming Inspection)',
     titleEn: 'Zn Wire Incoming Inspection & COA OCR System',
     descriptionTh: 'สแกนรายงาน Mill Test Cert ลวดสังกะสี (Zn Wire), สกัดข้อมูลส่วนผสมเคมี (Pb, Fe, Cd, Sn, Cu, Zn) และสมบัติเชิงกล (Tensile, Elongation) ด้วย AI, ประเมินผลผ่าน/ไม่ผ่าน อัตโนมัติ พร้อมพิมพ์ QR Identification Tag',
     descriptionEn: 'AI OCR Mill Test Certificate scanner for Zinc Wire, chemical & mechanical property spec verification, pass/fail judgment & QR identification tag printing.',
-    category: 'IQC',
+    category: 'IQA',
     iconName: 'Zap',
     status: 'ACTIVE',
     pinned: true,
@@ -100,8 +100,8 @@ export const INITIAL_MODULES: QAModule[] = [
       { labelTh: 'อัตราผ่าน (Pass Rate)', labelEn: 'Pass Rate', value: '99.2%', trend: '+0.5%', trendUp: true }
     ],
     specs: {
-      targetUsersTh: 'เจ้าหน้าที่ IQC ตรวจรับวัตถุดิบ, วิศวกรควบคุมคุณภาพ (QA/QC Engineer)',
-      targetUsersEn: 'IQC Material Inspector, QA/QC Engineer',
+      targetUsersTh: 'เจ้าหน้าที่ IQA ตรวจรับวัตถุดิบ, วิศวกรควบคุมคุณภาพ (QA/QC Engineer)',
+      targetUsersEn: 'IQA Material Inspector, QA/QC Engineer',
       checklistItemsCount: 16,
       estimatedTimeMin: 4,
       outputReportTypeTh: 'รายงานผลการตรวจรับลวดสังกะสี (Zn Wire Inspection Report & Tag)',
@@ -123,13 +123,13 @@ export const INITIAL_MODULES: QAModule[] = [
     }
   },
   {
-    id: 'mod-ipqc-01',
-    code: 'IPQC-01',
+    id: 'mod-ipqa-01',
+    code: 'IPQA-01',
     titleTh: 'การทดสอบแรงดึง (Tensile Measurement)',
     titleEn: 'Tensile Measurement & Quality Spec System',
     descriptionTh: 'บันทึกค่าแรงดึง (Tensile, Yield, Elongation), ตรวจสอบเกณฑ์มาตรฐาน Dimension & Spec อัตโนมัติ, กราฟแนวโน้ม Trend Dashboard และตั้งค่า Spec ควบคุมผ่าน Admin',
     descriptionEn: 'Tensile strength, yield strength, elongation measurement & dimension verification with trend charts and admin-protected quality spec manager.',
-    category: 'IPQC',
+    category: 'IPQA',
     iconName: 'Activity',
     status: 'ACTIVE',
     pinned: true,
@@ -142,8 +142,8 @@ export const INITIAL_MODULES: QAModule[] = [
       { labelTh: 'อัตราผ่านเกณฑ์ (Pass Rate)', labelEn: 'Pass Rate', value: '96.5%', trend: '+1.5%', trendUp: true }
     ],
     specs: {
-      targetUsersTh: 'เจ้าหน้าที่ IPQC, วิศวกรควบคุมคุณภาพ (Quality Engineer)',
-      targetUsersEn: 'IPQC Auditor, Quality Engineer, Lab Tech',
+      targetUsersTh: 'เจ้าหน้าที่ IPQA, วิศวกรควบคุมคุณภาพ (Quality Engineer)',
+      targetUsersEn: 'IPQA Auditor, Quality Engineer, Lab Tech',
       checklistItemsCount: 15,
       estimatedTimeMin: 5,
       outputReportTypeTh: 'รายงานการทดสอบแรงดึงประจำกะ (Tensile & Yield Test Report)',
@@ -163,13 +163,13 @@ export const INITIAL_MODULES: QAModule[] = [
     }
   },
   {
-    id: 'mod-ipqc-02',
-    code: 'IPQC-02',
+    id: 'mod-ipqa-02',
+    code: 'IPQA-02',
     titleTh: 'การตรวจวัดความเรียบผิว (Roughness Measurement)',
     titleEn: 'Surface Roughness Measurement System (Ra/Rz/Rt/Ry)',
     descriptionTh: 'บันทึกค่าความเรียบผิว (Ra, Rz, Rt, Ry) หลายจุดทั้งขอบบน-ขอบล่าง, คำนวณ Rz Cal (3-Sigma) อัตโนมัติ, พร้อมกราฟ Sparkline Trend และตั้งค่า Profile Spec (Admin Security)',
     descriptionEn: 'Surface roughness (Ra, Rz, Rt, Ry) measurement for upper & lower surfaces, auto 3-Sigma Rz Cal, sparkline trend analysis & admin spec manager.',
-    category: 'IPQC',
+    category: 'IPQA',
     iconName: 'Activity',
     status: 'ACTIVE',
     pinned: true,
@@ -182,8 +182,8 @@ export const INITIAL_MODULES: QAModule[] = [
       { labelTh: 'อัตราผ่านเกณฑ์ (Pass Rate)', labelEn: 'Pass Rate', value: '98.2%', trend: '+0.5%', trendUp: true }
     ],
     specs: {
-      targetUsersTh: 'เจ้าหน้าที่ IPQC, วิศวกรตรวจสอบคุณภาพ (QA/QC Engineer)',
-      targetUsersEn: 'IPQC Auditor, QA/QC Surface Metrology Tech',
+      targetUsersTh: 'เจ้าหน้าที่ IPQA, วิศวกรตรวจสอบคุณภาพ (QA/QC Engineer)',
+      targetUsersEn: 'IPQA Auditor, QA/QC Surface Metrology Tech',
       checklistItemsCount: 14,
       estimatedTimeMin: 4,
       outputReportTypeTh: 'รายงานผลการตรวจวัดความเรียบผิว (Surface Roughness Inspection Report)',
@@ -205,13 +205,13 @@ export const INITIAL_MODULES: QAModule[] = [
     }
   },
   {
-    id: 'mod-ipqc-03',
-    code: 'IPQC-03',
+    id: 'mod-ipqa-03',
+    code: 'IPQA-03',
     titleTh: 'การตรวจวัดด้วยรังสีเอกซ์ (X-Ray Measurement)',
     titleEn: 'X-Ray Coating Weight & Coverage Measurement System',
     descriptionTh: 'บันทึกและวิเคราะห์ค่าความหนาชั้นเคลือบสังกะสี (Zn weight), Flux weight, และ Coverage % ทั้งขอบบน (Up) และขอบล่าง (Lo), พร้อมประเมินผล Pass/Fail อัตโนมัติ, กราฟแนวโน้ม Sparkline, และตั้งค่า Profile Spec (Admin Security)',
     descriptionEn: 'X-ray measurement system for Zn coating weight, Flux weight & Coverage % (Up/Lo), automatic pass/fail judgment, sparkline trends & admin spec manager.',
-    category: 'IPQC',
+    category: 'IPQA',
     iconName: 'Cpu',
     status: 'ACTIVE',
     pinned: true,
@@ -224,8 +224,8 @@ export const INITIAL_MODULES: QAModule[] = [
       { labelTh: 'อัตราผ่านเกณฑ์ (Pass Rate)', labelEn: 'Pass Rate', value: '97.6%', trend: '+0.4%', trendUp: true }
     ],
     specs: {
-      targetUsersTh: 'เจ้าหน้าที่ IPQC, ช่างเทคนิค X-Ray, วิศวกรควบคุมคุณภาพ (QA/QC Engineer)',
-      targetUsersEn: 'IPQC Auditor, X-Ray Technician, QA/QC Engineer',
+      targetUsersTh: 'เจ้าหน้าที่ IPQA, ช่างเทคนิค X-Ray, วิศวกรควบคุมคุณภาพ (QA/QC Engineer)',
+      targetUsersEn: 'IPQA Auditor, X-Ray Technician, QA/QC Engineer',
       checklistItemsCount: 16,
       estimatedTimeMin: 3,
       outputReportTypeTh: 'รายงานผลการตรวจวัด X-Ray (X-Ray Inspection Report)',
@@ -247,13 +247,13 @@ export const INITIAL_MODULES: QAModule[] = [
     }
   },
   {
-    id: 'mod-ipqc-04',
-    code: 'IPQC-04',
+    id: 'mod-ipqa-04',
+    code: 'IPQA-04',
     titleTh: 'การตรวจวัดการเคลือบผิว (Coating Measurement)',
     titleEn: 'Coating Weight, Area, Binder % & Hardness Measurement System',
     descriptionTh: 'บันทึกและคำนวณค่า Coating Width, Area, Total Wt, Dryer Wt, Binder Wt, Coating Weight Up/Lo, Binder %, Amount of Binder และ Hardness พร้อมประเมินผล Pass/Fail อัตโนมัติ, กราฟแนวโน้ม และตั้งค่า Profile Spec',
     descriptionEn: 'Coating thickness, binder weight, coating area, coating weight & hardness measurement system with automatic judgment & trend analysis.',
-    category: 'IPQC',
+    category: 'IPQA',
     iconName: 'Layers',
     status: 'ACTIVE',
     pinned: true,
@@ -266,8 +266,8 @@ export const INITIAL_MODULES: QAModule[] = [
       { labelTh: 'อัตราผ่านเกณฑ์ (Pass Rate)', labelEn: 'Pass Rate', value: '98.2%', trend: '+0.6%', trendUp: true }
     ],
     specs: {
-      targetUsersTh: 'เจ้าหน้าที่ IPQC, ช่างเทคนิค Coating, วิศวกรควบคุมคุณภาพ (QA/QC Engineer)',
-      targetUsersEn: 'IPQC Auditor, Coating Technician, QA/QC Engineer',
+      targetUsersTh: 'เจ้าหน้าที่ IPQA, ช่างเทคนิค Coating, วิศวกรควบคุมคุณภาพ (QA/QC Engineer)',
+      targetUsersEn: 'IPQA Auditor, Coating Technician, QA/QC Engineer',
       checklistItemsCount: 18,
       estimatedTimeMin: 4,
       outputReportTypeTh: 'รายงานผลการตรวจวัด Coating (Coating Measurement Report)',
@@ -289,13 +289,13 @@ export const INITIAL_MODULES: QAModule[] = [
     }
   },
   {
-    id: 'mod-ipqc-05',
-    code: 'IPQC-05',
+    id: 'mod-ipqa-05',
+    code: 'IPQA-05',
     titleTh: 'การตรวจวัดขนาดจากการตัด (Cutting Dimension Measurement)',
     titleEn: 'Cutting Dimension & Tolerance Measurement System',
     descriptionTh: 'บันทึกและตรวจสอบมิติขนาดการตัด (Width, Height, Length, Bending, Camber, Twist) พร้อมเปรียบเทียบค่าพิกัดความคลาดเคลื่อน (Tolerance Limits) ประเมิน PASS/FAIL อัตโนมัติ, กราฟแนวโน้ม และระบบตั้งค่า Profile Spec (Admin Security)',
     descriptionEn: 'Cutting dimension inspection system for Width, Height, Length, Bending, Camber & Twist with automatic tolerance judgment, sparkline trend graphs & admin spec manager.',
-    category: 'IPQC',
+    category: 'IPQA',
     iconName: 'Ruler',
     status: 'ACTIVE',
     pinned: true,
@@ -308,8 +308,8 @@ export const INITIAL_MODULES: QAModule[] = [
       { labelTh: 'อัตราผ่านเกณฑ์ (Pass Rate)', labelEn: 'Pass Rate', value: '99.1%', trend: '+0.5%', trendUp: true }
     ],
     specs: {
-      targetUsersTh: 'เจ้าหน้าที่ IPQC, ช่างตัดชิ้นงาน, วิศวกรควบคุมคุณภาพ (QA/QC Engineer)',
-      targetUsersEn: 'IPQC Auditor, Cutting Operator, QA/QC Engineer',
+      targetUsersTh: 'เจ้าหน้าที่ IPQA, ช่างตัดชิ้นงาน, วิศวกรควบคุมคุณภาพ (QA/QC Engineer)',
+      targetUsersEn: 'IPQA Auditor, Cutting Operator, QA/QC Engineer',
       checklistItemsCount: 16,
       estimatedTimeMin: 3,
       outputReportTypeTh: 'รายงานผลการตรวจวัดขนาดจากการตัด (Cutting Dimension Report)',
@@ -331,13 +331,13 @@ export const INITIAL_MODULES: QAModule[] = [
     }
   },
   {
-    id: 'mod-ipqc-06',
-    code: 'IPQC-06',
+    id: 'mod-ipqa-06',
+    code: 'IPQA-06',
     titleTh: 'การตรวจวัดคุณภาพสารผสม (Mixing Inspection)',
     titleEn: 'Mixing Inspection System & Coating Spec Manager',
     descriptionTh: 'บันทึกและคำนวณข้อมูลการผสมสารเคลือบ (Cup Wt, Coating Wt, Dry 105/430, Binder %, Solid %, Grindometer, Viscosity) ประเมิน PASS/FAIL อัตโนมัติ พร้อม Admin Coating Spec Manager',
     descriptionEn: 'Mixing inspection system for Cup weight, Coating weight, Dry 105/430, Binder %, Solid %, Grindometer & Viscosity with automatic PASS/FAIL evaluation & Admin spec manager.',
-    category: 'IPQC',
+    category: 'IPQA',
     iconName: 'Beaker',
     status: 'ACTIVE',
     pinned: true,
@@ -350,8 +350,8 @@ export const INITIAL_MODULES: QAModule[] = [
       { labelTh: 'อัตราผ่านเกณฑ์ (Pass Rate)', labelEn: 'Mixing Pass Rate', value: '98.5%', trend: '+0.3%', trendUp: true }
     ],
     specs: {
-      targetUsersTh: 'เจ้าหน้าที่ IPQC, ช่างผสมสารเคลือบ (Mixing Operator), วิศวกรเคมี/ควบคุมคุณภาพ',
-      targetUsersEn: 'IPQC Auditor, Mixing Operator, Chemical QA/QC Engineer',
+      targetUsersTh: 'เจ้าหน้าที่ IPQA, ช่างผสมสารเคลือบ (Mixing Operator), วิศวกรเคมี/ควบคุมคุณภาพ',
+      targetUsersEn: 'IPQA Auditor, Mixing Operator, Chemical QA/QC Engineer',
       checklistItemsCount: 14,
       estimatedTimeMin: 4,
       outputReportTypeTh: 'รายงานผลการตรวจวัดสารผสม (Mixing Inspection Cloud Report)',
@@ -373,13 +373,13 @@ export const INITIAL_MODULES: QAModule[] = [
     }
   },
   {
-    id: 'mod-ipqc-07',
-    code: 'IPQC-07',
+    id: 'mod-ipqa-07',
+    code: 'IPQA-07',
     titleTh: 'วัดความหนาผนังชิ้นงาน (Thickness Wall Measurement)',
     titleEn: 'Thickness Wall Measurement System & Profile Spec Manager',
     descriptionTh: 'สกัดและวิเคราะห์ข้อมูลความหนาผนังชิ้นงานจากไฟล์ PDF/รูปถ่าย ด้วย AI (Gemini 2.5) ตรวจสอบค่า T1-T5, OR, IR, IHR, OHW, IHW, RA, IOR เทียบกับ Profile Spec พร้อม Dashboard สรุปผล และ Export Excel',
     descriptionEn: 'AI-powered thickness wall measurement system (Gemini 2.5) for T1-T5, OR, IR, IHR, OHW, IHW, RA, IOR data extraction, profile spec verification, interactive dashboard & Excel export.',
-    category: 'IPQC',
+    category: 'IPQA',
     iconName: 'Ruler',
     status: 'ACTIVE',
     pinned: true,
@@ -392,8 +392,8 @@ export const INITIAL_MODULES: QAModule[] = [
       { labelTh: 'อัตราผ่านเกณฑ์ (Pass Rate)', labelEn: 'Thickness Pass Rate', value: '98.8%', trend: '+0.4%', trendUp: true }
     ],
     specs: {
-      targetUsersTh: 'เจ้าหน้าที่ IPQC, ช่างวัดมิติชิ้นงาน, วิศวกรควบคุมคุณภาพ (QA/QC Engineer)',
-      targetUsersEn: 'IPQC Auditor, Dimension Inspector, QA/QC Engineer',
+      targetUsersTh: 'เจ้าหน้าที่ IPQA, ช่างวัดมิติชิ้นงาน, วิศวกรควบคุมคุณภาพ (QA/QC Engineer)',
+      targetUsersEn: 'IPQA Auditor, Dimension Inspector, QA/QC Engineer',
       checklistItemsCount: 18,
       estimatedTimeMin: 3,
       outputReportTypeTh: 'รายงานตรวจวัดความหนาผนังชิ้นงาน (Thickness Wall Measurement Report)',
@@ -415,13 +415,13 @@ export const INITIAL_MODULES: QAModule[] = [
     }
   },
   {
-    id: 'mod-oqc-01',
-    code: 'OQC-01',
+    id: 'mod-oqa-01',
+    code: 'OQA-01',
     titleTh: 'ตรวจสินค้าก่อนจัดส่ง FG Pre-Shipment (Tag Label Checker)',
     titleEn: 'FG Pre-Shipment Tag Label Checker & AI Comparison System',
     descriptionTh: 'วิเคราะห์และเปรียบเทียบข้อมูลป้าย Tag Label ด้วย AI 2-Step Analysis (ดึงข้อมูล Auto-Fill และเปรียบเทียบ Reference vs Test Image), จัดการ Master Spec, สรุปประวัติ และส่งออก Excel',
     descriptionEn: 'FG Pre-Shipment Inspection system with 2-Step AI Label Analysis (auto-fill extraction & Reference vs Test image comparison), Master Spec profile manager, history log & Excel export.',
-    category: 'OQC',
+    category: 'OQA',
     iconName: 'TruckCheck',
     status: 'ACTIVE',
     pinned: true,
@@ -434,8 +434,8 @@ export const INITIAL_MODULES: QAModule[] = [
       { labelTh: 'อัตราถูกต้อง (Pass Rate)', labelEn: 'Tag Accuracy Rate', value: '98.8%', trend: '+0.5%', trendUp: true }
     ],
     specs: {
-      targetUsersTh: 'เจ้าหน้าที่ OQC, เจ้าหน้าที่จัดส่งและคลังสินค้า, วิศวกรประกันคุณภาพ (QA/QC Engineer)',
-      targetUsersEn: 'OQC Inspector, Shipping & Logistics Specialist, QA/QC Engineer',
+      targetUsersTh: 'เจ้าหน้าที่ OQA, เจ้าหน้าที่จัดส่งและคลังสินค้า, วิศวกรประกันคุณภาพ (QA/QC Engineer)',
+      targetUsersEn: 'OQA Inspector, Shipping & Logistics Specialist, QA/QC Engineer',
       checklistItemsCount: 16,
       estimatedTimeMin: 3,
       outputReportTypeTh: 'รายงานตรวจป้ายฉลากสินค้าก่อนจัดส่ง (FG Pre-Shipment Inspection Report)',
@@ -520,8 +520,8 @@ export const INITIAL_MODULES: QAModule[] = [
       { labelTh: 'ระยะเวลาปิดงานเฉลี่ย', labelEn: 'Avg. Closure Time', value: '3.2 Days', trend: '-0.8 Days', trendUp: true }
     ],
     specs: {
-      targetUsersTh: 'ทีม QA Manager, วิศวกรประกันคุณภาพ, หัวหน้างานฝ่ายผลิต, เจ้าหน้าที่ IQC/IPQC/OQC',
-      targetUsersEn: 'QA Manager, QA/QC Engineers, Production Supervisors, IQC/IPQC/OQC Officers',
+      targetUsersTh: 'ทีม QA Manager, วิศวกรประกันคุณภาพ, หัวหน้างานฝ่ายผลิต, เจ้าหน้าที่ IQA/IPQA/OQA',
+      targetUsersEn: 'QA Manager, QA/QC Engineers, Production Supervisors, IQA/IPQA/OQA Officers',
       checklistItemsCount: 16,
       estimatedTimeMin: 15,
       outputReportTypeTh: 'รายงานแจ้งของเสีย NCR & แบบฟอร์ม 8D CAPA (CSV/Excel/Print)',
@@ -582,14 +582,14 @@ export const INITIAL_MODULES: QAModule[] = [
     code: 'COI-01',
     titleTh: 'ออกใบรับรองผลการตรวจคุณภาพ (Certificate of Inspection - COI)',
     titleEn: 'Certificate of Inspection & Analysis (COI / COA)',
-    descriptionTh: 'ระบบออกใบรับรองคุณภาพสินค้า Certificate of Inspection (COI) อัตโนมัติจากผลการตรวจ IQC/IPQC/OQC พร้อม QR Verification',
-    descriptionEn: 'Automated Certificate of Inspection (COI / COA) issuance system based on inspection logs with QR code verification.',
+    descriptionTh: 'ระบบออกใบรับรองคุณภาพสินค้า COI พร้อมแท็บออกแบบหัวข้อตรวจสอบตามแต่ละ Profile และแท็บระบุรายละเอียด Coil No., Length เพื่อออกใบรับรองส่งลูกค้าทันที',
+    descriptionEn: 'Automated Certificate of Inspection (COI / COA) with Profile Test Spec Designer and Issue Details Engine.',
     category: 'CERTIFICATE_COI',
     iconName: 'FileCheck',
-    status: 'READY_FOR_DEV',
+    status: 'ACTIVE',
     pinned: true,
     isPopular: true,
-    version: 'v1.0.0',
+    version: 'v1.1.0',
     metrics: [
       { labelTh: 'ออกใบ COI วันนี้', labelEn: 'COI Issued Today', value: '45 Certificates' },
       { labelTh: 'ความถูกต้องแม่นยำ', labelEn: 'Accuracy Rate', value: '100%', trend: '0%', trendUp: true }
@@ -597,19 +597,21 @@ export const INITIAL_MODULES: QAModule[] = [
     specs: {
       targetUsersTh: 'เจ้าหน้าที่ประกันคุณภาพ (QA Officer), QA Manager, ฝ่ายจัดส่ง',
       targetUsersEn: 'QA Officer, QA Manager, Shipping & Logistics Team',
-      checklistItemsCount: 10,
-      estimatedTimeMin: 2,
+      checklistItemsCount: 15,
+      estimatedTimeMin: 1,
       outputReportTypeTh: 'Certificate of Inspection (COI / COA) Official PDF Document',
       outputReportTypeEn: 'Certificate of Inspection (COI / COA) Official PDF Document',
       keyFeaturesTh: [
-        'ดึงข้อมูลผลการตรวจวัดมิติและสเปกอัตโนมัติมาสร้างเป็นเอกสาร COI',
-        'สร้าง QR Code สำหรับตรวจสอบความถูกต้องของเอกสาร COI ออนไลน์',
-        'ส่งออกเป็นไฟล์ PDF มาตรฐาน และส่งอีเมลหาลูกค้าอัตโนมัติ'
+        'แท็บ 1: ออกแบบหัวข้อการตรวจ (COI Design) กำหนดค่าเคมี แรงดึง ผิว ขนาด มิติ ของแต่ละ Profile',
+        'แท็บ 2: ระบุรายละเอียดการออก (Issue Detail) เลือก Profile, Coil No., Length แล้วกดสร้าง COI',
+        'ระบบดึงข้อมูลเกณฑ์มาตรฐานและผลการตรวจจริงจาก Tab Design มาสร้างเป็น COI ส่งลูกค้าทันที',
+        'หน้าแสดงใบรับรองทางการ A4 พร้อมตราประทับ QA และ QR Code สำหรับตรวจสอบย้อนกลับ'
       ],
       keyFeaturesEn: [
-        'Automatic inspection data retrieval for COI document generation',
-        'QR Code generation for digital COI verification',
-        'Export to standard PDF and automated email dispatch'
+        'Tab 1: COI Design Engine to configure chemical, mechanical, surface, and dimension specs per profile',
+        'Tab 2: Issue Details to specify Profile, Coil No., Length and generate official COI',
+        'Auto-populates inspection parameters from Tab Design into customer-ready Certificate',
+        'Printable ISO 9001 standard A4 certificate layout with QA seal and digital verification'
       ]
     }
   }
@@ -619,10 +621,10 @@ export const INITIAL_ACTIVITIES: InspectionActivity[] = [
   {
     id: 'act-101',
     timestamp: '10:45 AM',
-    moduleCode: 'IQC-01',
+    moduleCode: 'IQA-01',
     moduleTitleTh: 'ตรวจรับวัตถุดิบและชิ้นส่วน',
     moduleTitleEn: 'Incoming Material Inspection',
-    inspector: 'สมชาย รักดี (IQC-02)',
+    inspector: 'สมชาย รักดี (IQA-02)',
     batchLot: 'LOT-20260804-001 (Aluminum Alloy Sheet)',
     result: 'PASS',
     remarks: 'AQL 0.65 Level II Compliant'
@@ -630,10 +632,10 @@ export const INITIAL_ACTIVITIES: InspectionActivity[] = [
   {
     id: 'act-102',
     timestamp: '10:30 AM',
-    moduleCode: 'IPQC-01',
+    moduleCode: 'IPQA-01',
     moduleTitleTh: 'การตรวจชิ้นงานแรก & สายการผลิต',
     moduleTitleEn: 'First Piece Line Patrol Check',
-    inspector: 'วิภาวี สุขเจริญ (IPQC-01)',
+    inspector: 'วิภาวี สุขเจริญ (IPQA-01)',
     batchLot: 'LINE-02 (PCB Mainboard Assembly)',
     result: 'PASS',
     remarks: 'Solder joint & component placement verified'
@@ -653,10 +655,10 @@ export const INITIAL_ACTIVITIES: InspectionActivity[] = [
   {
     id: 'act-104',
     timestamp: '09:15 AM',
-    moduleCode: 'OQC-01',
+    moduleCode: 'OQA-01',
     moduleTitleTh: 'ตรวจสินค้าก่อนจัดส่ง FG Pre-Shipment',
     moduleTitleEn: 'FG Pre-Shipment Quality Audit',
-    inspector: 'กิตติพงษ์ ชัยชนะ (OQC Lead)',
+    inspector: 'กิตติพงษ์ ชัยชนะ (OQA Lead)',
     batchLot: 'FG-BATCH-882 (Model X-200 Smart Sensor)',
     result: 'PASS',
     remarks: 'Tag Label & Specification verified'

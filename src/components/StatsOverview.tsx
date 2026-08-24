@@ -33,9 +33,9 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
 
   const categories: { key: QACategory; labelTh: string; labelEn: string; icon: string; color: string }[] = [
     { key: 'ALL', labelTh: 'แอปทั้งหมด', labelEn: 'All Sub-Apps', icon: 'Layers', color: 'bg-slate-800 text-slate-200' },
-    { key: 'IQC', labelTh: 'IQC ตรวจรับวัตถุดิบ', labelEn: 'IQC Incoming', icon: 'PackageCheck', color: 'bg-blue-500/10 text-blue-400 border-blue-500/30' },
-    { key: 'IPQC', labelTh: 'IPQC ตรวจสายผลิต', labelEn: 'IPQC In-Process', icon: 'Activity', color: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
-    { key: 'OQC', labelTh: 'OQC ตรวจจัดส่ง', labelEn: 'OQC Outgoing', icon: 'Truck', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' },
+    { key: 'IQA', labelTh: 'IQA ตรวจรับวัตถุดิบ', labelEn: 'IQA Incoming', icon: 'PackageCheck', color: 'bg-blue-500/10 text-blue-400 border-blue-500/30' },
+    { key: 'IPQA', labelTh: 'IPQA ตรวจสายผลิต', labelEn: 'IPQA In-Process', icon: 'Activity', color: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+    { key: 'OQA', labelTh: 'OQA ตรวจจัดส่ง', labelEn: 'OQA Outgoing', icon: 'Truck', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' },
     { key: 'EQUIPMENT', labelTh: 'เครื่องมือ & สอบเทียบ', labelEn: 'Metrology', icon: 'Wrench', color: 'bg-slate-700/50 text-slate-300 border-slate-600' },
     { key: 'NCR', labelTh: 'NCR & CAPA ของเสีย', labelEn: 'NCR & Defect', icon: 'AlertTriangle', color: 'bg-rose-500/10 text-rose-400 border-rose-500/30' },
     { key: 'ANALYTICS', labelTh: 'วิเคราะห์คุณภาพ', labelEn: 'Analytics', icon: 'BarChart3', color: 'bg-purple-500/10 text-purple-400 border-purple-500/30' },
@@ -63,7 +63,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
             </span>
           </div>
           <p className="text-[10px] text-slate-500 mt-1">
-            {isTh ? 'จาก IQC, IPQC, OQC' : 'Across all QA lines'}
+            {isTh ? 'จาก IQA, IPQA, OQA' : 'Across all QA lines'}
           </p>
         </div>
 

@@ -53,6 +53,7 @@ import { MetrologyCalibrationApp } from './components/MetrologyCalibrationApp';
 import { FgPreShipmentApp } from './components/FgPreShipmentApp';
 import { ThicknessWallApp } from './components/ThicknessWallApp';
 import { NcrManagementApp } from './components/NcrManagementApp';
+import { CoiManagementApp } from './components/CoiManagementApp';
 import { createNcrFromFailInspection, getStoredNcrRecords } from './utils/ncrStorage';
 
 import { 
@@ -213,7 +214,7 @@ export default function App() {
   }, [modules, selectedCategory, searchQuery]);
 
   // If a sub-app is active, render its full application screen (MUST be after all hooks)
-  if (activeSubApp === 'IPQC-01') {
+  if (activeSubApp === 'IPQA-01' || activeSubApp === 'IPQC-01') {
     return (
       <TensileMeasurementApp
         onBackToPortal={() => setActiveSubApp(null)}
@@ -223,7 +224,7 @@ export default function App() {
     );
   }
 
-  if (activeSubApp === 'IPQC-02') {
+  if (activeSubApp === 'IPQA-02' || activeSubApp === 'IPQC-02') {
     return (
       <RoughnessMeasurementApp
         onBackToPortal={() => setActiveSubApp(null)}
@@ -233,7 +234,7 @@ export default function App() {
     );
   }
 
-  if (activeSubApp === 'IPQC-03') {
+  if (activeSubApp === 'IPQA-03' || activeSubApp === 'IPQC-03') {
     return (
       <XRayMeasurementApp
         onBackToPortal={() => setActiveSubApp(null)}
@@ -243,7 +244,7 @@ export default function App() {
     );
   }
 
-  if (activeSubApp === 'IPQC-04') {
+  if (activeSubApp === 'IPQA-04' || activeSubApp === 'IPQC-04') {
     return (
       <CoatingMeasurementApp
         onBackToPortal={() => setActiveSubApp(null)}
@@ -253,7 +254,7 @@ export default function App() {
     );
   }
 
-  if (activeSubApp === 'IPQC-05') {
+  if (activeSubApp === 'IPQA-05' || activeSubApp === 'IPQC-05') {
     return (
       <CuttingDimensionApp
         onBackToPortal={() => setActiveSubApp(null)}
@@ -263,7 +264,7 @@ export default function App() {
     );
   }
 
-  if (activeSubApp === 'IPQC-06') {
+  if (activeSubApp === 'IPQA-06' || activeSubApp === 'IPQC-06') {
     return (
       <MixingInspectionApp
         onBackToPortal={() => setActiveSubApp(null)}
@@ -273,7 +274,7 @@ export default function App() {
     );
   }
 
-  if (activeSubApp === 'IQC-01') {
+  if (activeSubApp === 'IQA-01' || activeSubApp === 'IQC-01') {
     return (
       <BilletIncomingApp
         onBackToPortal={() => setActiveSubApp(null)}
@@ -283,7 +284,7 @@ export default function App() {
     );
   }
 
-  if (activeSubApp === 'IQC-02') {
+  if (activeSubApp === 'IQA-02' || activeSubApp === 'IQC-02') {
     return (
       <ChemicalIncomingApp
         onBackToPortal={() => setActiveSubApp(null)}
@@ -293,7 +294,7 @@ export default function App() {
     );
   }
 
-  if (activeSubApp === 'IQC-03') {
+  if (activeSubApp === 'IQA-03' || activeSubApp === 'IQC-03') {
     return (
       <ZnWireIncomingApp
         onBackToPortal={() => setActiveSubApp(null)}
@@ -313,7 +314,7 @@ export default function App() {
     );
   }
 
-  if (activeSubApp === 'OQC-01') {
+  if (activeSubApp === 'OQA-01' || activeSubApp === 'OQC-01') {
     return (
       <FgPreShipmentApp
         onBackToPortal={() => setActiveSubApp(null)}
@@ -323,7 +324,7 @@ export default function App() {
     );
   }
 
-  if (activeSubApp === 'IPQC-07') {
+  if (activeSubApp === 'IPQA-07' || activeSubApp === 'IPQC-07') {
     return (
       <ThicknessWallApp
         onBackToPortal={() => setActiveSubApp(null)}
@@ -337,6 +338,17 @@ export default function App() {
     return (
       <NcrManagementApp
         onBackToPortal={() => setActiveSubApp(null)}
+        onLogNewActivity={handleAddTestActivity}
+        language={language}
+      />
+    );
+  }
+
+  if (activeSubApp === 'COI-01') {
+    return (
+      <CoiManagementApp
+        onBackToPortal={() => setActiveSubApp(null)}
+        onBackToMenu={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
       />
@@ -427,34 +439,35 @@ export default function App() {
             <ModuleGrid
               modules={filteredModules}
               onSelectModule={(mod) => {
-                if (mod.code === 'IPQC-01') {
-                  setActiveSubApp('IPQC-01');
-                } else if (mod.code === 'IPQC-02') {
-                  setActiveSubApp('IPQC-02');
-                } else if (mod.code === 'IPQC-03') {
-                  setActiveSubApp('IPQC-03');
-                } else if (mod.code === 'IPQC-04') {
-                  setActiveSubApp('IPQC-04');
-                } else if (mod.code === 'IPQC-05') {
-                  setActiveSubApp('IPQC-05');
-                } else if (mod.code === 'IPQC-06') {
-                  setActiveSubApp('IPQC-06');
-                } else if (mod.code === 'IQC-01') {
-                  setActiveSubApp('IQC-01');
-                } else if (mod.code === 'IQC-02') {
-                  setActiveSubApp('IQC-02');
-                } else if (mod.code === 'IQC-03') {
-                  setActiveSubApp('IQC-03');
+                if (mod.code === 'IPQA-01' || mod.code === 'IPQC-01') {
+                  setActiveSubApp('IPQA-01');
+                } else if (mod.code === 'IPQA-02' || mod.code === 'IPQC-02') {
+                  setActiveSubApp('IPQA-02');
+                } else if (mod.code === 'IPQA-03' || mod.code === 'IPQC-03') {
+                  setActiveSubApp('IPQA-03');
+                } else if (mod.code === 'IPQA-04' || mod.code === 'IPQC-04') {
+                  setActiveSubApp('IPQA-04');
+                } else if (mod.code === 'IPQA-05' || mod.code === 'IPQC-05') {
+                  setActiveSubApp('IPQA-05');
+                } else if (mod.code === 'IPQA-06' || mod.code === 'IPQC-06') {
+                  setActiveSubApp('IPQA-06');
+                } else if (mod.code === 'IQA-01' || mod.code === 'IQC-01') {
+                  setActiveSubApp('IQA-01');
+                } else if (mod.code === 'IQA-02' || mod.code === 'IQC-02') {
+                  setActiveSubApp('IQA-02');
+                } else if (mod.code === 'IQA-03' || mod.code === 'IQC-03') {
+                  setActiveSubApp('IQA-03');
                 } else if (mod.code === 'EQP-01') {
                   setActiveSubApp('EQP-01');
-                } else if (mod.code === 'OQC-01') {
-                  setActiveSubApp('OQC-01');
-                } else if (mod.code === 'IPQC-07') {
-                  setActiveSubApp('IPQC-07');
+                } else if (mod.code === 'OQA-01' || mod.code === 'OQC-01') {
+                  setActiveSubApp('OQA-01');
+                } else if (mod.code === 'IPQA-07' || mod.code === 'IPQC-07') {
+                  setActiveSubApp('IPQA-07');
                 } else if (mod.code === 'NCR-01') {
                   setActiveSubApp('NCR-01');
+                } else if (mod.code === 'COI-01') {
+                  setActiveSubApp('COI-01');
                 } else {
-
                   setSelectedModuleForDetail(mod);
                 }
               }}

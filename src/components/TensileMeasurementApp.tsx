@@ -25,7 +25,11 @@ import {
   TrendingUp,
   Sliders,
   Cpu,
-  Edit3
+  Edit3,
+  Sparkles,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -470,36 +474,120 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     }
   };
 
-  // Spec Settings Operations
-  const handleAddSpecRow = () => {
-    setSpecs(prev => [
-      ...prev,
-      {
-        id: `spec-${Date.now()}`,
-        profile: 'NEW_PROFILE',
-        process: 'HOT_ROLL',
-        min_w: 10.0,
-        max_w: 15.0,
-        min_h: 2.0,
-        max_h: 4.0,
-        tensile: 400,
-        yield: 250,
-        elong: 20
-      }
-    ]);
+  // Quality Specs Form & State (Empty inputs ready for user data entry)
+  const [newSpecForm, setNewSpecForm] = useState({
+    profile: '',
+    process: '',
+    min_w: '',
+    max_w: '',
+    min_h: '',
+    max_h: '',
+    tensile: '',
+    yield: '',
+    elong: ''
+  });
+  const [newSpecError, setNewSpecError] = useState('');
+  const [newSpecSuccessMsg, setNewSpecSuccessMsg] = useState('');
+  const [specSearchQuery, setSpecSearchQuery] = useState('');
+  const [editingSpec, setEditingSpec] = useState<TensileQualitySpec | null>(null);
+
+  // Handle Save New Profile Spec (takes empty form inputs, validates and stores)
+  const handleSaveNewSpec = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newSpecForm.profile.trim()) {
+      setNewSpecError(isTh ? 'กรุณาระบุชื่อ Profile Name' : 'Please enter Profile Name');
+      return;
+    }
+
+    const cleanProfile = newSpecForm.profile.trim().toUpperCase();
+    const cleanProcess = newSpecForm.process.trim().toUpperCase() || 'HOT_ROLL';
+
+    const newSpecObj: TensileQualitySpec = {
+      id: `spec-${Date.now()}`,
+      profile: cleanProfile,
+      process: cleanProcess,
+      min_w: parseFloat(newSpecForm.min_w) || 0,
+      max_w: parseFloat(newSpecForm.max_w) || 0,
+      min_h: parseFloat(newSpecForm.min_h) || 0,
+      max_h: parseFloat(newSpecForm.max_h) || 0,
+      tensile: parseFloat(newSpecForm.tensile) || 0,
+      yield: parseFloat(newSpecForm.yield) || 0,
+      elong: parseFloat(newSpecForm.elong) || 0
+    };
+
+    const existingIdx = specs.findIndex(s => s.profile.toUpperCase() === cleanProfile);
+    if (existingIdx >= 0) {
+      setSpecs(prev => {
+        const copy = [...prev];
+        copy[existingIdx] = { ...newSpecObj, id: copy[existingIdx].id };
+        return copy;
+      });
+      setNewSpecSuccessMsg(isTh ? `อัปเดตเกณฑ์ Spec สำหรับ "${cleanProfile}" เรียบร้อยแล้ว` : `Updated spec for "${cleanProfile}"`);
+    } else {
+      setSpecs(prev => [newSpecObj, ...prev]);
+      setNewSpecSuccessMsg(isTh ? `บันทึก Profile Spec ใหม่ "${cleanProfile}" เรียบร้อยแล้ว` : `Saved new profile spec "${cleanProfile}"`);
+    }
+
+    // Reset back to empty fields ready for next key-in
+    setNewSpecForm({
+      profile: '',
+      process: '',
+      min_w: '',
+      max_w: '',
+      min_h: '',
+      max_h: '',
+      tensile: '',
+      yield: '',
+      elong: ''
+    });
+    setNewSpecError('');
+    setTimeout(() => setNewSpecSuccessMsg(''), 4000);
   };
 
-  const handleUpdateSpec = (index: number, field: keyof TensileQualitySpec, value: any) => {
-    setSpecs(prev => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
-      return copy;
+  const handleResetNewSpecForm = () => {
+    setNewSpecForm({
+      profile: '',
+      process: '',
+      min_w: '',
+      max_w: '',
+      min_h: '',
+      max_h: '',
+      tensile: '',
+      yield: '',
+      elong: ''
     });
+    setNewSpecError('');
+  };
+
+  const handleSaveEditedSpec = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!editingSpec) return;
+    if (!editingSpec.profile.trim()) {
+      alert(isTh ? 'กรุณาระบุชื่อ Profile Name' : 'Profile Name cannot be empty');
+      return;
+    }
+    setSpecs(prev => prev.map(s => s.id === editingSpec.id ? editingSpec : s));
+    setEditingSpec(null);
   };
 
   const handleDeleteSpec = (id: string) => {
-    setSpecs(prev => prev.filter(s => s.id !== id));
+    const target = specs.find(s => s.id === id);
+    const confirmMsg = isTh 
+      ? `ต้องการลบ Profile Spec "${target?.profile || id}" ใช่หรือไม่?`
+      : `Are you sure you want to delete profile spec "${target?.profile || id}"?`;
+    if (window.confirm(confirmMsg)) {
+      setSpecs(prev => prev.filter(s => s.id !== id));
+      if (mainProfile === target?.profile) {
+        setMainProfile('');
+      }
+    }
   };
+
+  const filteredSpecs = useMemo(() => {
+    if (!specSearchQuery.trim()) return specs;
+    const q = specSearchQuery.trim().toLowerCase();
+    return specs.filter(s => s.profile.toLowerCase().includes(q) || s.process.toLowerCase().includes(q));
+  }, [specs, specSearchQuery]);
 
   // History Filter
   const filteredRecords = useMemo(() => {
@@ -1264,150 +1352,470 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       {/* TAB 4: QUALITY SPECS SETTING (ADMIN) */}
       {activeTab === 'specs' && (
         <div className="space-y-6">
-          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          {/* Header Banner */}
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-cyan-500/10 text-cyan-400 rounded-2xl border border-cyan-500/20">
+                <Settings className="w-6 h-6" />
+              </div>
               <div>
-                <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
-                  <Settings className="w-4 h-4 text-cyan-400" />
-                  {isTh ? 'ตั้งค่าเกณฑ์มาตรฐาน Spec เคมี & แรงดึง' : 'Cloud Quality Spec Configuration'}
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  {isTh ? 'ตั้งค่าเกณฑ์มาตรฐาน Spec เคมี & แรงดึง' : 'Quality Spec Profile Configuration'}
+                  <span className="text-xs font-mono font-normal px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    {specs.length} {isTh ? 'Profiles ที่บันทึก' : 'Profiles'}
+                  </span>
                 </h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  {isTh ? 'กำหนดเกณฑ์มาตรฐานกลางที่จะใช้ร่วมกันทุกเครื่องใน Cloud' : 'Global quality specs used for automated judgment'}
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {isTh 
+                    ? 'จัดการ Profile Spec กลางสำหรับตัดสินผล Pass/Fail อัตโนมัติในโมดูล IPQC-01' 
+                    : 'Manage standard quality criteria for automated Pass/Fail decisions'}
                 </p>
               </div>
+            </div>
 
+            <div className="flex items-center gap-2">
               <button
-                onClick={handleAddSpecRow}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-4 py-2 rounded-xl border border-slate-700 flex items-center gap-1.5 transition"
+                onClick={() => {
+                  alert(isTh ? 'อัปเดตเกณฑ์ Spec ทั้งหมดไปยัง Cloud เรียบร้อยแล้ว' : 'All specs synchronized to Cloud');
+                }}
+                className="bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold text-xs px-4 py-2.5 rounded-xl border border-slate-700 flex items-center gap-2 transition"
               >
-                <Plus className="w-4 h-4 text-cyan-400" />
-                <span>{isTh ? '+ เพิ่ม Profile Spec ใหม่' : 'Add New Spec Profile'}</span>
+                <Save className="w-4 h-4" />
+                <span>{isTh ? '💾 บันทึกขึ้น Cloud' : 'Sync to Cloud'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* SECTION 1: เพิ่ม PROFILE SPEC ใหม่ (ฟิลด์เปล่าเพื่อเตรียม Key ข้อมูล) */}
+          <div className="bg-slate-900/95 border border-cyan-500/30 rounded-2xl p-6 shadow-xl space-y-5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl border border-cyan-500/20">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-cyan-300 uppercase tracking-wider">
+                    {isTh ? '1. เพิ่ม Profile Spec ใหม่ (ฟิลด์เปล่าพร้อมกรอก)' : '1. Add New Profile Spec (Empty Form)'}
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    {isTh ? 'กรอกรายละเอียดและเกณฑ์มาตรฐานของ Profile ใหม่' : 'Key in profile name, process, dimensions and mechanical strength limits'}
+                  </p>
+                </div>
+              </div>
+
+              {newSpecSuccessMsg && (
+                <div className="bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>{newSpecSuccessMsg}</span>
+                </div>
+              )}
+            </div>
+
+            {newSpecError && (
+              <div className="bg-rose-950/80 border border-rose-800 text-rose-300 text-xs px-3.5 py-2 rounded-xl flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400" />
+                <span>{newSpecError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveNewSpec} className="space-y-4">
+              {/* Row 1: Profile & Process Identification */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
+                <div className="lg:col-span-6">
+                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">
+                    {isTh ? 'ชื่อ Profile Name *' : 'Profile Name *'}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={isTh ? 'เช่น HR-A36, CR-SS400, PIPE-STK500, PRO-1200' : 'e.g. HR-A36, CR-SS400, PIPE-STK500'}
+                    value={newSpecForm.profile}
+                    onChange={(e) => {
+                      setNewSpecForm({ ...newSpecForm, profile: e.target.value.toUpperCase() });
+                      if (newSpecError) setNewSpecError('');
+                    }}
+                    className="w-full bg-slate-950 border border-cyan-800/80 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-cyan-300 placeholder-slate-600 uppercase focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div className="lg:col-span-6">
+                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">
+                    {isTh ? 'ชื่อ Process Name' : 'Process Name'}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={isTh ? 'เช่น HOT_ROLL, COLD_ROLL, FORMING, EXTRUSION' : 'e.g. HOT_ROLL, COLD_ROLL, FORMING'}
+                    value={newSpecForm.process}
+                    onChange={(e) => setNewSpecForm({ ...newSpecForm, process: e.target.value.toUpperCase() })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-200 placeholder-slate-600 uppercase focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Dimension Limits */}
+              <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/80 space-y-2">
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">
+                  {isTh ? 'เกณฑ์ขนาด Dimension (mm)' : 'Dimension Limits (mm)'}
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Min Width (mm)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="เช่น 12.0"
+                      value={newSpecForm.min_w}
+                      onChange={(e) => setNewSpecForm({ ...newSpecForm, min_w: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Max Width (mm)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="เช่น 13.0"
+                      value={newSpecForm.max_w}
+                      onChange={(e) => setNewSpecForm({ ...newSpecForm, max_w: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Min Height (mm)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="เช่น 3.0"
+                      value={newSpecForm.min_h}
+                      onChange={(e) => setNewSpecForm({ ...newSpecForm, min_h: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Max Height (mm)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="เช่น 3.5"
+                      value={newSpecForm.max_h}
+                      onChange={(e) => setNewSpecForm({ ...newSpecForm, max_h: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 3: Mechanical Strength Limits */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-slate-950/80 p-3.5 rounded-xl border border-cyan-900/50">
+                  <label className="text-[10px] font-bold text-cyan-400 uppercase block mb-1">Min Tensile (MPa)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    placeholder="เช่น 400"
+                    value={newSpecForm.tensile}
+                    onChange={(e) => setNewSpecForm({ ...newSpecForm, tensile: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-cyan-300 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div className="bg-slate-950/80 p-3.5 rounded-xl border border-emerald-900/50">
+                  <label className="text-[10px] font-bold text-emerald-400 uppercase block mb-1">Min Yield (MPa)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    placeholder="เช่น 250"
+                    value={newSpecForm.yield}
+                    onChange={(e) => setNewSpecForm({ ...newSpecForm, yield: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-emerald-300 placeholder-slate-600 focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+
+                <div className="bg-slate-950/80 p-3.5 rounded-xl border border-amber-900/50">
+                  <label className="text-[10px] font-bold text-amber-400 uppercase block mb-1">Min Elongation (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    placeholder="เช่น 20.0"
+                    value={newSpecForm.elong}
+                    onChange={(e) => setNewSpecForm({ ...newSpecForm, elong: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-amber-300 placeholder-slate-600 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              {/* Form Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleResetNewSpecForm}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition flex items-center justify-center gap-1.5"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>{isTh ? 'ล้างค่า' : 'Clear'}</span>
+                </button>
+                <button
+                  type="submit"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 text-xs font-bold transition shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isTh ? '+ บันทึก Profile Spec นี้' : 'Save New Profile Spec'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* SECTION 2: รายการ PROFILE SPEC ที่บันทึกไปแล้ว (แสดงเฉพาะชื่อ PROFILE และปุ่มแก้ไข/ลบ) */}
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-cyan-400" />
+                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                  {isTh ? '2. รายการ Profile Spec ที่บันทึกแล้ว' : '2. Saved Profile Specs'}
+                </h4>
+                <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">
+                  {filteredSpecs.length} {isTh ? 'รายการ' : 'items'}
+                </span>
+              </div>
+
+              {/* Search Box for Profiles */}
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder={isTh ? 'ค้นหาชื่อ Profile...' : 'Search profile name...'}
+                  value={specSearchQuery}
+                  onChange={(e) => setSpecSearchQuery(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+            </div>
+
+            {/* Saved Profile List - Showing primarily the Profile Name as requested */}
+            {filteredSpecs.length === 0 ? (
+              <div className="text-center py-10 bg-slate-950/60 rounded-xl border border-slate-800/80 space-y-2">
+                <FileText className="w-8 h-8 mx-auto text-slate-600" />
+                <p className="text-xs text-slate-400">
+                  {isTh ? 'ไม่พบ Profile Spec ที่ตรงกับการค้นหา' : 'No profile specs found.'}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {filteredSpecs.map((spec) => (
+                  <div
+                    key={spec.id}
+                    className="bg-slate-950 border border-slate-800 hover:border-cyan-500/50 p-4 rounded-xl transition flex flex-col justify-between space-y-3 group shadow-md"
+                  >
+                    {/* Top Row: Profile Name & Process */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                          <span className="text-sm font-mono font-black text-cyan-300 tracking-wide">
+                            {spec.profile}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
+                            {spec.process || 'HOT_ROLL'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setEditingSpec(JSON.parse(JSON.stringify(spec)))}
+                          className="p-1.5 rounded-lg bg-slate-900 hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 border border-slate-800 hover:border-cyan-800 transition"
+                          title={isTh ? 'แก้ไขค่า Spec' : 'Edit Spec Values'}
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSpec(spec.id)}
+                          className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-800 transition"
+                          title={isTh ? 'ลบ Profile' : 'Delete Profile'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Compact Spec summary badges */}
+                    <div className="bg-slate-900/70 p-2 rounded-lg border border-slate-850 grid grid-cols-3 gap-1.5 text-center text-[10px] font-mono">
+                      <div>
+                        <span className="text-slate-500 block text-[9px]">Tensile</span>
+                        <span className="font-bold text-cyan-400">≥ {spec.tensile}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[9px]">Yield</span>
+                        <span className="font-bold text-emerald-400">≥ {spec.yield}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[9px]">Elong</span>
+                        <span className="font-bold text-amber-400">≥ {spec.elong}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* EDIT SAVED SPEC MODAL */}
+      {editingSpec && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-3xl p-6 space-y-5 shadow-2xl relative my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl border border-cyan-500/20">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {isTh ? 'แก้ไขเกณฑ์มาตรฐาน Profile Spec' : 'Edit Quality Spec Profile'}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Profile: {editingSpec.profile} ({editingSpec.process})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingSpec(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800/80"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Spec Cards List */}
-            <div className="grid grid-cols-1 gap-4">
-              {specs.map((spec, idx) => (
-                <div key={spec.id} className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4 relative hover:border-slate-700 transition">
-                  <button
-                    onClick={() => handleDeleteSpec(spec.id)}
-                    className="absolute top-4 right-4 text-slate-500 hover:text-rose-400 p-1"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+            <form onSubmit={handleSaveEditedSpec} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Profile Name *</label>
+                  <input
+                    type="text"
+                    value={editingSpec.profile}
+                    onChange={(e) => setEditingSpec({ ...editingSpec, profile: e.target.value.toUpperCase() })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-500 uppercase"
+                  />
+                </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-center">
-                    <div className="lg:col-span-4">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Profile Name</label>
-                      <input
-                        type="text"
-                        value={spec.profile}
-                        onChange={(e) => handleUpdateSpec(idx, 'profile', e.target.value.toUpperCase())}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm font-bold text-cyan-300 uppercase focus:outline-none focus:border-cyan-500"
-                      />
-                    </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Process Name</label>
+                  <input
+                    type="text"
+                    value={editingSpec.process}
+                    onChange={(e) => setEditingSpec({ ...editingSpec, process: e.target.value.toUpperCase() })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500 uppercase"
+                  />
+                </div>
+              </div>
 
-                    <div className="lg:col-span-3">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Process Name</label>
-                      <input
-                        type="text"
-                        value={spec.process}
-                        onChange={(e) => handleUpdateSpec(idx, 'process', e.target.value.toUpperCase())}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 uppercase focus:outline-none focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div className="lg:col-span-5 grid grid-cols-4 gap-2 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
-                      <div>
-                        <label className="text-[8px] text-slate-500 uppercase block">Min W</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={spec.min_w}
-                          onChange={(e) => handleUpdateSpec(idx, 'min_w', parseFloat(e.target.value) || 0)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-xs font-mono font-bold text-slate-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[8px] text-slate-500 uppercase block">Max W</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={spec.max_w}
-                          onChange={(e) => handleUpdateSpec(idx, 'max_w', parseFloat(e.target.value) || 0)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-xs font-mono font-bold text-slate-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[8px] text-slate-500 uppercase block">Min H</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={spec.min_h}
-                          onChange={(e) => handleUpdateSpec(idx, 'min_h', parseFloat(e.target.value) || 0)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-xs font-mono font-bold text-slate-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[8px] text-slate-500 uppercase block">Max H</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={spec.max_h}
-                          onChange={(e) => handleUpdateSpec(idx, 'max_h', parseFloat(e.target.value) || 0)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-xs font-mono font-bold text-slate-200"
-                        />
-                      </div>
-                    </div>
+              {/* Dimensions */}
+              <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">
+                  {isTh ? 'ขนาด Dimension (mm)' : 'Dimension Limits (mm)'}
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div>
+                    <label className="text-[9px] text-slate-500 uppercase block">Min W</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={editingSpec.min_w}
+                      onChange={(e) => setEditingSpec({ ...editingSpec, min_w: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+                    />
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="bg-slate-900/90 p-3 rounded-xl border border-cyan-900/40">
-                      <label className="text-[9px] font-bold text-cyan-400 uppercase block mb-1">Min Tensile (MPa)</label>
-                      <input
-                        type="number"
-                        step="1"
-                        value={spec.tensile}
-                        onChange={(e) => handleUpdateSpec(idx, 'tensile', parseFloat(e.target.value) || 0)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-cyan-300"
-                      />
-                    </div>
-
-                    <div className="bg-slate-900/90 p-3 rounded-xl border border-emerald-900/40">
-                      <label className="text-[9px] font-bold text-emerald-400 uppercase block mb-1">Min Yield (MPa)</label>
-                      <input
-                        type="number"
-                        step="1"
-                        value={spec.yield}
-                        onChange={(e) => handleUpdateSpec(idx, 'yield', parseFloat(e.target.value) || 0)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-emerald-300"
-                      />
-                    </div>
-
-                    <div className="bg-slate-900/90 p-3 rounded-xl border border-amber-900/40">
-                      <label className="text-[9px] font-bold text-amber-400 uppercase block mb-1">Min Elong (%)</label>
-                      <input
-                        type="number"
-                        step="1"
-                        value={spec.elong}
-                        onChange={(e) => handleUpdateSpec(idx, 'elong', parseFloat(e.target.value) || 0)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-amber-300"
-                      />
-                    </div>
+                  <div>
+                    <label className="text-[9px] text-slate-500 uppercase block">Max W</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={editingSpec.max_w}
+                      onChange={(e) => setEditingSpec({ ...editingSpec, max_w: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-slate-500 uppercase block">Min H</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={editingSpec.min_h}
+                      onChange={(e) => setEditingSpec({ ...editingSpec, min_h: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-slate-500 uppercase block">Max H</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={editingSpec.max_h}
+                      onChange={(e) => setEditingSpec({ ...editingSpec, max_h: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
 
-            <button
-              onClick={() => {
-                alert(isTh ? 'อัปเดตเกณฑ์ Spec ไปยัง Cloud เรียบร้อยแล้ว' : 'Cloud specs updated');
-              }}
-              className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-cyan-500/20 transition flex items-center justify-center gap-2"
-            >
-              <Save className="w-4 h-4" />
-              <span>{isTh ? '💾 บันทึกและอัปเดตข้อมูล Spec ไปยัง Cloud' : 'Save & Sync Specs to Cloud'}</span>
-            </button>
+              {/* Strength values */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-slate-950 p-3 rounded-xl border border-cyan-900/40">
+                  <label className="text-[9px] font-bold text-cyan-400 uppercase block mb-1">Min Tensile (MPa)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={editingSpec.tensile}
+                    onChange={(e) => setEditingSpec({ ...editingSpec, tensile: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div className="bg-slate-950 p-3 rounded-xl border border-emerald-900/40">
+                  <label className="text-[9px] font-bold text-emerald-400 uppercase block mb-1">Min Yield (MPa)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={editingSpec.yield}
+                    onChange={(e) => setEditingSpec({ ...editingSpec, yield: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="bg-slate-950 p-3 rounded-xl border border-amber-900/40">
+                  <label className="text-[9px] font-bold text-amber-400 uppercase block mb-1">Min Elong (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editingSpec.elong}
+                    onChange={(e) => setEditingSpec({ ...editingSpec, elong: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-300 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingSpec(null)}
+                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-3 rounded-xl transition"
+                >
+                  {isTh ? 'ยกเลิก' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs py-3 rounded-xl transition shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isTh ? 'บันทึกการแก้ไข' : 'Save Changes'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
