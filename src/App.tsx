@@ -33,6 +33,7 @@ import {
   QAModule, 
   QACategory, 
   Language, 
+  ThemeMode,
   UserRole, 
   InspectionActivity, 
   SystemMetrics, 
@@ -84,10 +85,15 @@ export default function App() {
 
 
   // UI Navigation & Controls
+  const [theme, setTheme] = useState<ThemeMode>('light');
   const [language, setLanguage] = useState<Language>('th');
   const [selectedCategory, setSelectedCategory] = useState<QACategory>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMainTab, setActiveMainTab] = useState<'PORTAL' | 'LOGS'>('PORTAL');
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+  };
 
   // Modals
   const [selectedModuleForDetail, setSelectedModuleForDetail] = useState<QAModule | null>(null);
@@ -220,6 +226,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -230,6 +238,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -240,6 +250,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -250,6 +262,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -260,6 +274,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -270,6 +286,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -280,6 +298,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -290,6 +310,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -300,6 +322,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -310,6 +334,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -320,6 +346,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -330,6 +358,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -340,6 +370,8 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -351,18 +383,26 @@ export default function App() {
         onBackToMenu={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
         language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
 
 
+  const isLight = theme === 'light';
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950 flex flex-col antialiased">
+    <div className={`min-h-screen font-sans flex flex-col antialiased transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
+    }`}>
       
       {/* Global Header */}
       <Header
         language={language}
         onLanguageChange={setLanguage}
+        theme={theme}
+        onToggleTheme={toggleTheme}
         userProfile={userProfile}
         onUserProfileChange={(role: UserRole) => setUserProfile({ ...userProfile, role })}
         shiftInfo={shiftInfo}
@@ -382,20 +422,27 @@ export default function App() {
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
           language={language}
+          theme={theme}
           totalModulesCount={modules.length}
           filteredCount={filteredModules.length}
           onOpenNcr={() => setActiveSubApp('NCR-01')}
         />
 
         {/* Main View Switcher Tabs */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+        <div className={`flex items-center justify-between border-b pb-2 ${
+          isLight ? 'border-slate-200' : 'border-slate-800'
+        }`}>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveMainTab('PORTAL')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 border ${
                 activeMainTab === 'PORTAL'
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-cyan-400/50 shadow-md shadow-cyan-500/20'
-                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                  ? isLight
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                    : 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-cyan-400/50 shadow-md shadow-cyan-500/20'
+                  : isLight
+                    ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
               }`}
             >
               <LayoutGrid className="w-4 h-4" />
@@ -406,8 +453,12 @@ export default function App() {
               onClick={() => setActiveMainTab('LOGS')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 border ${
                 activeMainTab === 'LOGS'
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-cyan-400/50 shadow-md shadow-cyan-500/20'
-                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                  ? isLight
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                    : 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-cyan-400/50 shadow-md shadow-cyan-500/20'
+                  : isLight
+                    ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
               }`}
             >
               <Activity className="w-4 h-4" />
@@ -421,13 +472,13 @@ export default function App() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <h2 className={`text-base font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? 'เมนูระบบย่อยการตรวจคุณภาพ (QA Sub-App Modules)' : 'QA Sub-App Modules'}
-                  <span className="text-xs font-normal text-slate-400">
+                  <span className={`text-xs font-normal ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     ({filteredModules.length} {isTh ? 'เมนู' : 'modules'})
                   </span>
                 </h2>
-                <p className="text-xs text-slate-400">
+                <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                   {isTh 
                     ? 'กด "เปิดแอป / ดูสเปค" บนแต่ละเมนู เพื่อเปิดหน้าต่างทดสอบจำลองหรือเตรียมสั่งสร้างแอปย่อย' 
                     : 'Click "Launch / Specs" on any module to open interactive sandbox or view sub-app specs.'}
@@ -473,6 +524,7 @@ export default function App() {
               }}
               onTogglePin={handleTogglePin}
               language={language}
+              theme={theme}
             />
           </div>
         )}
@@ -482,6 +534,7 @@ export default function App() {
           <QuickActivityLog
             activities={activities}
             language={language}
+            theme={theme}
           />
         )}
 
@@ -492,6 +545,7 @@ export default function App() {
         module={selectedModuleForDetail}
         onClose={() => setSelectedModuleForDetail(null)}
         language={language}
+        theme={theme}
         onAddTestActivity={handleAddTestActivity}
         onLaunchApp={handleLaunchApp}
       />
@@ -502,11 +556,13 @@ export default function App() {
         onClose={() => setIsAddModalOpen(false)}
         onAddModule={handleAddModule}
         language={language}
+        theme={theme}
       />
 
       {/* Global Footer */}
-      <Footer language={language} />
+      <Footer language={language} theme={theme} />
 
     </div>
   );
+
 }

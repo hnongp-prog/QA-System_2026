@@ -131,6 +131,7 @@ export interface NcrRecord {
 }
 
 export type Language = 'th' | 'en';
+export type ThemeMode = 'light' | 'dark';
 
 // Billet Incoming Inspection App Types
 export type ChemElementKey = 'Si' | 'Fe' | 'Cu' | 'Mn' | 'Mg' | 'Cr' | 'Zn' | 'Ti' | 'Pb' | 'Cd' | 'Al';
@@ -233,6 +234,8 @@ export interface ChemicalInspectionEntry {
 }
 
 // Tensile Measurement App Types (IPQC-01)
+export type TensileElongMode = 'min' | 'max' | 'both';
+
 export interface TensileQualitySpec {
   id: string;
   profile: string;
@@ -243,7 +246,9 @@ export interface TensileQualitySpec {
   max_h: number;
   tensile: number;
   yield: number;
-  elong: number;
+  elong: number; // Min value (or single limit value)
+  elong_max?: number; // Max value when mode is 'max' or 'both'
+  elong_mode?: TensileElongMode; // 'min' (≥ Min), 'max' (≤ Max), or 'both' (Min ~ Max)
 }
 
 export interface TensileRecord {

@@ -20,13 +20,14 @@ import {
   UserCheck,
   Download
 } from 'lucide-react';
-import { QAModule, Language, InspectionActivity } from '../types';
+import { QAModule, Language, InspectionActivity, ThemeMode } from '../types';
 import { IconRenderer } from './IconRenderer';
 
 interface ModuleDetailModalProps {
   module: QAModule | null;
   onClose: () => void;
   language: Language;
+  theme?: ThemeMode;
   onAddTestActivity: (activity: InspectionActivity) => void;
   onLaunchApp?: (moduleCode: string) => void;
 }
@@ -35,12 +36,14 @@ export const ModuleDetailModal: React.FC<ModuleDetailModalProps> = ({
   module,
   onClose,
   language,
+  theme = 'light',
   onAddTestActivity,
   onLaunchApp
 }) => {
   if (!module) return null;
 
   const isTh = language === 'th';
+  const isLight = theme === 'light';
   const [activeTab, setActiveTab] = useState<'sandbox' | 'specs' | 'prompt'>('sandbox');
   const [copiedPrompt, setCopiedPrompt] = useState(false);
 
@@ -78,19 +81,18 @@ ${module.specs.keyFeaturesTh.map((f, i) => `   - ${f}`).join('\n')}
     setTimeout(() => setCopiedPrompt(false), 2000);
   };
 
-  const handleSimulateInspectionSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogTest = () => {
     const newActivity: InspectionActivity = {
-      id: `act-${Date.now().toString().slice(-4)}`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      id: `act-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       moduleCode: module.code,
       moduleTitleTh: module.titleTh,
       moduleTitleEn: module.titleEn,
       inspector: testInspector,
       batchLot: testLot,
       result: testResult,
-      defectCount: testResult === 'FAIL' ? (testDefectCount || 1) : 0,
-      remarks: testRemarks || (testResult === 'PASS' ? 'Sample test passed all criteria' : 'Defect detected in test sample')
+      defectCount: testResult === 'FAIL' ? Math.max(1, testDefectCount) : 0,
+      remarks: testRemarks || (testResult === 'PASS' ? 'Sample passed standard spec limits' : 'Out of spec detected')
     };
 
     onAddTestActivity(newActivity);
@@ -99,283 +101,271 @@ ${module.specs.keyFeaturesTh.map((f, i) => `   - ${f}`).join('\n')}
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto">
+      <div className={`w-full max-w-3xl border rounded-2xl shadow-2xl overflow-hidden flex flex-col my-8 transition-colors ${
+        isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+      }`}>
         
-        {/* Modal Top Banner */}
-        <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shrink-0">
-              <IconRenderer name={module.iconName} className="w-5 h-5" />
+        {/* Header Ribbon */}
+        <div className={`px-6 py-4 border-b flex items-start justify-between gap-4 ${
+          isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800'
+        }`}>
+          <div className="flex items-start gap-3.5">
+            <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${
+              isLight ? 'bg-white border-slate-200 text-blue-600 shadow-xs' : 'bg-slate-900 border-slate-800 text-cyan-400'
+            }`}>
+              <IconRenderer name={module.iconName} className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded border ${
+                  isLight ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-cyan-950 text-cyan-300 border-cyan-800'
+                }`}>
                   {module.code}
                 </span>
-                <span className="text-xs text-slate-400">|</span>
-                <span className="text-xs text-emerald-400 font-medium flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  {module.status === 'ACTIVE' ? (isTh ? 'เปิดใช้งานแอปพลิเคชันแล้ว (Live App)' : 'Live App') : module.status === 'READY_FOR_DEV' ? (isTh ? 'พร้อมรับโจทย์สร้างแอปย่อย' : 'Ready for Sub-App Dev') : module.status}
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                  isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-slate-800 text-slate-300 border-slate-700'
+                }`}>
+                  {module.category}
                 </span>
               </div>
-              <h2 className="text-lg font-bold text-white mt-0.5">{title}</h2>
+              <h2 className={`text-lg font-bold mt-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                {title}
+              </h2>
+              <p className={`text-xs line-clamp-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                {description}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {onLaunchApp && (
-              <button
-                onClick={() => {
-                  onLaunchApp(module.code);
-                  onClose();
-                }}
-                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-500/20 active:scale-95 transition"
-              >
-                <Play className="w-4 h-4 fill-slate-950" />
-                <span>{isTh ? 'เปิดใช้งานแอปย่อยนี้' : 'Launch Sub-App'}</span>
-              </button>
-            )}
-
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className={`p-2 rounded-xl border transition ${
+              isLight 
+                ? 'text-slate-400 hover:text-slate-700 bg-white border-slate-200 hover:bg-slate-100' 
+                : 'text-slate-400 hover:text-white bg-slate-800/80 border-slate-700'
+            }`}
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="px-6 bg-slate-900 border-b border-slate-800 flex items-center gap-2 pt-2">
+        {/* Tab Switcher */}
+        <div className={`flex items-center gap-2 px-6 py-2.5 border-b text-xs font-bold ${
+          isLight ? 'bg-slate-100/50 border-slate-200 text-slate-600' : 'bg-slate-900 border-slate-800 text-slate-400'
+        }`}>
           <button
             onClick={() => setActiveTab('sandbox')}
-            className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition flex items-center gap-2 border-b-2 ${
+            className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
               activeTab === 'sandbox'
-                ? 'border-cyan-400 text-cyan-300 bg-slate-800/80'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? isLight ? 'bg-white text-blue-600 shadow-xs border border-slate-200' : 'bg-slate-800 text-cyan-400'
+                : 'hover:text-slate-900'
             }`}
           >
             <Play className="w-3.5 h-3.5" />
-            <span>{isTh ? '1. ทดลองจำลองใช้งาน (Interactive Sandbox)' : '1. Interactive Sandbox'}</span>
+            <span>{isTh ? 'จำลองส่งผลตรวจ (Interactive Sandbox)' : 'Interactive Sandbox'}</span>
           </button>
-
+          
           <button
             onClick={() => setActiveTab('specs')}
-            className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition flex items-center gap-2 border-b-2 ${
+            className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
               activeTab === 'specs'
-                ? 'border-cyan-400 text-cyan-300 bg-slate-800/80'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? isLight ? 'bg-white text-blue-600 shadow-xs border border-slate-200' : 'bg-slate-800 text-cyan-400'
+                : 'hover:text-slate-900'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>{isTh ? '2. ข้อกำหนดสเปค (System Specs)' : '2. System Specs'}</span>
+            <span>{isTh ? 'สเปคระบบย่อย (Specs & Architecture)' : 'Sub-App Specifications'}</span>
           </button>
 
           <button
             onClick={() => setActiveTab('prompt')}
-            className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition flex items-center gap-2 border-b-2 ${
+            className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
               activeTab === 'prompt'
-                ? 'border-cyan-400 text-cyan-300 bg-slate-800/80'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? isLight ? 'bg-white text-blue-600 shadow-xs border border-slate-200' : 'bg-slate-800 text-cyan-400'
+                : 'hover:text-slate-900'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>{isTh ? '3. ข้อความสำหรับคำสั่งสร้างแอปย่อย (AI Prompt)' : '3. AI Prompt Specs'}</span>
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span>{isTh ? 'คัดลอกคำสั่งสร้างแอป (AI Prompt)' : 'Sub-App Builder Prompt'}</span>
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6">
-
-          {/* TAB 1: SANDBOX SIMULATOR */}
+        <div className="p-6 space-y-5 flex-1 overflow-y-auto max-h-[60vh]">
+          
+          {/* TAB 1: SANDBOX */}
           {activeTab === 'sandbox' && (
-            <div className="space-y-6">
-              <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs text-slate-300 flex items-start gap-3">
-                <Zap className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-bold text-white text-sm">
-                    {isTh ? 'พื้นที่ทดสอบจำลองกระบวนการแอปย่อย (Sub-App Sandbox)' : 'Sub-App Interactive Sandbox'}
-                  </h4>
-                  <p className="mt-1 text-slate-400 leading-relaxed">
-                    {isTh 
-                      ? 'คุณสามารถทดลองกรอกข้อมูลจำลองและบันทึกผลการตรวจ เพื่อทดสอบความสมบูรณ์ของระบบเมนูหลักก่อนที่จะสร้างแอปย่อยเต็มรูปแบบในขั้นตอนถัดไป' 
-                      : 'Test simulate inspecting and logging results to verify the workflow before full sub-app module implementation.'}
-                  </p>
+            <div className="space-y-4">
+              <div className={`p-4 rounded-xl border ${
+                isLight ? 'bg-blue-50/60 border-blue-200 text-slate-700' : 'bg-cyan-950/40 border-cyan-800/60 text-slate-300'
+              }`}>
+                <div className="flex items-center gap-2 font-semibold text-xs mb-1">
+                  <Play className="w-4 h-4 text-blue-600" />
+                  <span>{isTh ? 'การทดสอบจำลองส่งข้อมูลจากแอปย่อยนี้เข้า Portal' : 'Live Data Simulation'}</span>
                 </div>
+                <p className="text-[11px] leading-relaxed">
+                  {isTh 
+                    ? 'คุณสามารถจำลองการสุ่มตรวจ บันทึกผล และส่งกิจกรรมเข้าระบบ Live Log ส่วนกลางได้ทันที' 
+                    : 'Simulate inspection entries directly into the central live QA feed.'}
+                </p>
               </div>
 
-              {/* Sandbox Form */}
-              <form onSubmit={handleSimulateInspectionSubmit} className="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-700">
-                  <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sliders className="w-4 h-4" />
-                    {isTh ? 'ฟอร์มจำลองการตรวจสำหรับ' : 'Simulated Inspection Form:'} {module.code}
-                  </span>
-                  <span className="text-[11px] text-slate-400 font-mono">
-                    {isTh ? 'มาตรฐาน AQL Level II' : 'AQL Level II Standard'}
-                  </span>
+              {loggedSuccessMsg && (
+                <div className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-semibold animate-in fade-in ${
+                  isLight ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                }`}>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{isTh ? 'บันทึกรายการตรวจสำเร็จ! ข้อมูลถูกส่งเข้า Live Inspection Log เรียบร้อยแล้ว' : 'Record saved to central inspection logs!'}</span>
                 </div>
+              )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      {isTh ? 'หมายเลขลอต / Batch Number' : 'Batch / Lot Number'}
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={testLot}
-                        onChange={(e) => setTestLot(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 font-mono"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setTestLot(`LOT-2026-${Math.floor(100 + Math.random() * 900)}`)}
-                        className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 shrink-0"
-                        title="Generate mock Lot ID"
-                      >
-                        <QrCode className="w-3.5 h-3.5" />
-                        <span>Scan</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      {isTh ? 'ชื่อผู้ตรวจประเมิน' : 'Inspector Name'}
-                    </label>
-                    <input
-                      type="text"
-                      value={testInspector}
-                      onChange={(e) => setTestInspector(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Result Toggle */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    {isTh ? 'ผลการตรวจทดสอบ (Inspection Decision)' : 'Inspection Decision'}
+                  <label className={`block text-xs font-semibold mb-1 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isTh ? 'รหัสล็อต / Coil No. / Batch No.' : 'Batch / Lot No.'}
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setTestResult('PASS')}
-                      className={`py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border ${
-                        testResult === 'PASS'
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500 shadow-md shadow-emerald-950/50'
-                          : 'bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-800'
-                      }`}
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>{isTh ? 'ผ่านเกณฑ์ (PASS)' : 'PASS / Approved'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setTestResult('FAIL')}
-                      className={`py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border ${
-                        testResult === 'FAIL'
-                          ? 'bg-rose-500/20 text-rose-300 border-rose-500 shadow-md shadow-rose-950/50'
-                          : 'bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-800'
-                      }`}
-                    >
-                      <XCircle className="w-4 h-4" />
-                      <span>{isTh ? 'ไม่ผ่าน (FAIL / Reject)' : 'FAIL / Reject'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {testResult === 'FAIL' && (
-                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl space-y-2 animate-fadeIn">
-                    <label className="block text-xs font-medium text-rose-300">
-                      {isTh ? 'จำนวนชิ้นงานเสียที่พบ (Defect Count)' : 'Defect Count Detected'}
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={testDefectCount}
-                      onChange={(e) => setTestDefectCount(parseInt(e.target.value) || 0)}
-                      className="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    {isTh ? 'หมายเหตุ / ข้อสังเกตเพิ่มเติม (Inspection Remarks)' : 'Inspection Remarks'}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={testRemarks}
-                    onChange={(e) => setTestRemarks(e.target.value)}
-                    placeholder={isTh ? 'ระบุผลการตรวจสอบมิติ หรือข้อเสนอแนะ...' : 'Enter dimension results or remarks...'}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+                  <input
+                    type="text"
+                    value={testLot}
+                    onChange={(e) => setTestLot(e.target.value)}
+                    className={`w-full px-3 py-2 text-xs rounded-lg border font-mono transition ${
+                      isLight ? 'bg-white border-slate-300 text-slate-900 focus:border-blue-600' : 'bg-slate-800 border-slate-700 text-slate-100'
+                    }`}
                   />
                 </div>
 
-                <div className="pt-2 flex items-center justify-between">
-                  <button
-                    type="submit"
-                    className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition active:scale-95 shadow-md shadow-cyan-500/20"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>{isTh ? 'บันทึกการตรวจจำลอง' : 'Log Test Inspection'}</span>
-                  </button>
-
-                  {loggedSuccessMsg && (
-                    <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 bg-emerald-950/80 px-3 py-1 rounded-md border border-emerald-800">
-                      <Check className="w-3.5 h-3.5" />
-                      {isTh ? 'บันทึกข้อมูลเข้าแดชบอร์ดแล้ว!' : 'Inspection logged to dashboard!'}
-                    </span>
-                  )}
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* TAB 2: SYSTEM SPECS */}
-          {activeTab === 'specs' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-                  <span className="text-[11px] text-slate-400 block">{isTh ? 'ผู้ใช้งานเป้าหมาย' : 'Target Persona'}</span>
-                  <span className="text-xs font-bold text-cyan-300 mt-1 block">
-                    {isTh ? module.specs.targetUsersTh : module.specs.targetUsersEn}
-                  </span>
+                <div>
+                  <label className={`block text-xs font-semibold mb-1 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isTh ? 'ผู้ตรวจสอบ (Inspector)' : 'Inspector Name'}
+                  </label>
+                  <input
+                    type="text"
+                    value={testInspector}
+                    onChange={(e) => setTestInspector(e.target.value)}
+                    className={`w-full px-3 py-2 text-xs rounded-lg border transition ${
+                      isLight ? 'bg-white border-slate-300 text-slate-900 focus:border-blue-600' : 'bg-slate-800 border-slate-700 text-slate-100'
+                    }`}
+                  />
                 </div>
 
-                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-                  <span className="text-[11px] text-slate-400 block">{isTh ? 'รายการเช็คลิสต์' : 'Checklist Items'}</span>
-                  <span className="text-xs font-bold text-emerald-400 mt-1 block">
-                    {module.specs.checklistItemsCount} {isTh ? 'รายการมาตรฐาน' : 'Standard Items'}
-                  </span>
+                <div>
+                  <label className={`block text-xs font-semibold mb-1 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isTh ? 'ผลการตรวจสอบ (Result)' : 'Inspection Decision'}
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTestResult('PASS')}
+                      className={`py-2 rounded-lg text-xs font-bold border transition flex items-center justify-center gap-1.5 ${
+                        testResult === 'PASS'
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : isLight ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>PASS (ผ่านเกณฑ์)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTestResult('FAIL')}
+                      className={`py-2 rounded-lg text-xs font-bold border transition flex items-center justify-center gap-1.5 ${
+                        testResult === 'FAIL'
+                          ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                          : isLight ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>FAIL (ตกสเปค)</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-                  <span className="text-[11px] text-slate-400 block">{isTh ? 'รูปแบบรายงานออก' : 'Report Format'}</span>
-                  <span className="text-xs font-bold text-indigo-300 mt-1 block">
-                    {isTh ? module.specs.outputReportTypeTh : module.specs.outputReportTypeEn}
-                  </span>
+                <div>
+                  <label className={`block text-xs font-semibold mb-1 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isTh ? 'จำนวนจุดเสีย (Defect Points)' : 'Defect Count'}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={testDefectCount}
+                    onChange={(e) => setTestDefectCount(Number(e.target.value))}
+                    disabled={testResult === 'PASS'}
+                    className={`w-full px-3 py-2 text-xs rounded-lg border font-mono transition ${
+                      testResult === 'PASS' 
+                        ? 'opacity-40 cursor-not-allowed bg-slate-100 border-slate-200'
+                        : isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-slate-800 border-slate-700 text-slate-100'
+                    }`}
+                  />
                 </div>
               </div>
 
               <div>
-                <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                  {isTh ? 'ฟีเจอร์หลักของแอปพลิเคชันย่อยนี้ (Key Modules & Features)' : 'Key Modules & Features'}
+                <label className={`block text-xs font-semibold mb-1 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                  {isTh ? 'หมายเหตุเพิ่มเติม (Remarks)' : 'Remarks'}
+                </label>
+                <input
+                  type="text"
+                  value={testRemarks}
+                  onChange={(e) => setTestRemarks(e.target.value)}
+                  placeholder={isTh ? 'เช่น ค่าความหนาต่ำกว่าเกณฑ์ 0.05 mm' : 'e.g., Wall thickness deviation observed'}
+                  className={`w-full px-3 py-2 text-xs rounded-lg border transition ${
+                    isLight ? 'bg-white border-slate-300 text-slate-900 focus:border-blue-600' : 'bg-slate-800 border-slate-700 text-slate-100'
+                  }`}
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleLogTest}
+                  className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-xs px-5 py-2.5 rounded-lg shadow-sm hover:shadow transition active:scale-95"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isTh ? 'ส่งผลตรวจเข้า Live Feed' : 'Submit to Live Feed'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: SPECS */}
+          {activeTab === 'specs' && (
+            <div className="space-y-4 text-xs">
+              <div className={`p-4 rounded-xl border ${
+                isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+              }`}>
+                <h4 className={`font-bold text-xs mb-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  {isTh ? 'สเปคและขอบเขตฟังก์ชันของแอปย่อยนี้' : 'Sub-App Specifications & Scope'}
                 </h4>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {(isTh ? module.specs.keyFeaturesTh : module.specs.keyFeaturesEn).map((feat, i) => (
-                    <li key={i} className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3 text-xs text-slate-200 flex items-start gap-2.5">
-                      <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
-                        {i + 1}
-                      </span>
-                      <span>{feat}</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+                  <div>
+                    <span className={isLight ? 'text-slate-500 font-semibold' : 'text-slate-400'}>
+                      {isTh ? 'กลุ่มผู้ใช้งาน:' : 'Target Users:'}
+                    </span>
+                    <p className={`font-semibold mt-0.5 ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+                      {isTh ? module.specs.targetUsersTh : module.specs.targetUsersEn}
+                    </p>
+                  </div>
+                  <div>
+                    <span className={isLight ? 'text-slate-500 font-semibold' : 'text-slate-400'}>
+                      {isTh ? 'รูปแบบรายงานผล:' : 'Output Report:'}
+                    </span>
+                    <p className={`font-semibold mt-0.5 ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+                      {isTh ? module.specs.outputReportTypeTh : module.specs.outputReportTypeEn}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className={`font-bold text-xs mb-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  {isTh ? 'ฟีเจอร์หลัก (Key Features)' : 'Key Features'}
+                </h4>
+                <ul className="space-y-1.5">
+                  {(isTh ? module.specs.keyFeaturesTh : module.specs.keyFeaturesEn).map((f, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className={isLight ? 'text-slate-700' : 'text-slate-300'}>{f}</span>
                     </li>
                   ))}
                 </ul>
@@ -383,58 +373,57 @@ ${module.specs.keyFeaturesTh.map((f, i) => `   - ${f}`).join('\n')}
             </div>
           )}
 
-          {/* TAB 3: AI PROMPT SPECS */}
+          {/* TAB 3: AI PROMPT BUILDER */}
           {activeTab === 'prompt' && (
-            <div className="space-y-4">
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-xs text-amber-200 flex items-start gap-3">
-                <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-bold text-amber-300">
-                    {isTh ? 'คำสั่งสร้างแอปพลิเคชันย่อยนี้ (Ready-to-use Prompt)' : 'Ready-to-use AI Prompt'}
-                  </h4>
-                  <p className="mt-1 text-slate-300">
-                    {isTh 
-                      ? 'คุณสามารถคัดลอกข้อความด้านล่างนี้ เพื่อนำไปสั่ง AI ให้สร้างระบบแอปย่อยนี้แบบละเอียดได้ทันทีเมื่อระบบเมนูหลักสมบูรณ์แล้ว' 
-                      : 'Copy the formatted prompt below to generate this sub-app module in the next phase.'}
-                  </p>
+            <div className="space-y-3">
+              <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
+                isLight ? 'bg-amber-50/70 border-amber-200 text-amber-900' : 'bg-amber-950/40 border-amber-800 text-amber-300'
+              }`}>
+                <div className="flex items-center gap-2 text-xs font-semibold">
+                  <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span>{isTh ? 'คำสั่งพร้อมใช้สำหรับส่งให้ AI เพื่อสร้างหน้าแอปพลิเคชันย่อยนี้' : 'Ready prompt to generate this sub-app UI'}</span>
                 </div>
-              </div>
-
-              <div className="relative">
-                <pre className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-cyan-300 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-64">
-                  {generatedPromptText}
-                </pre>
-
                 <button
                   onClick={handleCopyPrompt}
-                  className="absolute top-3 right-3 bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-600 transition flex items-center gap-1.5 shadow-md"
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border transition ${
+                    isLight 
+                      ? 'bg-white hover:bg-slate-50 text-slate-800 border-amber-300 shadow-xs' 
+                      : 'bg-amber-900/50 hover:bg-amber-800 text-amber-200 border-amber-700'
+                  }`}
                 >
-                  {copiedPrompt ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400">{isTh ? 'คัดลอกแล้ว!' : 'Copied!'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>{isTh ? 'คัดลอกข้อความ' : 'Copy Prompt'}</span>
-                    </>
-                  )}
+                  {copiedPrompt ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedPrompt ? (isTh ? 'คัดลอกแล้ว!' : 'Copied!') : (isTh ? 'คัดลอกคำสั่ง' : 'Copy Prompt')}</span>
                 </button>
               </div>
+
+              <textarea
+                readOnly
+                value={generatedPromptText}
+                rows={10}
+                className={`w-full p-3 text-xs font-mono rounded-xl border transition ${
+                  isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-slate-950 border-slate-800 text-slate-300'
+                }`}
+              />
             </div>
           )}
 
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-6 py-3.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-          <span>
-            {isTh ? 'QA Main Portal Engine v2.5' : 'QA Main Portal Engine v2.5'}
-          </span>
+        {/* Footer */}
+        <div className={`px-6 py-3.5 border-t flex items-center justify-between gap-3 ${
+          isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800'
+        }`}>
+          <div className={`text-[11px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            Module Status: <span className="text-emerald-600 font-bold">READY</span>
+          </div>
+
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium rounded-lg transition"
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition ${
+              isLight
+                ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+            }`}
           >
             {isTh ? 'ปิดหน้าต่าง' : 'Close'}
           </button>

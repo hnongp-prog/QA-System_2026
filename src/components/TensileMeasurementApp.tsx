@@ -29,7 +29,10 @@ import {
   Sparkles,
   SlidersHorizontal,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ListFilter,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -46,13 +49,45 @@ import {
   TensileQualitySpec, 
   TensileRecord, 
   Language, 
-  InspectionActivity 
+  InspectionActivity,
+  TensileElongMode,
+  ThemeMode
 } from '../types';
+
+export const formatElongationSpec = (spec: TensileQualitySpec): string => {
+  const mode = spec.elong_mode || 'min';
+  if (mode === 'max') {
+    const maxVal = spec.elong_max !== undefined ? spec.elong_max : spec.elong;
+    return `≤ ${maxVal}%`;
+  }
+  if (mode === 'both') {
+    const minVal = spec.elong;
+    const maxVal = spec.elong_max !== undefined ? spec.elong_max : spec.elong;
+    return `${minVal}% - ${maxVal}%`;
+  }
+  return `≥ ${spec.elong}%`;
+};
+
+export const isElongPass = (val: number, spec: TensileQualitySpec): boolean => {
+  const mode = spec.elong_mode || 'min';
+  if (mode === 'max') {
+    const maxVal = spec.elong_max !== undefined ? spec.elong_max : spec.elong;
+    return val <= maxVal;
+  }
+  if (mode === 'both') {
+    const minVal = spec.elong;
+    const maxVal = spec.elong_max !== undefined ? spec.elong_max : spec.elong;
+    return val >= minVal && val <= maxVal;
+  }
+  return val >= spec.elong;
+};
 
 interface TensileMeasurementAppProps {
   onBackToPortal?: () => void;
   onLogNewActivity?: (activity: InspectionActivity) => void;
   language?: Language;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 const DEFAULT_TENSILE_SPECS: TensileQualitySpec[] = [
@@ -66,7 +101,8 @@ const DEFAULT_TENSILE_SPECS: TensileQualitySpec[] = [
     max_h: 3.5,
     tensile: 400.0,
     yield: 250.0,
-    elong: 20.0
+    elong: 20.0,
+    elong_mode: 'min'
   },
   {
     id: 'spec-02',
@@ -78,7 +114,9 @@ const DEFAULT_TENSILE_SPECS: TensileQualitySpec[] = [
     max_h: 2.5,
     tensile: 450.0,
     yield: 275.0,
-    elong: 18.0
+    elong: 18.0,
+    elong_max: 30.0,
+    elong_mode: 'both'
   },
   {
     id: 'spec-03',
@@ -90,7 +128,8 @@ const DEFAULT_TENSILE_SPECS: TensileQualitySpec[] = [
     max_h: 4.8,
     tensile: 500.0,
     yield: 320.0,
-    elong: 15.0
+    elong: 15.0,
+    elong_mode: 'min'
   }
 ];
 
@@ -157,9 +196,12 @@ const INITIAL_RECORDS: TensileRecord[] = [
 export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   onBackToPortal,
   onLogNewActivity,
-  language = 'th'
+  language = 'th',
+  theme = 'light',
+  onToggleTheme
 }) => {
   const isTh = language === 'th';
+  const isLight = theme === 'light';
   const [activeTab, setActiveTab] = useState<'entry' | 'history' | 'dashboard' | 'specs'>('entry');
 
   // Quality Specs state
@@ -180,8 +222,8 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   const [mainMachine, setMainMachine] = useState('');
   const [mainInspector, setMainInspector] = useState('');
 
-  // Entry Test Rows (Clean start for user input, no demo leftover)
-  const [testRows, setTestRows] = useState<{
+  // Active top blank input row for rapid continuous entry
+  const [topRow, setTopRow] = useState<{
     coil_no: string;
     heat_no: string;
     sample_name: string;
@@ -191,19 +233,32 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     tensile: string;
     yield_val: string;
     elong: string;
-  }[]>([
-    {
-      coil_no: '',
-      heat_no: '',
-      sample_name: '',
-      width: '',
-      h_left: '',
-      h_right: '',
-      tensile: '',
-      yield_val: '',
-      elong: ''
-    }
-  ]);
+  }>({
+    coil_no: '',
+    heat_no: '',
+    sample_name: '',
+    width: '',
+    h_left: '',
+    h_right: '',
+    tensile: '',
+    yield_val: '',
+    elong: ''
+  });
+
+  // Entered rows that shift downward as new entries are added
+  const [enteredRows, setEnteredRows] = useState<{
+    id: string;
+    coil_no: string;
+    heat_no: string;
+    sample_name: string;
+    width: string;
+    h_left: string;
+    h_right: string;
+    tensile: string;
+    yield_val: string;
+    elong: string;
+  }[]>([]);
+  const [entrySuccessToast, setEntrySuccessToast] = useState('');
 
   // Admin Modal Security
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -285,28 +340,38 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     }
   };
 
+  const handleResetTopRow = () => {
+    setTopRow({
+      coil_no: '',
+      heat_no: '',
+      sample_name: '',
+      width: '',
+      h_left: '',
+      h_right: '',
+      tensile: '',
+      yield_val: '',
+      elong: ''
+    });
+  };
+
   const handleResetForm = () => {
     setMainProfile('');
     setMainProcess('');
     setMainMachine('');
     setMainInspector('');
-    setTestRows([
-      {
-        coil_no: '',
-        heat_no: '',
-        sample_name: '',
-        width: '',
-        h_left: '',
-        h_right: '',
-        tensile: '',
-        yield_val: '',
-        elong: ''
-      }
-    ]);
+    handleResetTopRow();
+    setEnteredRows([]);
   };
 
   // Single Row Evaluator
-  const evaluateRow = (row: typeof testRows[0]): 'PASS' | 'FAIL' | 'PENDING' => {
+  const evaluateRow = (row: {
+    width: string;
+    h_left: string;
+    h_right: string;
+    tensile: string;
+    yield_val: string;
+    elong: string;
+  }): 'PASS' | 'FAIL' | 'PENDING' => {
     if (!matchedSpec) return 'PENDING';
     const w = parseFloat(row.width);
     const hl = parseFloat(row.h_left);
@@ -322,39 +387,75 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     const passDim = w >= matchedSpec.min_w && w <= matchedSpec.max_w &&
                     hl >= matchedSpec.min_h && hl <= matchedSpec.max_h &&
                     hr >= matchedSpec.min_h && hr <= matchedSpec.max_h;
-    const passTest = t >= matchedSpec.tensile && y >= matchedSpec.yield && e >= matchedSpec.elong;
+    const passTensile = t >= matchedSpec.tensile;
+    const passYield = y >= matchedSpec.yield;
+    const passElong = isElongPass(e, matchedSpec);
 
-    return passDim && passTest ? 'PASS' : 'FAIL';
+    return passDim && passTensile && passYield && passElong ? 'PASS' : 'FAIL';
   };
 
-  // Add Row in Entry
-  const addTestRow = () => {
-    setTestRows(prev => [
-      ...prev,
-      {
-        coil_no: prev.length > 0 ? prev[prev.length - 1].coil_no : '',
-        heat_no: prev.length > 0 ? prev[prev.length - 1].heat_no : '',
-        sample_name: '',
-        width: '',
-        h_left: '',
-        h_right: '',
-        tensile: '',
-        yield_val: '',
-        elong: ''
-      }
-    ]);
-  };
+  // Add Item from Top Row into List (Pushes down previous items)
+  const handleAddFromTopRow = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
 
-  const updateTestRow = (index: number, field: keyof typeof testRows[0], value: string) => {
-    setTestRows(prev => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
-      return copy;
+    // Check if at least some key values are typed
+    const hasValues = topRow.tensile.trim() || topRow.width.trim() || topRow.coil_no.trim() || topRow.sample_name.trim();
+    if (!hasValues) {
+      alert(isTh ? 'กรุณากรอกข้อมูลในฟิลด์แถวด้านบนก่อนกดเพิ่มรายการ' : 'Please enter measurement values in the top row before adding');
+      return;
+    }
+
+    const currentCount = enteredRows.length + 1;
+    const cleanCoil = topRow.coil_no.trim().toUpperCase() || (enteredRows[0]?.coil_no || 'COIL-01');
+    const cleanHeat = topRow.heat_no.trim().toUpperCase() || (enteredRows[0]?.heat_no || 'HEAT-01');
+    const cleanSample = topRow.sample_name.trim().toUpperCase() || `SAMPLE-${String(currentCount).padStart(2, '0')}`;
+
+    const newEntryItem = {
+      id: `entry-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      coil_no: cleanCoil,
+      heat_no: cleanHeat,
+      sample_name: cleanSample,
+      width: topRow.width,
+      h_left: topRow.h_left,
+      h_right: topRow.h_right,
+      tensile: topRow.tensile,
+      yield_val: topRow.yield_val,
+      elong: topRow.elong
+    };
+
+    // Prepend to enteredRows so previous rows shift downward
+    setEnteredRows(prev => [newEntryItem, ...prev]);
+
+    // Keep coil_no and heat_no for continuous entry of same batch, clear numerical fields
+    setTopRow({
+      coil_no: cleanCoil,
+      heat_no: cleanHeat,
+      sample_name: '',
+      width: '',
+      h_left: '',
+      h_right: '',
+      tensile: '',
+      yield_val: '',
+      elong: ''
     });
+
+    setEntrySuccessToast(isTh ? `✓ เพิ่ม ${cleanSample} สำเร็จ (เลื่อนลงสู่รายการด้านล่าง)` : `✓ Added ${cleanSample} successfully`);
+    setTimeout(() => setEntrySuccessToast(''), 3000);
   };
 
-  const deleteTestRow = (index: number) => {
-    setTestRows(prev => prev.filter((_, i) => i !== index));
+  const handleUpdateEnteredRow = (id: string, field: string, value: string) => {
+    setEnteredRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+  };
+
+  const handleDeleteEnteredRow = (id: string) => {
+    setEnteredRows(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleClearAllEnteredRows = () => {
+    if (enteredRows.length === 0) return;
+    if (window.confirm(isTh ? 'ต้องการล้างรายการทั้งหมดที่รอการบันทึกใช่หรือไม่?' : 'Clear all pending rows?')) {
+      setEnteredRows([]);
+    }
   };
 
   // Save All Entry Rows
@@ -364,10 +465,34 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       return;
     }
 
+    // Collect all entered rows
+    const rowsToProcess = [...enteredRows];
+
+    // If operator has filled numbers in the top row without clicking Add, include it too
+    if (topRow.width.trim() && topRow.tensile.trim()) {
+      rowsToProcess.unshift({
+        id: `entry-top-${Date.now()}`,
+        coil_no: topRow.coil_no.trim().toUpperCase() || 'COIL-01',
+        heat_no: topRow.heat_no.trim().toUpperCase() || 'HEAT-01',
+        sample_name: topRow.sample_name.trim().toUpperCase() || `SAMPLE-${rowsToProcess.length + 1}`,
+        width: topRow.width,
+        h_left: topRow.h_left,
+        h_right: topRow.h_right,
+        tensile: topRow.tensile,
+        yield_val: topRow.yield_val,
+        elong: topRow.elong
+      });
+    }
+
+    if (rowsToProcess.length === 0) {
+      alert(isTh ? 'กรุณากรอกผลการทดสอบอย่างน้อย 1 รายการก่อนบันทึก' : 'Please enter at least 1 test measurement before saving');
+      return;
+    }
+
     const newRecordsToSave: TensileRecord[] = [];
     const now = new Date();
 
-    testRows.forEach((row, i) => {
+    rowsToProcess.forEach((row, i) => {
       const w = parseFloat(row.width);
       const hl = parseFloat(row.h_left);
       const hr = parseFloat(row.h_right);
@@ -405,7 +530,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
 
       const inspectionResultText = decision === 'PASS' 
         ? `PASS (Tensile: ${t} MPa, Yield: ${y} MPa, Elong: ${e}%)` 
-        : `FAIL / Out of Spec: Tensile ${t} MPa (Spec Min: ${matchedSpec.tensile}), Yield ${y} MPa (Spec Min: ${matchedSpec.yield}), Elongation ${e}% (Spec Min: ${matchedSpec.elong}%)`;
+        : `FAIL / Out of Spec: Tensile ${t} MPa (Spec Min: ${matchedSpec.tensile}), Yield ${y} MPa (Spec Min: ${matchedSpec.yield}), Elongation ${e}% (Spec: ${formatElongationSpec(matchedSpec)})`;
 
       if (onLogNewActivity) {
         onLogNewActivity({
@@ -434,20 +559,8 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     }
 
     setRecords(prev => [...newRecordsToSave, ...prev]);
-    setTestRows([
-      {
-        coil_no: '',
-        heat_no: '',
-        sample_name: '',
-        width: '',
-        h_left: '',
-        h_right: '',
-        tensile: '',
-        yield_val: '',
-        elong: ''
-      }
-    ]);
-
+    setEnteredRows([]);
+    handleResetTopRow();
     setActiveTab('history');
   };
 
@@ -475,7 +588,19 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   };
 
   // Quality Specs Form & State (Empty inputs ready for user data entry)
-  const [newSpecForm, setNewSpecForm] = useState({
+  const [newSpecForm, setNewSpecForm] = useState<{
+    profile: string;
+    process: string;
+    min_w: string;
+    max_w: string;
+    min_h: string;
+    max_h: string;
+    tensile: string;
+    yield: string;
+    elong_mode: TensileElongMode;
+    elong: string;
+    elong_max: string;
+  }>({
     profile: '',
     process: '',
     min_w: '',
@@ -484,7 +609,9 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     max_h: '',
     tensile: '',
     yield: '',
-    elong: ''
+    elong_mode: 'min',
+    elong: '',
+    elong_max: ''
   });
   const [newSpecError, setNewSpecError] = useState('');
   const [newSpecSuccessMsg, setNewSpecSuccessMsg] = useState('');
@@ -502,6 +629,9 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     const cleanProfile = newSpecForm.profile.trim().toUpperCase();
     const cleanProcess = newSpecForm.process.trim().toUpperCase() || 'HOT_ROLL';
 
+    const elongVal = parseFloat(newSpecForm.elong) || 0;
+    const elongMaxVal = newSpecForm.elong_max ? (parseFloat(newSpecForm.elong_max) || 0) : undefined;
+
     const newSpecObj: TensileQualitySpec = {
       id: `spec-${Date.now()}`,
       profile: cleanProfile,
@@ -512,7 +642,9 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       max_h: parseFloat(newSpecForm.max_h) || 0,
       tensile: parseFloat(newSpecForm.tensile) || 0,
       yield: parseFloat(newSpecForm.yield) || 0,
-      elong: parseFloat(newSpecForm.elong) || 0
+      elong: elongVal,
+      elong_max: newSpecForm.elong_mode === 'max' ? (elongMaxVal !== undefined ? elongMaxVal : elongVal) : (newSpecForm.elong_mode === 'both' ? (elongMaxVal !== undefined ? elongMaxVal : elongVal) : undefined),
+      elong_mode: newSpecForm.elong_mode
     };
 
     const existingIdx = specs.findIndex(s => s.profile.toUpperCase() === cleanProfile);
@@ -538,7 +670,9 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       max_h: '',
       tensile: '',
       yield: '',
-      elong: ''
+      elong_mode: 'min',
+      elong: '',
+      elong_max: ''
     });
     setNewSpecError('');
     setTimeout(() => setNewSpecSuccessMsg(''), 4000);
@@ -554,7 +688,9 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       max_h: '',
       tensile: '',
       yield: '',
-      elong: ''
+      elong_mode: 'min',
+      elong: '',
+      elong_max: ''
     });
     setNewSpecError('');
   };
@@ -619,18 +755,24 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
 
   // Chart data formatting
   const chartData = useMemo(() => {
-    return dashboardRecords.slice(-20).map((r, i) => ({
-      index: i + 1,
-      coil: r.coil_no,
-      sample: r.sample_name,
-      tensile: r.tensile,
-      yield: r.yield,
-      elong: r.elong,
-      specTensile: matchedSpec?.tensile || 400,
-      specYield: matchedSpec?.yield || 250,
-      specElong: matchedSpec?.elong || 20
-    }));
-  }, [dashboardRecords, matchedSpec]);
+    const activeSpec = matchedSpec || (dashboardProfileFilter !== 'All' ? specs.find(s => s.profile === dashboardProfileFilter) : specs[0]);
+    return dashboardRecords.slice(-20).map((r, i) => {
+      const recordSpec = r.std || specs.find(s => s.profile === r.profile) || activeSpec;
+      return {
+        index: i + 1,
+        coil: r.coil_no,
+        sample: r.sample_name,
+        tensile: r.tensile,
+        yield: r.yield,
+        elong: r.elong,
+        specTensile: recordSpec?.tensile || 400,
+        specYield: recordSpec?.yield || 250,
+        specElongMin: recordSpec?.elong ?? 20,
+        specElongMax: recordSpec?.elong_max,
+        elongMode: recordSpec?.elong_mode || 'min'
+      };
+    });
+  }, [dashboardRecords, matchedSpec, dashboardProfileFilter, specs]);
 
   // Export CSV
   const exportHistoryCSV = () => {
@@ -647,18 +789,24 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 sm:p-6 space-y-6">
+    <div className={`min-h-screen font-sans p-4 sm:p-6 space-y-6 transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
+    }`}>
 
       {/* Admin Password Modal */}
       {showAdminModal && (
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95">
+          <div className={`w-full max-w-md rounded-3xl p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 border ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+          }`}>
             <div className="text-center space-y-2">
-              <div className="w-14 h-14 bg-cyan-500/10 text-cyan-400 rounded-2xl border border-cyan-500/20 flex items-center justify-center mx-auto">
+              <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center mx-auto ${
+                isLight ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+              }`}>
                 <Lock className="w-7 h-7" />
               </div>
-              <h3 className="text-lg font-bold text-white">Admin Verification</h3>
-              <p className="text-xs text-slate-400">
+              <h3 className={`text-lg font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Admin Verification</h3>
+              <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh ? 'กรุณาระบุรหัสผ่านเพื่อเข้าสู่โหมดตั้งค่า Spec (admin2026)' : 'Please enter admin password to configure quality specs'}
               </p>
             </div>
@@ -670,11 +818,15 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                   value={adminPasswordInput}
                   onChange={(e) => setAdminPasswordInput(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-center text-lg font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
+                  className={`w-full border rounded-2xl px-4 py-3 text-center text-lg font-mono focus:outline-none ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-300 text-blue-600 focus:border-blue-500' 
+                      : 'bg-slate-950 border-slate-800 text-cyan-300 focus:border-cyan-500'
+                  }`}
                   autoFocus
                 />
                 {passwordError && (
-                  <p className="text-rose-400 text-xs font-semibold text-center mt-2">
+                  <p className="text-rose-500 text-xs font-semibold text-center mt-2">
                     {isTh ? 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่' : 'Incorrect password. Please try again.'}
                   </p>
                 )}
@@ -684,13 +836,21 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAdminModal(false)}
-                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-3 rounded-xl transition"
+                  className={`flex-1 font-bold text-xs py-3 rounded-xl transition ${
+                    isLight 
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' 
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                  }`}
                 >
                   {isTh ? 'ยกเลิก' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs py-3 rounded-xl transition shadow-lg shadow-cyan-500/20"
+                  className={`flex-1 font-bold text-xs py-3 rounded-xl transition shadow-md ${
+                    isLight
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/20'
+                      : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/20'
+                  }`}
                 >
                   {isTh ? 'ยืนยันรหัสผ่าน' : 'Verify'}
                 </button>
@@ -701,33 +861,47 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       )}
 
       {/* Top Application Header */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b transition-colors ${
+        isLight ? 'border-slate-200' : 'border-slate-800'
+      }`}>
         <div className="flex items-center gap-3">
           {onBackToPortal && (
             <button
               onClick={onBackToPortal}
-              className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition flex items-center gap-1.5 text-xs font-semibold"
+              className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-xs font-semibold ${
+                isLight
+                  ? 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-xs'
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800'
+              }`}
               title="Return to QA Portal"
             >
-              <ArrowLeft className="w-4 h-4 text-cyan-400" />
+              <ArrowLeft className="w-4 h-4 text-blue-600" />
               <span>{isTh ? 'กลับสู่เมนูหลัก QA' : 'Back to Portal'}</span>
             </button>
           )}
 
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl text-slate-950 shadow-lg shadow-cyan-500/20">
+            <div className={`p-2.5 rounded-xl shadow-md ${
+              isLight 
+                ? 'bg-blue-600 text-white shadow-blue-500/20' 
+                : 'bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-950 shadow-cyan-500/20'
+            }`}>
               <Activity className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                  isLight ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-cyan-950 text-cyan-300 border-cyan-800'
+                }`}>
                   IPQC-01
                 </span>
-                <h1 className="text-xl font-bold text-white tracking-tight">
+                <h1 className={`text-xl font-bold tracking-tight ${
+                  isLight ? 'text-slate-900' : 'text-white'
+                }`}>
                   {isTh ? 'ระบบทดสอบแรงดึง (Tensile System)' : 'Tensile Measurement System'}
                 </h1>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh 
                   ? 'ตรวจสอบขนาด Dimension & ค่าแรงดึง Tensile / Yield / Elongation พร้อมระบบควบคุม Spec' 
                   : 'Quality Spec Control, Automated PASS/FAIL Judgment & Interactive Trend Dashboard'}
@@ -736,23 +910,48 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
           </div>
         </div>
 
-        {/* Engine status indicator */}
-        <div className="flex items-center gap-3">
-          <div className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        {/* Engine status indicator & Theme Toggle */}
+        <div className="flex items-center gap-2.5">
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition ${
+                isLight
+                  ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 shadow-xs'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}
+            >
+              {isLight ? <Moon className="w-3.5 h-3.5 text-indigo-600" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
+              <span>{isLight ? (isTh ? 'สว่าง' : 'Light') : (isTh ? 'มืด' : 'Dark')}</span>
+            </button>
+          )}
+
+          <div className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border ${
+            isLight 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+              : 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
+          }`}>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>Cloud Connected & Realtime Sync</span>
           </div>
         </div>
       </header>
 
       {/* Tabs Bar */}
-      <div className="flex space-x-2 border-b border-slate-800 pb-2 overflow-x-auto">
+      <div className={`flex space-x-2 border-b pb-2 overflow-x-auto ${
+        isLight ? 'border-slate-200' : 'border-slate-800'
+      }`}>
         <button
           onClick={() => setActiveTab('entry')}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'entry'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <Plus className="w-4 h-4" />
@@ -763,14 +962,20 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
           onClick={() => setActiveTab('history')}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'history'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <FileText className="w-4 h-4" />
           <span>{isTh ? '📜 ประวัติข้อมูล' : 'History Log'}</span>
           {records.length > 0 && (
-            <span className="ml-1 bg-slate-950 text-cyan-300 px-2 py-0.5 rounded-full text-[10px] font-mono border border-cyan-800">
+            <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+              isLight ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-slate-950 text-cyan-300 border-cyan-800'
+            }`}>
               {records.length}
             </span>
           )}
@@ -780,8 +985,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
           onClick={() => setActiveTab('dashboard')}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'dashboard'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <BarChart3 className="w-4 h-4" />
@@ -792,14 +1001,18 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
           onClick={handleAdminAccess}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'specs'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <Settings className="w-4 h-4" />
           <span>{isTh ? '⚙️ ตั้งค่า Spec' : 'Quality Specs'}</span>
           {isAdminAuthenticated && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           )}
         </button>
       </div>
@@ -893,18 +1106,25 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 <div><span className="text-slate-500">Spec Width (W):</span> <strong className="text-cyan-300">{matchedSpec.min_w} - {matchedSpec.max_w} mm</strong></div>
                 <div><span className="text-slate-500">Spec Height (H):</span> <strong className="text-cyan-300">{matchedSpec.min_h} - {matchedSpec.max_h} mm</strong></div>
                 <div><span className="text-slate-500">Min Tensile:</span> <strong className="text-emerald-300">≥ {matchedSpec.tensile} MPa</strong></div>
-                <div><span className="text-slate-500">Min Yield / Elong:</span> <strong className="text-amber-300">≥ {matchedSpec.yield} MPa / {matchedSpec.elong}%</strong></div>
+                <div><span className="text-slate-500">Yield / Elong:</span> <strong className="text-amber-300">≥ {matchedSpec.yield} MPa / {formatElongationSpec(matchedSpec)}</strong></div>
               </div>
             )}
           </div>
 
           {/* Section 2: Test Result Rows Entry Table */}
-          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 shadow-md">
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-5 shadow-md">
             <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
-              <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                <Gauge className="w-4 h-4 text-emerald-400" />
-                {isTh ? '2. บันทึกผลการทดสอบชิ้นงาน (Tensile Test Results)' : '2. Measurement & Test Entry'}
-              </h3>
+              <div>
+                <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                  <Gauge className="w-4 h-4 text-emerald-400" />
+                  {isTh ? '2. บันทึกผลการทดสอบชิ้นงาน (Tensile Test Entry)' : '2. Measurement & Test Entry'}
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {isTh 
+                    ? 'ฟิลด์กรอกข้อมูลว่างอยู่ด้านบนสุดตลอดเวลาเพื่อการ Key ข้อมูลต่อเนื่อง — เมื่อกดเพิ่มรายการจะเลื่อนลงไปในตารางด้านล่าง'
+                    : 'Blank input row stays at the very top for seamless continuous data entry — added items shift downward below'}
+                </p>
+              </div>
 
               <div className="flex items-center gap-2">
                 <button
@@ -918,164 +1138,402 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 </button>
 
                 <button
-                  onClick={addTestRow}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-3 py-2 rounded-xl border border-slate-700 flex items-center gap-1.5 transition"
-                >
-                  <Plus className="w-4 h-4 text-cyan-400" />
-                  <span>{isTh ? '+ เพิ่มรายการ' : 'Add Row'}</span>
-                </button>
-
-                <button
                   onClick={handleSaveAllRows}
-                  disabled={!matchedSpec}
+                  disabled={!matchedSpec || (enteredRows.length === 0 && !topRow.tensile.trim())}
                   className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white font-bold text-xs px-5 py-2 rounded-xl flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20"
                 >
                   <Save className="w-4 h-4" />
-                  <span>{isTh ? '💾 บันทึกผลทั้งหมด' : 'Save All Results'}</span>
+                  <span>
+                    {isTh 
+                      ? `💾 บันทึกผลทั้งหมด (${enteredRows.length + (topRow.width && topRow.tensile ? 1 : 0)})` 
+                      : `Save All (${enteredRows.length + (topRow.width && topRow.tensile ? 1 : 0)})`}
+                  </span>
                 </button>
               </div>
             </div>
 
-            <div className="space-y-3">
-              {testRows.map((row, idx) => {
-                const status = evaluateRow(row);
-                return (
-                  <div key={idx} className="bg-slate-950/80 p-4 rounded-xl border border-slate-800 space-y-3">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-2">
-                      <div>
-                        <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">Coil No. *</label>
-                        <input
-                          type="text"
-                          value={row.coil_no}
-                          onChange={(e) => updateTestRow(idx, 'coil_no', e.target.value)}
-                          placeholder="COIL-01"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-500 uppercase"
-                        />
-                      </div>
+            {/* Notification Toast */}
+            {entrySuccessToast && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="font-semibold">{entrySuccessToast}</span>
+              </div>
+            )}
 
-                      <div>
-                        <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">Heat No.</label>
-                        <input
-                          type="text"
-                          value={row.heat_no}
-                          onChange={(e) => updateTestRow(idx, 'heat_no', e.target.value)}
-                          placeholder="HEAT-01"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-500 uppercase"
-                        />
-                      </div>
+            {/* TOP FIXED INPUT ROW (ฟิลด์ข้อมูลเปล่าอยู่ด้านบนสุดเสมอ) */}
+            <div className="bg-slate-950 border-2 border-cyan-500/50 p-4 sm:p-5 rounded-2xl shadow-xl shadow-cyan-950/20 space-y-3 relative overflow-hidden">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                  <span className="text-xs font-bold text-cyan-300 uppercase tracking-wide">
+                    {isTh ? '⭐ ฟิลด์กรอกข้อมูลใหม่ (อยู่ด้านบนสุดตลอดเวลา พร้อม Key ต่อเนื่อง)' : '⭐ Active Input Row (Always at Top - Ready for Next Key)'}
+                  </span>
+                </div>
 
-                      <div>
-                        <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">Sample Name</label>
-                        <input
-                          type="text"
-                          value={row.sample_name}
-                          onChange={(e) => updateTestRow(idx, 'sample_name', e.target.value)}
-                          placeholder={`SAMPLE-0${idx + 1}`}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-100 font-bold focus:outline-none focus:border-cyan-500 uppercase"
-                        />
-                      </div>
+                {/* Real-time Status Badge */}
+                {(() => {
+                  const topStatus = evaluateRow(topRow);
+                  return (
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                      topStatus === 'PASS'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : topStatus === 'FAIL'
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                          : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {topStatus === 'PASS' ? '✓ ผ่านเกณฑ์ SPEC' : topStatus === 'FAIL' ? '✕ ไม่ผ่าน SPEC' : 'พร้อมรับข้อมูล'}
+                    </span>
+                  );
+                })()}
+              </div>
 
-                      <div>
-                        <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">W (mm)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={row.width}
-                          onChange={(e) => updateTestRow(idx, 'width', e.target.value)}
-                          placeholder="0.00"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-500"
-                        />
-                      </div>
+              {/* 9 Inputs Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-2.5">
+                <div>
+                  <label className="text-[9px] font-bold text-cyan-300 block uppercase mb-1">Coil No. *</label>
+                  <input
+                    type="text"
+                    value={topRow.coil_no}
+                    onChange={(e) => setTopRow(prev => ({ ...prev, coil_no: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                    placeholder="COIL-01"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
+                  />
+                </div>
 
-                      <div>
-                        <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">H_Left</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={row.h_left}
-                          onChange={(e) => updateTestRow(idx, 'h_left', e.target.value)}
-                          placeholder="0.00"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-500"
-                        />
-                      </div>
+                <div>
+                  <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">Heat No.</label>
+                  <input
+                    type="text"
+                    value={topRow.heat_no}
+                    onChange={(e) => setTopRow(prev => ({ ...prev, heat_no: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                    placeholder="HEAT-01"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
+                  />
+                </div>
 
-                      <div>
-                        <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">H_Right</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={row.h_right}
-                          onChange={(e) => updateTestRow(idx, 'h_right', e.target.value)}
-                          placeholder="0.00"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-500"
-                        />
-                      </div>
+                <div>
+                  <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">Sample Name</label>
+                  <input
+                    type="text"
+                    value={topRow.sample_name}
+                    onChange={(e) => setTopRow(prev => ({ ...prev, sample_name: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                    placeholder={`SAMPLE-${String(enteredRows.length + 1).padStart(2, '0')}`}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-bold focus:outline-none focus:border-cyan-400 uppercase"
+                  />
+                </div>
 
-                      <div>
-                        <label className="text-[9px] font-bold text-cyan-400 block uppercase mb-1">Tensile (MPa)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={row.tensile}
-                          onChange={(e) => updateTestRow(idx, 'tensile', e.target.value)}
-                          placeholder="MPa"
-                          className="w-full bg-slate-900 border border-cyan-900/60 rounded-lg px-2 py-1.5 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
-                        />
-                      </div>
+                <div>
+                  <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">W (mm)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={topRow.width}
+                    onChange={(e) => setTopRow(prev => ({ ...prev, width: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                    placeholder={matchedSpec ? `${matchedSpec.min_w}` : '0.00'}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
 
-                      <div>
-                        <label className="text-[9px] font-bold text-emerald-400 block uppercase mb-1">Yield (MPa)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={row.yield_val}
-                          onChange={(e) => updateTestRow(idx, 'yield_val', e.target.value)}
-                          placeholder="MPa"
-                          className="w-full bg-slate-900 border border-emerald-900/60 rounded-lg px-2 py-1.5 text-xs text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
-                        />
-                      </div>
+                <div>
+                  <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">H_Left</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={topRow.h_left}
+                    onChange={(e) => setTopRow(prev => ({ ...prev, h_left: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                    placeholder={matchedSpec ? `${matchedSpec.min_h}` : '0.00'}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
 
-                      <div>
-                        <label className="text-[9px] font-bold text-amber-400 block uppercase mb-1">Elong (%)</label>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={row.elong}
-                            onChange={(e) => updateTestRow(idx, 'elong', e.target.value)}
-                            placeholder="%"
-                            className="w-full bg-slate-900 border border-amber-900/60 rounded-lg px-2 py-1.5 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
-                          />
-                          {testRows.length > 1 && (
+                <div>
+                  <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">H_Right</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={topRow.h_right}
+                    onChange={(e) => setTopRow(prev => ({ ...prev, h_right: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                    placeholder={matchedSpec ? `${matchedSpec.max_h}` : '0.00'}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-bold text-cyan-400 block uppercase mb-1">Tensile (MPa)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={topRow.tensile}
+                    onChange={(e) => setTopRow(prev => ({ ...prev, tensile: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                    placeholder={matchedSpec ? `≥${matchedSpec.tensile}` : 'MPa'}
+                    className="w-full bg-slate-900 border border-cyan-900/80 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-bold text-emerald-400 block uppercase mb-1">Yield (MPa)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={topRow.yield_val}
+                    onChange={(e) => setTopRow(prev => ({ ...prev, yield_val: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                    placeholder={matchedSpec ? `≥${matchedSpec.yield}` : 'MPa'}
+                    className="w-full bg-slate-900 border border-emerald-900/80 rounded-lg px-2.5 py-1.5 text-xs text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-bold text-amber-400 block uppercase mb-1">Elong (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={topRow.elong}
+                    onChange={(e) => setTopRow(prev => ({ ...prev, elong: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                    placeholder={matchedSpec ? formatElongationSpec(matchedSpec) : '%'}
+                    className="w-full bg-slate-900 border border-amber-900/80 rounded-lg px-2.5 py-1.5 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              {/* Action Bar for Top Row */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-900">
+                <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 font-mono text-[10px] text-cyan-300">Tip:</span>
+                  <span>{isTh ? 'กด Enter หรือคลิกปุ่มด้านขวา เพื่อเพิ่มรายการแล้วฟิลด์ด้านบนจะพร้อมกรอกตัวอย่างถัดไปทันที' : 'Press Enter or click Add to append row downwards & continue typing'}</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetTopRow}
+                    className="bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 font-semibold text-xs px-3 py-1.5 rounded-lg border border-slate-800 transition"
+                  >
+                    {isTh ? 'ล้างฟิลด์นี้' : 'Clear Row'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAddFromTopRow()}
+                    className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs px-4 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-md shadow-cyan-500/20"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{isTh ? '+ เพิ่มลงรายการ (เลื่อนลงด้านล่าง)' : '+ Add to List (Push Down)'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* LIST OF ENTERED ROWS (เลื่อนลงไปเรื่อยๆ ด้านล่าง) */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>
+                    {isTh 
+                      ? `รายการที่เพิ่มแล้ว (${enteredRows.length} รายการ - รายการล่าสุดอยู่บนสุด / เลื่อนลงด้านล่าง)` 
+                      : `Entered Samples (${enteredRows.length} items - Latest on Top)`}
+                  </span>
+                </h4>
+
+                {enteredRows.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllEnteredRows}
+                    className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1 transition"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>{isTh ? 'ล้างรายการทั้งหมด' : 'Clear All'}</span>
+                  </button>
+                )}
+              </div>
+
+              {enteredRows.length === 0 ? (
+                <div className="bg-slate-950/60 p-8 rounded-2xl border border-slate-800/80 text-center space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500">
+                    <ListFilter className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-300">
+                    {isTh ? 'ยังไม่มีรายการชิ้นงานในตาราง' : 'No test samples added yet'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+                    {isTh 
+                      ? 'กรอกข้อมูลผลการทดสอบในฟิลด์แถวด้านบนสุด แล้วกด "+ เพิ่มลงรายการ" หรือกด Enter ข้อมูลจะถูกเลื่อนลงมาแสดงในรายการนี้ต่อเนื่อง'
+                      : 'Fill in test data in the top blank row and click "+ Add to List" or press Enter to push records into this list'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {enteredRows.map((row, idx) => {
+                    const status = evaluateRow(row);
+                    return (
+                      <div key={row.id} className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800/90 space-y-2.5 transition hover:border-slate-700">
+                        <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-900">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-300 font-mono text-[10px] font-bold">
+                              #{idx + 1}
+                            </span>
+                            <span className="font-bold text-white text-xs">{row.sample_name || `SAMPLE-${idx+1}`}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">({row.coil_no} / {row.heat_no})</span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              status === 'PASS'
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                : status === 'FAIL'
+                                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                                  : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}>
+                              {status === 'PASS' ? '✓ PASS' : status === 'FAIL' ? '✕ FAIL / NG' : 'PENDING'}
+                            </span>
+
                             <button
-                              onClick={() => deleteTestRow(idx)}
+                              onClick={() => handleDeleteEnteredRow(row.id)}
                               className="text-slate-500 hover:text-rose-400 p-1 transition"
+                              title={isTh ? 'ลบรายการนี้' : 'Delete'}
                             >
-                              <X className="w-4 h-4" />
+                              <X className="w-3.5 h-3.5" />
                             </button>
-                          )}
+                          </div>
+                        </div>
+
+                        {/* Row Editable Fields */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-2">
+                          <div>
+                            <label className="text-[8px] font-bold text-slate-500 block uppercase">Coil No.</label>
+                            <input
+                              type="text"
+                              value={row.coil_no}
+                              onChange={(e) => handleUpdateEnteredRow(row.id, 'coil_no', e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500 uppercase"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[8px] font-bold text-slate-500 block uppercase">Heat No.</label>
+                            <input
+                              type="text"
+                              value={row.heat_no}
+                              onChange={(e) => handleUpdateEnteredRow(row.id, 'heat_no', e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500 uppercase"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[8px] font-bold text-slate-500 block uppercase">Sample</label>
+                            <input
+                              type="text"
+                              value={row.sample_name}
+                              onChange={(e) => handleUpdateEnteredRow(row.id, 'sample_name', e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-bold focus:outline-none focus:border-cyan-500 uppercase"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[8px] font-bold text-slate-500 block uppercase">W (mm)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={row.width}
+                              onChange={(e) => handleUpdateEnteredRow(row.id, 'width', e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[8px] font-bold text-slate-500 block uppercase">H_Left</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={row.h_left}
+                              onChange={(e) => handleUpdateEnteredRow(row.id, 'h_left', e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[8px] font-bold text-slate-500 block uppercase">H_Right</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={row.h_right}
+                              onChange={(e) => handleUpdateEnteredRow(row.id, 'h_right', e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[8px] font-bold text-cyan-400 block uppercase">Tensile (MPa)</label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={row.tensile}
+                              onChange={(e) => handleUpdateEnteredRow(row.id, 'tensile', e.target.value)}
+                              className="w-full bg-slate-900 border border-cyan-900/60 rounded px-2 py-1 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[8px] font-bold text-emerald-400 block uppercase">Yield (MPa)</label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={row.yield_val}
+                              onChange={(e) => handleUpdateEnteredRow(row.id, 'yield_val', e.target.value)}
+                              className="w-full bg-slate-900 border border-emerald-900/60 rounded px-2 py-1 text-xs text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[8px] font-bold text-amber-400 block uppercase">Elong (%)</label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={row.elong}
+                              onChange={(e) => handleUpdateEnteredRow(row.id, 'elong', e.target.value)}
+                              className="w-full bg-slate-900 border border-amber-900/60 rounded px-2 py-1 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    );
+                  })}
 
-                    {/* Single Row Status */}
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-900 text-xs">
-                      <div className="text-[10px] text-slate-500">
-                        Row #{idx + 1} Judgment Evaluation
-                      </div>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                        status === 'PASS'
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                          : status === 'FAIL'
-                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                            : 'bg-slate-800 text-slate-400 border-slate-700'
-                      }`}>
-                        {status === 'PASS' ? '✓ PASS' : status === 'FAIL' ? '✕ FAIL / NG' : 'READY FOR INPUT'}
+                  {/* Summary & Bottom Save Button */}
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="text-xs text-slate-300">
+                      <span>{isTh ? 'สรุปรายการที่รอการบันทึก:' : 'Summary:'} </span>
+                      <strong className="text-cyan-300">{enteredRows.length} {isTh ? 'รายการ' : 'samples'}</strong>
+                      {' • '}
+                      <span className="text-emerald-400 font-semibold">
+                        {isTh ? 'ผ่าน' : 'Pass'}: {enteredRows.filter(r => evaluateRow(r) === 'PASS').length}
+                      </span>
+                      {' • '}
+                      <span className="text-rose-400 font-semibold">
+                        {isTh ? 'ไม่ผ่าน' : 'Fail'}: {enteredRows.filter(r => evaluateRow(r) === 'FAIL').length}
                       </span>
                     </div>
+
+                    <button
+                      onClick={handleSaveAllRows}
+                      disabled={!matchedSpec || (enteredRows.length === 0 && !topRow.tensile.trim())}
+                      className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white font-bold text-xs px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-600/20"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{isTh ? `💾 ยืนยันบันทึกผลการทดสอบทั้งหมด (${enteredRows.length})` : `Save All Results (${enteredRows.length})`}</span>
+                    </button>
                   </div>
-                );
-              })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1335,7 +1793,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                       <YAxis stroke="#64748b" fontSize={10} domain={['auto', 'auto']} />
                       <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', fontSize: '12px' }} />
                       <Line type="monotone" dataKey="elong" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b' }} name="Elongation (%)" />
-                      <ReferenceLine y={chartData[0]?.specElong || 20} stroke="#ef4444" strokeDasharray="4 4" label={{ value: 'Min Spec', fill: '#ef4444', fontSize: 10 }} />
+                      {(chartData[0]?.elongMode === 'min' || chartData[0]?.elongMode === 'both' || !chartData[0]?.elongMode) && (
+                        <ReferenceLine y={chartData[0]?.specElongMin || 20} stroke="#ef4444" strokeDasharray="4 4" label={{ value: 'Min Spec', fill: '#ef4444', fontSize: 10 }} />
+                      )}
+                      {(chartData[0]?.elongMode === 'max' || (chartData[0]?.elongMode === 'both' && chartData[0]?.specElongMax)) && (
+                        <ReferenceLine y={chartData[0]?.specElongMax || 25} stroke="#f97316" strokeDasharray="4 4" label={{ value: 'Max Spec', fill: '#f97316', fontSize: 10 }} />
+                      )}
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
@@ -1506,42 +1969,142 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 </div>
               </div>
 
-              {/* Row 3: Mechanical Strength Limits */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-slate-950/80 p-3.5 rounded-xl border border-cyan-900/50">
-                  <label className="text-[10px] font-bold text-cyan-400 uppercase block mb-1">Min Tensile (MPa)</label>
-                  <input
-                    type="number"
-                    step="1"
-                    placeholder="เช่น 400"
-                    value={newSpecForm.tensile}
-                    onChange={(e) => setNewSpecForm({ ...newSpecForm, tensile: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-cyan-300 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
-                  />
+              {/* Row 3: Mechanical Strength Limits & Elongation Condition Setting */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-slate-950/80 p-3.5 rounded-xl border border-cyan-900/50">
+                    <label className="text-[10px] font-bold text-cyan-400 uppercase block mb-1">Min Tensile Strength (MPa)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      placeholder="เช่น 400"
+                      value={newSpecForm.tensile}
+                      onChange={(e) => setNewSpecForm({ ...newSpecForm, tensile: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-cyan-300 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+
+                  <div className="bg-slate-950/80 p-3.5 rounded-xl border border-emerald-900/50">
+                    <label className="text-[10px] font-bold text-emerald-400 uppercase block mb-1">Min Yield Strength (MPa)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      placeholder="เช่น 250"
+                      value={newSpecForm.yield}
+                      onChange={(e) => setNewSpecForm({ ...newSpecForm, yield: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-emerald-300 placeholder-slate-600 focus:outline-none focus:border-emerald-400"
+                    />
+                  </div>
                 </div>
 
-                <div className="bg-slate-950/80 p-3.5 rounded-xl border border-emerald-900/50">
-                  <label className="text-[10px] font-bold text-emerald-400 uppercase block mb-1">Min Yield (MPa)</label>
-                  <input
-                    type="number"
-                    step="1"
-                    placeholder="เช่น 250"
-                    value={newSpecForm.yield}
-                    onChange={(e) => setNewSpecForm({ ...newSpecForm, yield: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-emerald-300 placeholder-slate-600 focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
+                {/* Elongation Condition Selector & Fields (Min / Max / Both) */}
+                <div className="bg-slate-950/80 p-4 rounded-xl border border-amber-900/50 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
+                        {isTh ? 'เงื่อนไขกำหนดค่า Elongation % (Elongation Condition)' : 'Elongation Specification Condition'}
+                      </span>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {isTh 
+                          ? 'เลือกประเภทเกณฑ์ที่ต้องการ: ค่าขั้นต่ำ (Min), ค่าสูงสุด (Max), หรือกำหนดทั้ง 2 ค่า (ช่วง Min ~ Max)' 
+                          : 'Select condition: Minimum only (≥ Min), Maximum only (≤ Max), or Range (Min ~ Max)'}
+                      </p>
+                    </div>
 
-                <div className="bg-slate-950/80 p-3.5 rounded-xl border border-amber-900/50">
-                  <label className="text-[10px] font-bold text-amber-400 uppercase block mb-1">Min Elongation (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="เช่น 20.0"
-                    value={newSpecForm.elong}
-                    onChange={(e) => setNewSpecForm({ ...newSpecForm, elong: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-amber-300 placeholder-slate-600 focus:outline-none focus:border-amber-400"
-                  />
+                    {/* Condition Mode Selector Buttons */}
+                    <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setNewSpecForm(prev => ({ ...prev, elong_mode: 'min' }))}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                          newSpecForm.elong_mode === 'min'
+                            ? 'bg-amber-500 text-slate-950 shadow'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{isTh ? 'ค่าขั้นต่ำ (≥ Min)' : 'Min Only (≥)'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setNewSpecForm(prev => ({ ...prev, elong_mode: 'max' }))}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                          newSpecForm.elong_mode === 'max'
+                            ? 'bg-amber-500 text-slate-950 shadow'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{isTh ? 'ค่าสูงสุด (≤ Max)' : 'Max Only (≤)'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setNewSpecForm(prev => ({ ...prev, elong_mode: 'both' }))}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                          newSpecForm.elong_mode === 'both'
+                            ? 'bg-amber-500 text-slate-950 shadow'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{isTh ? 'ทั้ง 2 ค่า (Min ~ Max)' : 'Both (Min ~ Max)'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Elongation Input Fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {(newSpecForm.elong_mode === 'min' || newSpecForm.elong_mode === 'both') && (
+                      <div>
+                        <label className="text-[10px] font-bold text-amber-300 uppercase block mb-1">
+                          {newSpecForm.elong_mode === 'both' ? (isTh ? 'Min Elongation (%) [ค่าต่ำสุด]' : 'Min Elongation (%)') : (isTh ? 'Min Elongation (%) [เกณฑ์ขั้นต่ำ ≥]' : 'Min Elongation (%)')}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          placeholder={isTh ? 'เช่น 20.0' : 'e.g. 20.0'}
+                          value={newSpecForm.elong}
+                          onChange={(e) => setNewSpecForm({ ...newSpecForm, elong: e.target.value })}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-amber-300 placeholder-slate-600 focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                    )}
+
+                    {(newSpecForm.elong_mode === 'max' || newSpecForm.elong_mode === 'both') && (
+                      <div>
+                        <label className="text-[10px] font-bold text-amber-300 uppercase block mb-1">
+                          {newSpecForm.elong_mode === 'both' ? (isTh ? 'Max Elongation (%) [ค่าสูงสุด]' : 'Max Elongation (%)') : (isTh ? 'Max Elongation (%) [เกณฑ์สูงสุด ≤]' : 'Max Elongation (%)')}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          placeholder={isTh ? 'เช่น 30.0' : 'e.g. 30.0'}
+                          value={newSpecForm.elong_mode === 'max' ? (newSpecForm.elong_max || newSpecForm.elong) : newSpecForm.elong_max}
+                          onChange={(e) => {
+                            if (newSpecForm.elong_mode === 'max') {
+                              setNewSpecForm({ ...newSpecForm, elong_max: e.target.value, elong: e.target.value });
+                            } else {
+                              setNewSpecForm({ ...newSpecForm, elong_max: e.target.value });
+                            }
+                          }}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-amber-300 placeholder-slate-600 focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Live Criteria Preview Banner */}
+                  <div className="bg-slate-900/90 px-3 py-2 rounded-lg border border-slate-800 flex items-center justify-between text-xs">
+                    <span className="text-slate-400 text-[11px]">
+                      {isTh ? 'สรุปเกณฑ์ตัดสิน Elongation:' : 'Elongation Rule Preview:'}
+                    </span>
+                    <span className="font-mono font-bold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800">
+                      {newSpecForm.elong_mode === 'max'
+                        ? `≤ ${(newSpecForm.elong_max || newSpecForm.elong || '0')}%`
+                        : newSpecForm.elong_mode === 'both'
+                        ? `${newSpecForm.elong || '0'}% ~ ${newSpecForm.elong_max || '0'}%`
+                        : `≥ ${newSpecForm.elong || '0'}%`}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1620,6 +2183,15 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
                             {spec.process || 'HOT_ROLL'}
                           </span>
+                          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                            spec.elong_mode === 'max'
+                              ? 'bg-orange-950 text-orange-400 border-orange-800'
+                              : spec.elong_mode === 'both'
+                              ? 'bg-purple-950 text-purple-300 border-purple-800'
+                              : 'bg-amber-950 text-amber-400 border-amber-800'
+                          }`}>
+                            {spec.elong_mode === 'max' ? 'Elong: ≤Max' : spec.elong_mode === 'both' ? 'Elong: Range' : 'Elong: ≥Min'}
+                          </span>
                         </div>
                       </div>
 
@@ -1654,7 +2226,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                       </div>
                       <div>
                         <span className="text-slate-500 block text-[9px]">Elong</span>
-                        <span className="font-bold text-amber-400">≥ {spec.elong}%</span>
+                        <span className="font-bold text-amber-400">{formatElongationSpec(spec)}</span>
                       </div>
                     </div>
                   </div>
@@ -1763,39 +2335,117 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 </div>
               </div>
 
-              {/* Strength values */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-slate-950 p-3 rounded-xl border border-cyan-900/40">
-                  <label className="text-[9px] font-bold text-cyan-400 uppercase block mb-1">Min Tensile (MPa)</label>
-                  <input
-                    type="number"
-                    step="1"
-                    value={editingSpec.tensile}
-                    onChange={(e) => setEditingSpec({ ...editingSpec, tensile: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-500"
-                  />
+              {/* Strength values & Elongation condition in Edit Modal */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-slate-950 p-3 rounded-xl border border-cyan-900/40">
+                    <label className="text-[9px] font-bold text-cyan-400 uppercase block mb-1">Min Tensile (MPa)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={editingSpec.tensile}
+                      onChange={(e) => setEditingSpec({ ...editingSpec, tensile: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div className="bg-slate-950 p-3 rounded-xl border border-emerald-900/40">
+                    <label className="text-[9px] font-bold text-emerald-400 uppercase block mb-1">Min Yield (MPa)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={editingSpec.yield}
+                      onChange={(e) => setEditingSpec({ ...editingSpec, yield: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
                 </div>
 
-                <div className="bg-slate-950 p-3 rounded-xl border border-emerald-900/40">
-                  <label className="text-[9px] font-bold text-emerald-400 uppercase block mb-1">Min Yield (MPa)</label>
-                  <input
-                    type="number"
-                    step="1"
-                    value={editingSpec.yield}
-                    onChange={(e) => setEditingSpec({ ...editingSpec, yield: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+                {/* Edit Elongation Condition */}
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-amber-900/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-bold text-amber-400 uppercase">
+                      {isTh ? 'เงื่อนไข Elongation %' : 'Elongation Condition'}
+                    </label>
+                    <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setEditingSpec({ ...editingSpec, elong_mode: 'min' })}
+                        className={`px-2 py-1 rounded text-[10px] font-bold transition ${
+                          (!editingSpec.elong_mode || editingSpec.elong_mode === 'min')
+                            ? 'bg-amber-500 text-slate-950'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {isTh ? '≥ Min' : '≥ Min'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingSpec({ ...editingSpec, elong_mode: 'max', elong_max: editingSpec.elong_max ?? editingSpec.elong })}
+                        className={`px-2 py-1 rounded text-[10px] font-bold transition ${
+                          editingSpec.elong_mode === 'max'
+                            ? 'bg-amber-500 text-slate-950'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {isTh ? '≤ Max' : '≤ Max'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingSpec({ ...editingSpec, elong_mode: 'both', elong_max: editingSpec.elong_max ?? (editingSpec.elong + 10) })}
+                        className={`px-2 py-1 rounded text-[10px] font-bold transition ${
+                          editingSpec.elong_mode === 'both'
+                            ? 'bg-amber-500 text-slate-950'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {isTh ? 'Min ~ Max' : 'Min ~ Max'}
+                      </button>
+                    </div>
+                  </div>
 
-                <div className="bg-slate-950 p-3 rounded-xl border border-amber-900/40">
-                  <label className="text-[9px] font-bold text-amber-400 uppercase block mb-1">Min Elong (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={editingSpec.elong}
-                    onChange={(e) => setEditingSpec({ ...editingSpec, elong: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-300 focus:outline-none focus:border-amber-500"
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {(!editingSpec.elong_mode || editingSpec.elong_mode === 'min' || editingSpec.elong_mode === 'both') && (
+                      <div>
+                        <label className="text-[9px] text-amber-300 block mb-1">
+                          {editingSpec.elong_mode === 'both' ? (isTh ? 'Min Elong (%)' : 'Min Elong (%)') : (isTh ? 'Min Elong (%) [≥]' : 'Min Elong (%) [≥]')}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={editingSpec.elong}
+                          onChange={(e) => setEditingSpec({ ...editingSpec, elong: parseFloat(e.target.value) || 0 })}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-300 focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    )}
+
+                    {(editingSpec.elong_mode === 'max' || editingSpec.elong_mode === 'both') && (
+                      <div>
+                        <label className="text-[9px] text-amber-300 block mb-1">
+                          {editingSpec.elong_mode === 'both' ? (isTh ? 'Max Elong (%)' : 'Max Elong (%)') : (isTh ? 'Max Elong (%) [≤]' : 'Max Elong (%) [≤]')}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={editingSpec.elong_mode === 'max' ? (editingSpec.elong_max ?? editingSpec.elong) : (editingSpec.elong_max ?? editingSpec.elong)}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            if (editingSpec.elong_mode === 'max') {
+                              setEditingSpec({ ...editingSpec, elong_max: val, elong: val });
+                            } else {
+                              setEditingSpec({ ...editingSpec, elong_max: val });
+                            }
+                          }}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-300 focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-[10px] text-right font-mono text-amber-300">
+                    {isTh ? 'เกณฑ์ที่ตั้ง:' : 'Rule:'} {formatElongationSpec(editingSpec)}
+                  </div>
                 </div>
               </div>
 

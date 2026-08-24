@@ -35,10 +35,12 @@ import {
   AlertOctagon,
   ArrowUpRight,
   ShieldCheck,
-  X
+  X,
+  Sun,
+  Moon
 } from 'lucide-react';
 
-import { NcrRecord, NcrStatus, NcrSeverity, Language, InspectionActivity } from '../types';
+import { NcrRecord, NcrStatus, NcrSeverity, Language, InspectionActivity, ThemeMode } from '../types';
 import { 
   getStoredNcrRecords, 
   saveNcrRecords, 
@@ -50,6 +52,8 @@ interface NcrManagementAppProps {
   onBackToPortal?: () => void;
   onLogNewActivity?: (activity: InspectionActivity) => void;
   language?: Language;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 const PROCESS_OPTIONS = [
@@ -74,9 +78,12 @@ const PROCESS_OPTIONS = [
 export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
   onBackToPortal,
   onLogNewActivity,
-  language = 'th'
+  language = 'th',
+  theme = 'light',
+  onToggleTheme
 }) => {
   const isTh = language === 'th';
+  const isLight = theme === 'light';
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<'LOG' | 'CREATE' | 'ANALYTICS' | 'REPORT'>('LOG');
@@ -84,6 +91,12 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
   // NCR Records State
   const [ncrList, setNcrList] = useState<NcrRecord[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Delete NCR with admin2026 Password
+  const [deleteTargetNcrId, setDeleteTargetNcrId] = useState<string | null>(null);
+  const [deleteNcrPassword, setDeleteNcrPassword] = useState('');
+  const [deleteNcrError, setDeleteNcrError] = useState(false);
+  const [isDeleteNcrOpen, setIsDeleteNcrOpen] = useState(false);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -206,16 +219,34 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
     showToast('success', isTh ? `อัปเดตสถานะ ${id} เป็น "${newStat}" เรียบร้อยแล้ว` : `Updated status for ${id} to "${newStat}"`);
   };
 
-  // Handle Delete Record
-  const handleDeleteNcr = (id: string) => {
-    if (!window.confirm(isTh ? `ยืนยันการลบรายการ ${id}?` : `Confirm deleting record ${id}?`)) return;
-    const updated = ncrList.filter((item) => item.id !== id);
-    setNcrList(updated);
-    saveNcrRecords(updated);
-    if (selectedNcr?.id === id) {
-      setSelectedNcr(null);
+  // Handle Request Delete Record (Password Protected with admin2026)
+  const handleRequestDeleteNcr = (id: string) => {
+    setDeleteTargetNcrId(id);
+    setDeleteNcrPassword('');
+    setDeleteNcrError(false);
+    setIsDeleteNcrOpen(true);
+  };
+
+  const handleVerifyDeleteNcrPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (deleteNcrPassword === "admin2026") {
+      if (deleteTargetNcrId) {
+        const updated = ncrList.filter((item) => item.id !== deleteTargetNcrId);
+        setNcrList(updated);
+        saveNcrRecords(updated);
+        if (selectedNcr?.id === deleteTargetNcrId) {
+          setSelectedNcr(null);
+        }
+        showToast('info', isTh ? `ลบรายการ ${deleteTargetNcrId} เรียบร้อยแล้ว` : `Deleted ${deleteTargetNcrId}`);
+      }
+      setIsDeleteNcrOpen(false);
+      setDeleteNcrError(false);
+      setDeleteTargetNcrId(null);
+      setDeleteNcrPassword('');
+    } else {
+      setDeleteNcrError(true);
+      setDeleteNcrPassword('');
     }
-    showToast('info', isTh ? `ลบรายการ ${id} แล้ว` : `Deleted ${id}`);
   };
 
   // Handle Create Manual NCR
@@ -373,47 +404,57 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 sm:p-6 space-y-6">
+    <div className={`min-h-screen font-sans p-4 sm:p-6 space-y-6 transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
+    }`}>
       
       {/* Toast Notification */}
       {toastMsg && (
         <div className={`fixed top-5 right-5 z-[100] px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border text-sm font-semibold animate-in fade-in slide-in-from-top-4 ${
-          toastMsg.type === 'success' ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40' :
-          toastMsg.type === 'error' ? 'bg-rose-950/90 text-rose-300 border-rose-500/40' :
-          'bg-slate-900/90 text-slate-200 border-slate-700'
+          toastMsg.type === 'success' ? (isLight ? 'bg-white text-emerald-700 border-emerald-300 shadow-md' : 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40') :
+          toastMsg.type === 'error' ? (isLight ? 'bg-white text-rose-700 border-rose-300 shadow-md' : 'bg-rose-950/90 text-rose-300 border-rose-500/40') :
+          (isLight ? 'bg-white text-slate-700 border-slate-300 shadow-md' : 'bg-slate-900/90 text-slate-200 border-slate-700')
         }`}>
-          {toastMsg.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
-          {toastMsg.type === 'error' && <AlertOctagon className="w-5 h-5 text-rose-400" />}
-          {toastMsg.type === 'info' && <HelpCircle className="w-5 h-5 text-cyan-400" />}
+          {toastMsg.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
+          {toastMsg.type === 'error' && <AlertOctagon className="w-5 h-5 text-rose-500" />}
+          {toastMsg.type === 'info' && <HelpCircle className="w-5 h-5 text-blue-500" />}
           <span>{toastMsg.message}</span>
         </div>
       )}
 
       {/* Top Header Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-xl">
+      <div className={`border rounded-3xl p-5 sm:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-sm transition-colors ${
+        isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800 shadow-xl'
+      }`}>
         <div className="flex items-center gap-4">
           <button
             onClick={onBackToPortal}
-            className="p-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white rounded-2xl border border-slate-700 transition"
+            className={`p-3 active:scale-95 rounded-2xl border transition ${
+              isLight 
+                ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-300' 
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
+            }`}
             title={isTh ? 'กลับสู่หน้าหลัก QA Portal' : 'Back to QA Portal'}
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 text-rose-500" />
           </button>
 
-          <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 shadow-inner">
+          <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-500 shadow-inner">
             <AlertTriangle className="w-6 h-6" />
           </div>
 
           <div>
             <div className="flex items-center gap-2.5">
-              <span className="px-2.5 py-0.5 rounded-md text-xs font-mono font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+              <span className="px-2.5 py-0.5 rounded-md text-xs font-mono font-bold bg-rose-500/15 text-rose-600 border border-rose-500/30">
                 NCR-01
               </span>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              <h1 className={`text-xl sm:text-2xl font-black tracking-tight ${
+                isLight ? 'text-slate-900' : 'text-white'
+              }`}>
                 {isTh ? 'ศูนย์จัดการของเสีย & การแก้ไข CAPA' : 'Non-Conformance Report (NCR) & CAPA Center'}
               </h1>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className={`text-xs mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
               {isTh 
                 ? 'รวบรวมข้อมูลรายการ Fail / Out of Spec / NG อัตโนมัติจากทุกกระบวนการ แยกตาม Coil no., Profile, Inspection date, Inspector, Process และ Inspection result' 
                 : 'Centralized non-conformance database automatically aggregated from all inspection stations separated by Coil no., Profile, Date, Inspector, Process & Out of Spec details.'}
@@ -421,14 +462,31 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
           </div>
         </div>
 
-        {/* Top Action Tabs */}
+        {/* Top Action Tabs & Theme Toggle */}
         <div className="flex items-center gap-2 flex-wrap">
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`px-3 py-2.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition ${
+                isLight
+                  ? 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100 shadow-xs'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}
+            >
+              {isLight ? <Moon className="w-4 h-4 text-indigo-600" /> : <Sun className="w-4 h-4 text-amber-400" />}
+              <span>{isLight ? (isTh ? 'สว่าง' : 'Light') : (isTh ? 'มืด' : 'Dark')}</span>
+            </button>
+          )}
+
           <button
             onClick={() => setActiveTab('LOG')}
             className={`px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 ${
               activeTab === 'LOG'
-                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                ? 'bg-rose-600 text-white shadow-sm'
+                : isLight
+                  ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
             }`}
           >
             <FileText className="w-4 h-4" />
@@ -439,8 +497,10 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
             onClick={() => setActiveTab('CREATE')}
             className={`px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 ${
               activeTab === 'CREATE'
-                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                ? 'bg-rose-600 text-white shadow-sm'
+                : isLight
+                  ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
             }`}
           >
             <Plus className="w-4 h-4" />
@@ -451,8 +511,10 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
             onClick={() => setActiveTab('ANALYTICS')}
             className={`px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 ${
               activeTab === 'ANALYTICS'
-                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                ? 'bg-rose-600 text-white shadow-sm'
+                : isLight
+                  ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
             }`}
           >
             <BarChart3 className="w-4 h-4" />
@@ -461,7 +523,11 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
 
           <button
             onClick={() => exportNcrToCsv(filteredList)}
-            className="px-3 py-2.5 rounded-xl font-bold text-xs bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 transition flex items-center gap-1.5"
+            className={`px-3 py-2.5 rounded-xl font-bold text-xs border transition flex items-center gap-1.5 ${
+              isLight
+                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300'
+                : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/30'
+            }`}
             title="Export CSV"
           >
             <FileSpreadsheet className="w-4 h-4" />
@@ -762,9 +828,9 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                               <Eye className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => handleDeleteNcr(item.id)}
+                              onClick={() => handleRequestDeleteNcr(item.id)}
                               className="p-1.5 bg-rose-950/40 hover:bg-rose-900 text-rose-400 hover:text-rose-200 rounded-lg border border-rose-900/60 transition"
-                              title="Delete NCR"
+                              title={isTh ? "ลบ NCR (ต้องใส่รหัส admin2026)" : "Delete NCR (Password required)"}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -1311,6 +1377,65 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Delete NCR Password Modal (admin2026) */}
+      {isDeleteNcrOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+            <button 
+              onClick={() => setIsDeleteNcrOpen(false)} 
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h4 className="font-bold text-base text-white">
+                {isTh ? 'ยืนยันรหัสผ่านเพื่อลบ NCR' : 'Password Required to Delete NCR'}
+              </h4>
+              <p className="text-xs text-slate-400">
+                {isTh 
+                  ? `ต้องการลบรายการ NCR ${deleteTargetNcrId || ''} กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน` 
+                  : `Enter admin password admin2026 to delete NCR ${deleteTargetNcrId || ''}`}
+              </p>
+            </div>
+
+            <form onSubmit={handleVerifyDeleteNcrPassword} className="space-y-3">
+              <input
+                type="password"
+                autoFocus
+                placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
+                value={deleteNcrPassword}
+                onChange={(e) => setDeleteNcrPassword(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none focus:border-rose-500"
+              />
+              {deleteNcrError && (
+                <p className="text-xs text-rose-500 font-semibold text-center">
+                  {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
+                </p>
+              )}
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteNcrOpen(false)}
+                  className="flex-1 font-bold text-xs py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
+                >
+                  {isTh ? 'ยกเลิก' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isTh ? 'ยืนยันลบ NCR' : 'Verify & Delete'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

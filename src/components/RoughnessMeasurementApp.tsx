@@ -27,20 +27,25 @@ import {
   FileText,
   Sliders,
   Edit3,
-  RotateCcw
+  RotateCcw,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 import { 
   RoughnessProfileSpec, 
   RoughnessInspectionRecord, 
   Language, 
-  InspectionActivity 
+  InspectionActivity,
+  ThemeMode
 } from '../types';
 
 interface RoughnessMeasurementAppProps {
   onBackToPortal?: () => void;
   onLogNewActivity?: (activity: InspectionActivity) => void;
   language?: Language;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 // Sparkline SVG Component
@@ -188,9 +193,12 @@ const INITIAL_INSPECTIONS: RoughnessInspectionRecord[] = [
 export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = ({
   onBackToPortal,
   onLogNewActivity,
-  language = 'th'
+  language = 'th',
+  theme = 'light',
+  onToggleTheme
 }) => {
   const isTh = language === 'th';
+  const isLight = theme === 'light';
   const [activeTab, setActiveTab] = useState<'new-batch' | 'profile-settings' | 'dashboard' | 'history'>('new-batch');
 
   // Saved Profiles & Inspections in localStorage
@@ -837,18 +845,24 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
   }, [inspections, historySearchTerm]);
 
   return (
-    <div className="min-h-screen bg-slate-950 font-sans text-slate-100 p-4 sm:p-6 space-y-6">
+    <div className={`min-h-screen font-sans p-4 sm:p-6 space-y-6 transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
+    }`}>
 
       {/* Admin Verification Modal */}
       {showAdminModal && (
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95">
+          <div className={`w-full max-w-md rounded-3xl p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 border ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+          }`}>
             <div className="text-center space-y-2">
-              <div className="w-14 h-14 bg-cyan-500/10 text-cyan-400 rounded-2xl border border-cyan-500/20 flex items-center justify-center mx-auto">
+              <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center mx-auto ${
+                isLight ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+              }`}>
                 <Lock className="w-7 h-7" />
               </div>
-              <h3 className="text-lg font-bold text-white">Admin Verification</h3>
-              <p className="text-xs text-slate-400">
+              <h3 className={`text-lg font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Admin Verification</h3>
+              <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh ? 'กรุณาระบุรหัสผ่านเพื่อตั้งค่า Profile Spec (admin2026)' : 'Enter admin password to manage profile specifications'}
               </p>
             </div>
@@ -860,11 +874,15 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                   value={adminPasswordInput}
                   onChange={(e) => setAdminPasswordInput(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-center text-lg font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
+                  className={`w-full border rounded-2xl px-4 py-3 text-center text-lg font-mono focus:outline-none ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-300 text-blue-600 focus:border-blue-500' 
+                      : 'bg-slate-950 border-slate-800 text-cyan-300 focus:border-cyan-500'
+                  }`}
                   autoFocus
                 />
                 {showPasswordError && (
-                  <p className="text-rose-400 text-xs font-semibold text-center mt-2">
+                  <p className="text-rose-500 text-xs font-semibold text-center mt-2">
                     {isTh ? 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่' : 'Incorrect password. Please try again.'}
                   </p>
                 )}
@@ -874,13 +892,21 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                 <button
                   type="button"
                   onClick={() => setShowAdminModal(false)}
-                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-3 rounded-xl transition"
+                  className={`flex-1 font-bold text-xs py-3 rounded-xl transition ${
+                    isLight 
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' 
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                  }`}
                 >
                   {isTh ? 'ยกเลิก' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs py-3 rounded-xl transition shadow-lg shadow-cyan-500/20"
+                  className={`flex-1 font-bold text-xs py-3 rounded-xl transition shadow-md ${
+                    isLight
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/20'
+                      : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/20'
+                  }`}
                 >
                   {isTh ? 'ยืนยันรหัสผ่าน' : 'Verify'}
                 </button>
@@ -893,18 +919,22 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
-          <div className="bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full p-6 border border-slate-800 space-y-4">
-             <div className="w-14 h-14 bg-rose-500/10 text-rose-400 rounded-2xl border border-rose-500/20 flex items-center justify-center mx-auto">
+          <div className={`rounded-3xl shadow-2xl max-w-md w-full p-6 border space-y-4 ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+          }`}>
+             <div className="w-14 h-14 bg-rose-500/10 text-rose-500 rounded-2xl border border-rose-500/20 flex items-center justify-center mx-auto">
                 <Trash2 className="w-7 h-7" />
              </div>
              <div className="text-center">
-               <h3 className="text-lg font-bold text-white">{isTh ? 'ยืนยันการลบข้อมูล?' : 'Confirm Deletion'}</h3>
-               <p className="text-xs text-slate-400 mt-1">{isTh ? 'คุณต้องการลบ' : 'Delete'} <b>{deleteConfirm.label}</b> {isTh ? 'ใช่หรือไม่?' : 'permanently?'}</p>
+               <h3 className={`text-lg font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{isTh ? 'ยืนยันการลบข้อมูล?' : 'Confirm Deletion'}</h3>
+               <p className={`text-xs mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{isTh ? 'คุณต้องการลบ' : 'Delete'} <b>{deleteConfirm.label}</b> {isTh ? 'ใช่หรือไม่?' : 'permanently?'}</p>
              </div>
              <div className="flex gap-3 pt-2">
                 <button 
                   onClick={() => setDeleteConfirm(null)} 
-                  className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition"
+                  className={`flex-1 py-2.5 font-bold rounded-xl text-xs transition ${
+                    isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                  }`}
                 >
                   {isTh ? 'ยกเลิก' : 'Cancel'}
                 </button>
@@ -913,7 +943,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                     if (deleteConfirm.type === 'profile') handleDeleteProfile(deleteConfirm.id);
                     if (deleteConfirm.type === 'history') handleDeleteHistoryItem(deleteConfirm.id);
                   }} 
-                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-rose-600/20 transition"
+                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs shadow-md transition"
                 >
                   {isTh ? 'ยืนยันลบ' : 'Delete'}
                 </button>
@@ -923,33 +953,43 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
       )}
 
       {/* Header Bar */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b transition-colors ${
+        isLight ? 'border-slate-200' : 'border-slate-800'
+      }`}>
         <div className="flex items-center gap-3">
           {onBackToPortal && (
             <button
               onClick={onBackToPortal}
-              className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition flex items-center gap-1.5 text-xs font-semibold"
+              className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-xs font-semibold ${
+                isLight
+                  ? 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-xs'
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800'
+              }`}
               title="Return to QA Portal"
             >
-              <ArrowLeft className="w-4 h-4 text-cyan-400" />
+              <ArrowLeft className="w-4 h-4 text-blue-600" />
               <span>{isTh ? 'กลับสู่เมนูหลัก QA' : 'Back to Portal'}</span>
             </button>
           )}
 
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-xl text-slate-950 shadow-lg shadow-indigo-500/20">
+            <div className={`p-2.5 rounded-xl shadow-md ${
+              isLight ? 'bg-indigo-600 text-white' : 'bg-gradient-to-br from-indigo-500 to-cyan-500 text-slate-950 shadow-indigo-500/20'
+            }`}>
               <ClipboardCheck className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                  isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-950 text-indigo-300 border-indigo-800'
+                }`}>
                   IPQC-02
                 </span>
-                <h1 className="text-xl font-bold text-white tracking-tight">
+                <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? 'ระบบตรวจวัดความเรียบผิว (Roughness System)' : 'Surface Roughness Measurement System'}
                 </h1>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh 
                   ? 'วัดค่า Ra, Rz, Rt, Ry ขอบบน-ขอบล่าง, คำนวณ Rz Cal (3-Sigma) พร้อมกราฟแนวโน้ม' 
                   : 'Surface metrology parameters (Ra, Rz, Rt, Ry), 3-Sigma Rz Cal, Sparklines & Spec Control'}
@@ -958,22 +998,44 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        {/* Status indicator & Theme Toggle */}
+        <div className="flex items-center gap-2.5">
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition ${
+                isLight
+                  ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 shadow-xs'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}
+            >
+              {isLight ? <Moon className="w-3.5 h-3.5 text-indigo-600" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
+              <span>{isLight ? (isTh ? 'สว่าง' : 'Light') : (isTh ? 'มืด' : 'Dark')}</span>
+            </button>
+          )}
+
+          <div className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border ${
+            isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
+          }`}>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>Cloud Sync Active</span>
           </div>
         </div>
       </header>
 
       {/* Navigation Tabs */}
-      <div className="flex space-x-2 border-b border-slate-800 pb-2 overflow-x-auto">
+      <div className={`flex space-x-2 border-b pb-2 overflow-x-auto ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
         <button
           onClick={() => setActiveTab('new-batch')}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'new-batch'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <PlusCircle className="w-4 h-4" />
@@ -984,14 +1046,18 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
           onClick={handleAdminAccess}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'profile-settings'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <Settings2 className="w-4 h-4" />
           <span>{isTh ? '⚙️ Profile Spec' : 'Profile Spec'}</span>
           {isAdminAuthenticated && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           )}
         </button>
 
@@ -999,8 +1065,12 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
           onClick={() => setActiveTab('dashboard')}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'dashboard'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <BarChart3 className="w-4 h-4" />
@@ -1011,14 +1081,20 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
           onClick={() => setActiveTab('history')}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'history'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <History className="w-4 h-4" />
-          <span>{isTh ? '📜 ประวัติ' : 'History'}</span>
+          <span>{isTh ? '📜 ประวัติ' : 'History Log'}</span>
           {inspections.length > 0 && (
-            <span className="ml-1 bg-slate-950 text-cyan-300 px-2 py-0.5 rounded-full text-[10px] font-mono border border-cyan-800">
+            <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+              isLight ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-slate-950 text-cyan-300 border-cyan-800'
+            }`}>
               {inspections.length}
             </span>
           )}

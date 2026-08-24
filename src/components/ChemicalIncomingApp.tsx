@@ -35,7 +35,9 @@ import {
   Scale, 
   Clock,
   Edit3,
-  AlertTriangle
+  AlertTriangle,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 import { 
@@ -44,6 +46,7 @@ import {
   ChemicalMeasureItem, 
   ChemicalInspectionEntry, 
   Language, 
+  ThemeMode,
   InspectionActivity 
 } from '../types';
 import { analyzeChemicalCertClient } from '../services/geminiClient';
@@ -52,6 +55,8 @@ interface ChemicalIncomingAppProps {
   onBackToPortal?: () => void;
   onLogNewActivity?: (activity: InspectionActivity) => void;
   language?: Language;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 const DEFAULT_SPECS: ChemicalSpecMap = {
@@ -124,9 +129,12 @@ const INITIAL_HISTORY: ChemicalInspectionEntry[] = [
 export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
   onBackToPortal,
   onLogNewActivity,
-  language = 'th'
+  language = 'th',
+  theme = 'light',
+  onToggleTheme
 }) => {
   const isTh = language === 'th';
+  const isLight = theme === 'light';
   const [activeTab, setActiveTab] = useState<'extraction' | 'history' | 'settings'>('extraction');
 
   // File & AI State
@@ -190,7 +198,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
   // Search Filter
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Delete Confirmation Modal State
+  // Delete Confirmation Modal State with Password Protection (admin2026)
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -206,6 +214,8 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     cancelText: '',
     onConfirm: () => {},
   });
+  const [deleteConfirmPassword, setDeleteConfirmPassword] = useState("");
+  const [deleteConfirmPasswordError, setDeleteConfirmPasswordError] = useState(false);
 
   // Trigger Edit Record
   const handleRequestEditHistory = (item: ChemicalInspectionEntry) => {
@@ -215,14 +225,16 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     setIsHistoryAuthOpen(true);
   };
 
-  // Delete history item with custom modal confirmation
+  // Delete history item with custom modal confirmation & admin2026 password
   const handleDeleteHistoryItem = (item: ChemicalInspectionEntry) => {
+    setDeleteConfirmPassword("");
+    setDeleteConfirmPasswordError(false);
     setConfirmModal({
       isOpen: true,
       title: isTh ? 'ยืนยันการลบรายการประวัติ' : 'Confirm Delete Record',
       message: isTh 
-        ? `คุณต้องการลบประวัติการตรวจรับ Batch/Lot: ${item.batch_lot} (${item.chemical}) ใช่หรือไม่?` 
-        : `Are you sure you want to delete inspection record for Batch ${item.batch_lot}?`,
+        ? `คุณต้องการลบประวัติการตรวจรับ Batch/Lot: ${item.batch_lot} (${item.chemical}) กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน` 
+        : `Are you sure you want to delete inspection record for Batch ${item.batch_lot}? Enter admin2026 to confirm.`,
       confirmText: isTh ? 'ลบรายการ' : 'Delete',
       cancelText: isTh ? 'ยกเลิก' : 'Cancel',
       onConfirm: () => {
@@ -236,14 +248,16 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     });
   };
 
-  // Clear all history with custom modal confirmation
+  // Clear all history with custom modal confirmation & admin2026 password
   const handleClearAllHistory = () => {
+    setDeleteConfirmPassword("");
+    setDeleteConfirmPasswordError(false);
     setConfirmModal({
       isOpen: true,
       title: isTh ? 'ยืนยันการลบประวัติทั้งหมด' : 'Confirm Clear All History',
       message: isTh 
-        ? 'คุณต้องการลบประวัติการตรวจรับเคมีทั้งหมดใช่หรือไม่? (การกระทำนี้ไม่สามารถยกเลิกได้)' 
-        : 'Are you sure you want to clear all chemical inspection history? (This cannot be undone)',
+        ? 'คุณต้องการลบประวัติการตรวจรับเคมีทั้งหมดใช่หรือไม่? (การกระทำนี้ไม่สามารถยกเลิกได้) กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน' 
+        : 'Are you sure you want to clear all chemical inspection history? Enter admin2026 to confirm.',
       confirmText: isTh ? 'ล้างประวัติทั้งหมด' : 'Clear All',
       cancelText: isTh ? 'ยกเลิก' : 'Cancel',
       onConfirm: () => {
@@ -631,12 +645,14 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
   };
 
   const deleteProfile = (keyToDelete: string) => {
+    setDeleteConfirmPassword("");
+    setDeleteConfirmPasswordError(false);
     setConfirmModal({
       isOpen: true,
       title: isTh ? 'ยืนยันการลบ Spec' : 'Confirm Delete Spec',
       message: isTh 
-        ? `คุณต้องการลบเกณฑ์ Spec ของรหัสเคมี ${keyToDelete} ใช่หรือไม่?` 
-        : `Are you sure you want to delete spec for chemical code ${keyToDelete}?`,
+        ? `คุณต้องการลบเกณฑ์ Spec ของรหัสเคมี ${keyToDelete} กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน` 
+        : `Are you sure you want to delete spec for chemical code ${keyToDelete}? Enter admin2026 to confirm.`,
       confirmText: isTh ? 'ลบ Spec' : 'Delete Spec',
       cancelText: isTh ? 'ยกเลิก' : 'Cancel',
       onConfirm: () => {
@@ -692,18 +708,26 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 sm:p-6 space-y-6">
+    <div className={`min-h-screen font-sans p-4 sm:p-6 space-y-6 transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
+    }`}>
       
       {/* Admin Password Modal */}
       {showAdminModal && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95">
+        <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md ${
+          isLight ? 'bg-slate-900/40' : 'bg-slate-950/80'
+        }`}>
+          <div className={`border w-full max-w-md rounded-3xl p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 ${
+            isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+          }`}>
             <div className="text-center space-y-2">
-              <div className="w-14 h-14 bg-indigo-500/10 text-indigo-400 rounded-2xl border border-indigo-500/20 flex items-center justify-center mx-auto">
+              <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center mx-auto ${
+                isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+              }`}>
                 <Lock className="w-7 h-7" />
               </div>
-              <h3 className="text-lg font-bold text-white">Admin Authentication</h3>
-              <p className="text-xs text-slate-400">
+              <h3 className={`text-lg font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Admin Authentication</h3>
+              <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh ? 'กรุณาระบุรหัสผ่านเพื่อเข้าสู่โหมดตั้งค่า Spec' : 'Please enter admin password to configure specs'}
               </p>
             </div>
@@ -715,11 +739,15 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                   value={adminPasswordInput}
                   onChange={(e) => setAdminPasswordInput(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-center text-lg font-mono text-cyan-300 focus:outline-none focus:border-indigo-500"
+                  className={`w-full border rounded-2xl px-4 py-3 text-center text-lg font-mono focus:outline-none ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-300 text-indigo-700 focus:border-indigo-600' 
+                      : 'bg-slate-950 border-slate-800 text-cyan-300 focus:border-indigo-500'
+                  }`}
                   autoFocus
                 />
                 {passwordError && (
-                  <p className="text-rose-400 text-xs font-semibold text-center mt-2">
+                  <p className="text-rose-500 text-xs font-semibold text-center mt-2">
                     {isTh ? 'รหัสผ่านไม่ถูกต้อง (ลอง admin2026)' : 'Incorrect password (try admin2026)'}
                   </p>
                 )}
@@ -729,13 +757,17 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAdminModal(false)}
-                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-3 rounded-xl transition"
+                  className={`flex-1 font-bold text-xs py-3 rounded-xl transition border ${
+                    isLight 
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200' 
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                  }`}
                 >
                   {isTh ? 'ยกเลิก' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 rounded-xl transition shadow-lg shadow-indigo-600/30"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-3 rounded-xl transition shadow-md shadow-indigo-600/30"
                 >
                   {isTh ? 'เข้าสู่ระบบ' : 'Login'}
                 </button>
@@ -746,33 +778,41 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
       )}
 
       {/* Top Application Bar */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b ${
+        isLight ? 'border-slate-200' : 'border-slate-800'
+      }`}>
         <div className="flex items-center gap-3">
           {onBackToPortal && (
             <button
               onClick={onBackToPortal}
-              className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition flex items-center gap-1.5 text-xs font-semibold"
+              className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-xs font-semibold ${
+                isLight 
+                  ? 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-xs' 
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800'
+              }`}
               title="Return to QA Portal"
             >
-              <ArrowLeft className="w-4 h-4 text-cyan-400" />
+              <ArrowLeft className={`w-4 h-4 ${isLight ? 'text-indigo-600' : 'text-cyan-400'}`} />
               <span>{isTh ? 'กลับสู่เมนูหลัก QA' : 'Back to Portal'}</span>
             </button>
           )}
 
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl text-white shadow-lg shadow-indigo-500/20">
+            <div className="p-2.5 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl text-white shadow-md shadow-indigo-500/20">
               <FlaskConical className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                  isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-950 text-indigo-300 border-indigo-800'
+                }`}>
                   IQC-02
                 </span>
-                <h1 className="text-xl font-bold text-white tracking-tight">
+                <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? 'ระบบตรวจรับเคมีเคลือบผิว (Chemical Incoming Inspection)' : 'Coating Chemical Incoming Inspection'}
                 </h1>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh 
                   ? 'วิเคราะห์ไฟล์ PDF / รูปถ่าย COA, สกัดค่าส่วนผสมเคมี และตรวจสอบเกณฑ์มาตรฐาน' 
                   : 'PDF/Image COA AI OCR, Chemical Property Spec Match, Cloud Persistence'}
@@ -781,23 +821,44 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
           </div>
         </div>
 
-        {/* Engine Badge */}
-        <div className="flex items-center gap-3">
-          <div className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-800 text-indigo-300 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-indigo-400" />
+        {/* Right Action Tools */}
+        <div className="flex items-center gap-2">
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`p-2 rounded-xl border transition flex items-center gap-2 text-xs font-semibold ${
+                isLight
+                  ? 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-xs'
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700'
+              }`}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Industrial'}
+            >
+              {isLight ? <Moon className="w-4 h-4 text-slate-700" /> : <Sun className="w-4 h-4 text-amber-400" />}
+              <span className="hidden sm:inline">{isLight ? (isTh ? 'โหมดมืด' : 'Dark') : (isTh ? 'โหมดสว่าง' : 'Light')}</span>
+            </button>
+          )}
+
+          <div className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-2 ${
+            isLight ? 'bg-white border-slate-200 text-indigo-700 shadow-xs' : 'bg-slate-900 border-slate-800 text-indigo-300'
+          }`}>
+            <Sparkles className="w-4 h-4 text-indigo-500" />
             <span>Engine: Gemini-2.5-Flash</span>
           </div>
         </div>
       </header>
 
       {/* Tabs Bar */}
-      <div className="flex space-x-2 border-b border-slate-800 pb-2 overflow-x-auto">
+      <div className={`flex space-x-2 border-b pb-2 overflow-x-auto ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
         <button
           onClick={() => setActiveTab('extraction')}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'extraction'
-              ? 'bg-indigo-600 text-white border-indigo-500 font-bold shadow-md shadow-indigo-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                : 'bg-indigo-600 text-white border-indigo-500 font-bold shadow-md shadow-indigo-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <FileText className="w-4 h-4" />
@@ -808,14 +869,20 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
           onClick={() => setActiveTab('history')}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'history'
-              ? 'bg-indigo-600 text-white border-indigo-500 font-bold shadow-md shadow-indigo-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                : 'bg-indigo-600 text-white border-indigo-500 font-bold shadow-md shadow-indigo-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <BarChart3 className="w-4 h-4" />
           <span>{isTh ? '2. ประวัติการตรวจรับ (Inspection History)' : '2. Inspection History'}</span>
           {history.length > 0 && (
-            <span className="ml-1 bg-slate-950 text-indigo-300 px-2 py-0.5 rounded-full text-[10px] font-mono border border-indigo-800">
+            <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+              isLight ? 'bg-indigo-100 text-indigo-800 border-indigo-200' : 'bg-slate-950 text-indigo-300 border-indigo-800'
+            }`}>
               {history.length}
             </span>
           )}
@@ -825,14 +892,18 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
           onClick={handleAdminAccessRequest}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'settings'
-              ? 'bg-indigo-600 text-white border-indigo-500 font-bold shadow-md shadow-indigo-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                : 'bg-indigo-600 text-white border-indigo-500 font-bold shadow-md shadow-indigo-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <Settings className="w-4 h-4" />
           <span>{isTh ? '3. ตั้งค่าเกณฑ์ Spec (Chemical Specs)' : '3. Spec Setting'}</span>
           {isAdminAuthenticated && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           )}
         </button>
       </div>
@@ -843,20 +914,28 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
           
           {/* Left Upload Panel */}
           <div className="lg:col-span-4 space-y-4">
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4 shadow-md sticky top-6">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Upload className="w-4 h-4 text-indigo-400" />
+            <div className={`p-5 rounded-2xl border space-y-4 sticky top-6 ${
+              isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-900 border-slate-800 shadow-md'
+            }`}>
+              <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${
+                isLight ? 'text-slate-900' : 'text-white'
+              }`}>
+                <Upload className="w-4 h-4 text-indigo-500" />
                 {isTh ? '1. นำเข้าไฟล์ (PDF / Image)' : '1. Import File (PDF / Image)'}
               </h3>
 
               {/* Drop Zone */}
               <div className={`relative border-2 border-dashed rounded-xl p-4 min-h-[200px] flex flex-col items-center justify-center transition ${
-                image ? 'border-indigo-500 bg-slate-950' : 'border-slate-800 hover:border-slate-700 bg-slate-950/50'
+                isLight
+                  ? image ? 'border-indigo-500 bg-indigo-50/20' : 'border-slate-300 hover:border-slate-400 bg-slate-50'
+                  : image ? 'border-indigo-500 bg-slate-950' : 'border-slate-800 hover:border-slate-700 bg-slate-950/50'
               }`}>
                 {isProcessing && (
-                  <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center text-center p-4">
-                    <Loader2 className="w-10 h-10 text-indigo-400 animate-spin mb-2" />
-                    <span className="text-xs font-bold text-indigo-300">
+                  <div className={`absolute inset-0 z-20 flex flex-col items-center justify-center text-center p-4 backdrop-blur-sm ${
+                    isLight ? 'bg-white/80' : 'bg-slate-950/80'
+                  }`}>
+                    <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-2" />
+                    <span className={`text-xs font-bold ${isLight ? 'text-indigo-700' : 'text-indigo-300'}`}>
                       {isTh ? 'กำลังสกัดข้อมูลด้วย AI...' : 'Analyzing document with AI...'}
                     </span>
                   </div>
@@ -866,11 +945,11 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                   <img src={image} alt="Cert Preview" className="max-h-[220px] w-full object-contain rounded-lg" />
                 ) : (
                   <div className="text-center p-4 space-y-2">
-                    <Upload className="mx-auto w-10 h-10 text-slate-600 mb-2" />
-                    <p className="font-semibold text-xs text-slate-300">
+                    <Upload className={`mx-auto w-10 h-10 mb-2 ${isLight ? 'text-slate-400' : 'text-slate-600'}`} />
+                    <p className={`font-semibold text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
                       {isTh ? 'ลากไฟล์มาวาง หรือ คลิกเพื่อเลือก' : 'Drag & drop file or click to select'}
                     </p>
-                    <p className="text-[10px] text-slate-500">
+                    <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                       {isTh ? 'รองรับไฟล์สแกน, รูปถ่าย COA มือถือ' : 'Supports scanned PDFs & COA images'}
                     </p>
                   </div>
@@ -885,9 +964,11 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               </div>
 
               {fileName && (
-                <div className="p-3 bg-indigo-950/40 border border-indigo-900/60 rounded-xl flex items-center justify-between text-xs text-indigo-300">
+                <div className={`p-3 rounded-xl flex items-center justify-between text-xs border ${
+                  isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-indigo-950/40 border-indigo-900/60 text-indigo-300'
+                }`}>
                   <span className="font-mono truncate max-w-[200px]">{fileName}</span>
-                  <button onClick={() => { setImage(null); setFileName(''); setBase64Image(null); }} className="text-slate-400 hover:text-rose-400">
+                  <button onClick={() => { setImage(null); setFileName(''); setBase64Image(null); }} className="text-slate-400 hover:text-rose-500">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -898,7 +979,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 <button
                   onClick={processDocument}
                   disabled={isProcessing}
-                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition shadow-md shadow-indigo-500/20 active:scale-95 disabled:opacity-50"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition shadow-md shadow-indigo-500/20 active:scale-95 disabled:opacity-50"
                 >
                   {isProcessing ? <Loader2 className="animate-spin w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
                   <span>{isTh ? 'สกัดข้อมูลด้วย AI แม่นยำสูง' : 'Extract Data with AI'}</span>
@@ -906,9 +987,13 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
                 <button
                   onClick={loadDemoCert}
-                  className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs py-2.5 rounded-xl flex items-center justify-center gap-2 transition border border-slate-700"
+                  className={`w-full font-medium text-xs py-2.5 rounded-xl flex items-center justify-center gap-2 transition border ${
+                    isLight
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                  }`}
                 >
-                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <Zap className="w-3.5 h-3.5 text-amber-500" />
                   <span>{isTh ? '⚡ โหลดเอกสารตัวอย่าง Chemical COA' : '⚡ Load Demo Chemical COA'}</span>
                 </button>
               </div>
@@ -917,11 +1002,15 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
           {/* Right Structured Data Results Panel */}
           <div className="lg:col-span-8 space-y-4">
-            <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-6 shadow-md">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className={`p-6 rounded-2xl border space-y-6 ${
+              isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-900 border-slate-800 shadow-md'
+            }`}>
+              <div className={`flex items-center justify-between pb-3 border-b ${
+                isLight ? 'border-slate-200' : 'border-slate-800'
+              }`}>
                 <div className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-full ${tableItems.length > 0 ? 'bg-emerald-400' : 'bg-slate-600'}`}></span>
-                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                  <span className={`w-2.5 h-2.5 rounded-full ${tableItems.length > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                  <h3 className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
                     {isTh ? 'ผลการสกัดข้อมูล (Structured Data)' : 'Structured Data Results'}
                   </h3>
                 </div>
@@ -930,7 +1019,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                   <button
                     onClick={saveInspection}
                     disabled={tableItems.length === 0}
-                    className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition shadow-sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition shadow-xs"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{isTh ? 'บันทึกเข้าสู่ระบบ Cloud' : 'Save to Cloud'}</span>
@@ -939,7 +1028,11 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                   <button
                     onClick={copyJSON}
                     disabled={tableItems.length === 0}
-                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 font-bold text-xs px-3 py-2 rounded-xl border border-slate-700 flex items-center gap-1.5 transition"
+                    className={`font-bold text-xs px-3 py-2 rounded-xl border flex items-center gap-1.5 transition disabled:opacity-40 ${
+                      isLight
+                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                    }`}
                   >
                     <Copy className="w-3.5 h-3.5" />
                     <span>JSON</span>
@@ -947,7 +1040,11 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
                   <button
                     onClick={clearForm}
-                    className="p-2 bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 rounded-xl border border-slate-700 transition"
+                    className={`p-2 rounded-xl border transition ${
+                      isLight
+                        ? 'bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border-slate-200'
+                        : 'bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 border-slate-700'
+                    }`}
                     title="Clear"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -956,9 +1053,11 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               </div>
 
               {/* Header Metadata Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bg-slate-950/70 p-4 rounded-xl border border-slate-800">
+              <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4 rounded-xl border ${
+                isLight ? 'bg-slate-50/80 border-slate-200' : 'bg-slate-950/70 border-slate-800'
+              }`}>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">
+                  <label className={`text-[10px] font-bold block uppercase mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Inspector Name
                   </label>
                   <input
@@ -966,12 +1065,14 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                     value={header.inspector_name}
                     onChange={(e) => setHeader({ ...header, inspector_name: e.target.value })}
                     placeholder="Inspector Name"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                    className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 ${
+                      isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-200'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-indigo-400 block uppercase mb-1">
+                  <label className={`text-[10px] font-bold block uppercase mb-1 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`}>
                     Coating Chemical *
                   </label>
                   <input
@@ -979,12 +1080,16 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                     value={header.coating_chemical}
                     onChange={(e) => setHeader({ ...header, coating_chemical: e.target.value.toUpperCase() })}
                     placeholder="e.g. A-001, COAT-901"
-                    className="w-full bg-slate-900 border border-indigo-900/80 text-indigo-300 font-bold rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-400 uppercase"
+                    className={`w-full border font-bold rounded-lg px-2.5 py-1.5 text-xs focus:outline-none uppercase ${
+                      isLight
+                        ? 'bg-white border-indigo-300 text-indigo-700 focus:border-indigo-600'
+                        : 'bg-slate-900 border-indigo-900/80 text-indigo-300 focus:border-indigo-400'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">
+                  <label className={`text-[10px] font-bold block uppercase mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Batch / Lot
                   </label>
                   <input
@@ -992,12 +1097,14 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                     value={header.batch_lot}
                     onChange={(e) => setHeader({ ...header, batch_lot: e.target.value })}
                     placeholder="Batch/Lot"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                    className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-mono ${
+                      isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-200'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">
+                  <label className={`text-[10px] font-bold block uppercase mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Product Date
                   </label>
                   <input
@@ -1005,12 +1112,14 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                     value={header.product_date}
                     onChange={(e) => setHeader({ ...header, product_date: e.target.value })}
                     placeholder="YYYY-MM-DD"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                    className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-mono ${
+                      isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-200'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-rose-400 block uppercase mb-1">
+                  <label className={`text-[10px] font-bold block uppercase mb-1 ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
                     Expiration Date
                   </label>
                   <input
@@ -1018,12 +1127,16 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                     value={header.expiration_date}
                     onChange={(e) => setHeader({ ...header, expiration_date: e.target.value })}
                     placeholder="YYYY-MM-DD"
-                    className="w-full bg-slate-900 border border-rose-900/50 text-rose-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-rose-400 font-mono"
+                    className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none font-mono ${
+                      isLight
+                        ? 'bg-white border-rose-300 text-rose-700 focus:border-rose-500'
+                        : 'bg-slate-900 border-rose-900/50 text-rose-300 focus:border-rose-400'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">
+                  <label className={`text-[10px] font-bold block uppercase mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Weight (kg) / Q'ty (pcs)
                   </label>
                   <div className="flex gap-1.5">
@@ -1032,20 +1145,24 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                       placeholder="Weight kg"
                       value={header.weight_kg}
                       onChange={(e) => setHeader({ ...header, weight_kg: e.target.value })}
-                      className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                      className={`w-1/2 border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-mono ${
+                        isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-200'
+                      }`}
                     />
                     <input
                       type="text"
                       placeholder="Qty pcs"
                       value={header.qty_pcs}
                       onChange={(e) => setHeader({ ...header, qty_pcs: e.target.value })}
-                      className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                      className={`w-1/2 border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-mono ${
+                        isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-200'
+                      }`}
                     />
                   </div>
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">
+                  <label className={`text-[10px] font-bold block uppercase mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Supplier Name
                   </label>
                   <input
@@ -1053,12 +1170,14 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                     value={header.supplier}
                     onChange={(e) => setHeader({ ...header, supplier: e.target.value })}
                     placeholder="Supplier Name"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                    className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 ${
+                      isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-200'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">
+                  <label className={`text-[10px] font-bold block uppercase mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Packaging Situation
                   </label>
                   <input
@@ -1066,7 +1185,9 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                     value={header.packaging_situation}
                     onChange={(e) => setHeader({ ...header, packaging_situation: e.target.value })}
                     placeholder="Normal / Sealed"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                    className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 ${
+                      isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-200'
+                    }`}
                   />
                 </div>
               </div>
@@ -1074,27 +1195,35 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               {/* Table of Measurements */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  <span className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
                     {isTh ? 'ตารางรายการวัด (Measurement Items)' : 'Measurement Table'}
                   </span>
 
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-400">
+                    <span className={`text-xs font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                       {isTh ? 'ผลสรุปรวม:' : 'Overall Status:'}
                     </span>
                     <span className={`px-3 py-0.5 rounded-full text-xs font-bold border ${
                       overallResult === 'PASS' 
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
-                        : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                        ? isLight
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                        : isLight
+                          ? 'bg-rose-100 text-rose-800 border-rose-300'
+                          : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                     }`}>
                       {overallResult === 'PASS' ? '✓ PASS' : '✕ FAIL / REJECT'}
                     </span>
                   </div>
                 </div>
 
-                <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950">
+                <div className={`border rounded-xl overflow-hidden ${
+                  isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-950 border-slate-800'
+                }`}>
                   <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-900 text-slate-400 border-b border-slate-800 font-bold uppercase">
+                    <thead className={`border-b font-bold uppercase ${
+                      isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-slate-900 text-slate-400 border-slate-800'
+                    }`}>
                       <tr>
                         <th className="px-3 py-2.5 w-12 text-center">#</th>
                         <th className="px-3 py-2.5">Measurement Item</th>
@@ -1103,19 +1232,21 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                         <th className="px-3 py-2.5 w-12"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/80">
+                    <tbody className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-slate-800/80'}`}>
                       {tableItems.map((item, idx) => {
                         const status = validateItemRow(header.coating_chemical, item.description, item.total);
                         return (
-                          <tr key={idx} className="hover:bg-slate-900/50">
-                            <td className="px-3 py-2 text-center text-slate-500 font-mono">{idx + 1}</td>
+                          <tr key={idx} className={isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-900/50'}>
+                            <td className={`px-3 py-2 text-center font-mono ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{idx + 1}</td>
                             <td className="px-3 py-2">
                               <input
                                 type="text"
                                 value={item.description}
                                 onChange={(e) => updateTableItem(idx, 'description', e.target.value)}
                                 placeholder="Item code (e.g. OR, T1, PH)"
-                                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 font-semibold focus:outline-none focus:border-indigo-500"
+                                className={`w-full border rounded px-2 py-1 font-semibold focus:outline-none focus:border-indigo-500 ${
+                                  isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-200'
+                                }`}
                               />
                             </td>
                             <td className="px-3 py-2 text-right">
@@ -1124,16 +1255,20 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                                 value={item.total}
                                 onChange={(e) => updateTableItem(idx, 'total', e.target.value)}
                                 placeholder="0.00"
-                                className="w-full bg-slate-900 border border-indigo-900/60 rounded px-2 py-1 text-right text-indigo-300 font-mono font-bold focus:outline-none focus:border-indigo-400"
+                                className={`w-full border rounded px-2 py-1 text-right font-mono font-bold focus:outline-none ${
+                                  isLight 
+                                    ? 'bg-white border-indigo-200 text-indigo-700 focus:border-indigo-500' 
+                                    : 'bg-slate-900 border-indigo-900/60 text-indigo-300 focus:border-indigo-400'
+                                }`}
                               />
                             </td>
                             <td className="px-3 py-2 text-center">
                               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                                 status === 'PASS'
-                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                  ? isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                                   : status === 'FAIL'
-                                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                                    ? isLight ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                                    : isLight ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-slate-800 text-slate-400 border-slate-700'
                               }`}>
                                 {status}
                               </span>
@@ -1141,7 +1276,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                             <td className="px-3 py-2 text-center">
                               <button
                                 onClick={() => deleteTableItem(idx)}
-                                className="text-slate-500 hover:text-rose-400 transition"
+                                className={`transition ${isLight ? 'text-slate-400 hover:text-rose-600' : 'text-slate-500 hover:text-rose-400'}`}
                               >
                                 <X className="w-4 h-4" />
                               </button>
@@ -1152,7 +1287,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
                       {tableItems.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="p-8 text-center text-slate-500">
+                          <td colSpan={5} className={`p-8 text-center ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                             {isTh ? 'ยังไม่มีจุดวัด กรุณาอัปโหลดเอกสารหรือกดปุ่มเพิ่มรายการ' : 'No measurement items yet. Upload doc or click add.'}
                           </td>
                         </tr>
@@ -1163,7 +1298,11 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
                 <button
                   onClick={addTableItemRow}
-                  className="w-full py-2.5 border-2 border-dashed border-slate-800 hover:border-indigo-500/50 rounded-xl text-indigo-400 font-bold text-xs hover:bg-slate-900/50 transition flex items-center justify-center gap-1.5"
+                  className={`w-full py-2.5 border-2 border-dashed rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 ${
+                    isLight 
+                      ? 'border-indigo-200 text-indigo-600 hover:bg-indigo-50/50 hover:border-indigo-300' 
+                      : 'border-slate-800 hover:border-indigo-500/50 rounded-xl text-indigo-400 hover:bg-slate-900/50'
+                  }`}
                 >
                   <Plus className="w-4 h-4" />
                   <span>{isTh ? 'เพิ่มจุดวัด (Measurement Item)' : 'Add Measurement Row'}</span>
@@ -1180,7 +1319,9 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
       {activeTab === 'history' && (
         <div className="space-y-6">
           {/* Top Control Ribbon */}
-          <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 ${
+            isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-900 border-slate-800'
+          }`}>
             <div className="relative w-full sm:w-80">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -1188,14 +1329,16 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 placeholder={isTh ? "ค้นหา Chemical, Batch, Supplier..." : "Search Chemical, Batch..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                className={`w-full border rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                  isLight ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-950 border-slate-800 text-slate-200'
+                }`}
               />
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={exportHistoryCSV}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition shadow-xs"
               >
                 <FileSpreadsheet className="w-4 h-4" />
                 <span>{isTh ? 'ส่งออก CSV' : 'Export CSV'}</span>
@@ -1203,7 +1346,11 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
               <button
                 onClick={handleClearAllHistory}
-                className="bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 font-bold text-xs px-3 py-2 rounded-xl border border-slate-700 flex items-center gap-1.5 transition"
+                className={`font-bold text-xs px-3 py-2 rounded-xl border flex items-center gap-1.5 transition ${
+                  isLight
+                    ? 'bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 border-slate-200'
+                    : 'bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border-slate-700'
+                }`}
               >
                 <Trash2 className="w-4 h-4" />
                 <span>{isTh ? 'ล้างประวัติ' : 'Clear All'}</span>
@@ -1212,10 +1359,14 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
           </div>
 
           {/* History Data Table */}
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+          <div className={`rounded-2xl border overflow-hidden ${
+            isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-900 border-slate-800'
+          }`}>
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase font-bold text-[10px]">
+                <thead className={`border-b uppercase font-bold text-[10px] ${
+                  isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-slate-950 text-slate-400 border-slate-800'
+                }`}>
                   <tr>
                     <th className="px-4 py-3">Date/Time</th>
                     <th className="px-4 py-3">Chemical</th>
@@ -1227,22 +1378,22 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/80">
+                <tbody className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-slate-800/80'}`}>
                   {filteredHistory.map((entry) => (
-                    <tr key={entry.id} className="hover:bg-slate-950/40">
-                      <td className="px-4 py-3 text-slate-400 font-mono text-[11px]">{entry.timestamp}</td>
-                      <td className="px-4 py-3 font-bold text-indigo-400">{entry.chemical}</td>
-                      <td className="px-4 py-3 font-mono font-semibold text-slate-200">{entry.batch_lot}</td>
-                      <td className="px-4 py-3 text-slate-400">{entry.supplier || '-'}</td>
+                    <tr key={entry.id} className={isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-950/40'}>
+                      <td className={`px-4 py-3 font-mono text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{entry.timestamp}</td>
+                      <td className={`px-4 py-3 font-bold ${isLight ? 'text-indigo-700' : 'text-indigo-400'}`}>{entry.chemical}</td>
+                      <td className={`px-4 py-3 font-mono font-semibold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{entry.batch_lot}</td>
+                      <td className={`px-4 py-3 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{entry.supplier || '-'}</td>
                       <td className="px-4 py-3 font-mono">
-                        <span className="text-slate-200">{entry.weight} kg</span> / <span className="text-slate-400">{entry.qty} pcs</span>
+                        <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>{entry.weight} kg</span> / <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>{entry.qty} pcs</span>
                       </td>
-                      <td className="px-4 py-3 text-slate-400">{entry.packaging || '-'}</td>
+                      <td className={`px-4 py-3 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{entry.packaging || '-'}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                           entry.result === 'PASS'
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                            : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                            ? isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : isLight ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                         }`}>
                           {entry.result}
                         </span>
@@ -1251,7 +1402,11 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleRequestEditHistory(entry)}
-                            className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg transition border border-amber-500/30 flex items-center gap-1 text-[11px] font-bold"
+                            className={`p-1.5 rounded-lg transition border flex items-center gap-1 text-[11px] font-bold ${
+                              isLight 
+                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200' 
+                                : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30'
+                            }`}
                             title={isTh ? "แก้ไขข้อมูล (ใส่รหัส admin2026)" : "Edit Record (Password required)"}
                           >
                             <Edit3 className="w-3.5 h-3.5" />
@@ -1259,7 +1414,11 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                           </button>
                           <button
                             onClick={() => handleDeleteHistoryItem(entry)}
-                            className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition border border-rose-500/30 flex items-center gap-1 text-[11px] font-bold"
+                            className={`p-1.5 rounded-lg transition border flex items-center gap-1 text-[11px] font-bold ${
+                              isLight 
+                                ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200' 
+                                : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30'
+                            }`}
                             title={isTh ? "ลบรายการประวัติ" : "Delete Record"}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1272,7 +1431,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
                   {filteredHistory.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="p-12 text-center text-slate-500">
+                      <td colSpan={8} className={`p-12 text-center ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                         {isTh ? 'ไม่มีข้อมูลประวัติการตรวจรับ' : 'No inspection history found'}
                       </td>
                     </tr>
@@ -1287,17 +1446,23 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
       {/* TAB 3: SPECIFICATION SETTINGS (ADMIN) */}
       {activeTab === 'settings' && (
         <div className="space-y-6">
-          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Settings className="w-4 h-4 text-indigo-400" />
+          <div className={`p-6 rounded-2xl border space-y-5 ${
+            isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-900 border-slate-800'
+          }`}>
+            <div className={`flex items-center justify-between pb-3 border-b ${
+              isLight ? 'border-slate-200' : 'border-slate-800'
+            }`}>
+              <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${
+                isLight ? 'text-slate-900' : 'text-white'
+              }`}>
+                <Settings className="w-4 h-4 text-indigo-500" />
                 {isTh ? 'ตั้งค่า Spec เคมีใหม่ (New Chemical Spec)' : 'Configure New Chemical Spec'}
               </h3>
             </div>
 
             <div className="space-y-4">
               <div className="max-w-xs">
-                <label className="text-[10px] font-bold text-indigo-400 uppercase block mb-1">
+                <label className={`text-[10px] font-bold uppercase block mb-1 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`}>
                   Coating Chemical Name
                 </label>
                 <input
@@ -1305,13 +1470,21 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                   value={settingProfileName}
                   onChange={(e) => setSettingProfileName(e.target.value.toUpperCase())}
                   placeholder="e.g. A-001, COAT-901"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm font-bold text-indigo-300 uppercase focus:outline-none focus:border-indigo-500"
+                  className={`w-full border rounded-xl px-3 py-2 text-sm font-bold uppercase focus:outline-none ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-300 text-indigo-700 focus:border-indigo-600' 
+                      : 'bg-slate-950 border-slate-800 text-indigo-300 focus:border-indigo-500'
+                  }`}
                 />
               </div>
 
-              <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950">
+              <div className={`border rounded-xl overflow-hidden ${
+                isLight ? 'bg-white border-slate-200' : 'bg-slate-950 border-slate-800'
+              }`}>
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-900 text-slate-400 font-bold uppercase border-b border-slate-800">
+                  <thead className={`font-bold uppercase border-b ${
+                    isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-slate-900 text-slate-400 border-slate-800'
+                  }`}>
                     <tr>
                       <th className="px-4 py-2.5">Measurement Item (Prefix)</th>
                       <th className="px-4 py-2.5 w-36 text-center">Min Spec</th>
@@ -1319,9 +1492,9 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                       <th className="px-4 py-2.5 w-12"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-slate-800'}`}>
                     {settingRows.map((row, idx) => (
-                      <tr key={idx} className="hover:bg-slate-900/50">
+                      <tr key={idx} className={isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-900/50'}>
                         <td className="px-4 py-2">
                           <input
                             type="text"
@@ -1332,7 +1505,9 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                               setSettingRows(copy);
                             }}
                             placeholder="Prefix (e.g. OR, PH, IR)"
-                            className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 font-semibold text-slate-200 focus:outline-none focus:border-indigo-500 uppercase"
+                            className={`w-full border rounded px-2.5 py-1.5 font-semibold focus:outline-none uppercase ${
+                              isLight ? 'bg-white border-slate-300 text-slate-800 focus:border-indigo-500' : 'bg-slate-900 border-slate-800 text-slate-200 focus:border-indigo-500'
+                            }`}
                           />
                         </td>
                         <td className="px-4 py-2">
@@ -1345,7 +1520,9 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                               setSettingRows(copy);
                             }}
                             placeholder="Min"
-                            className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-center font-mono text-emerald-400 font-bold focus:outline-none focus:border-emerald-500"
+                            className={`w-full border rounded px-2.5 py-1.5 text-center font-mono font-bold focus:outline-none ${
+                              isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-700 focus:border-emerald-500' : 'bg-slate-900 border-slate-800 text-emerald-400 focus:border-emerald-500'
+                            }`}
                           />
                         </td>
                         <td className="px-4 py-2">
@@ -1358,13 +1535,15 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                               setSettingRows(copy);
                             }}
                             placeholder="Max"
-                            className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-center font-mono text-rose-400 font-bold focus:outline-none focus:border-rose-500"
+                            className={`w-full border rounded px-2.5 py-1.5 text-center font-mono font-bold focus:outline-none ${
+                              isLight ? 'bg-rose-50 border-rose-200 text-rose-700 focus:border-rose-500' : 'bg-slate-900 border-slate-800 text-rose-400 focus:border-rose-500'
+                            }`}
                           />
                         </td>
                         <td className="px-4 py-2 text-center">
                           <button
                             onClick={() => setSettingRows(prev => prev.filter((_, i) => i !== idx))}
-                            className="text-slate-500 hover:text-rose-400"
+                            className={isLight ? 'text-slate-400 hover:text-rose-600' : 'text-slate-500 hover:text-rose-400'}
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -1378,15 +1557,19 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               <div className="flex gap-3">
                 <button
                   onClick={addSettingRow}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 flex items-center gap-1.5 transition"
+                  className={`px-4 py-2 font-bold text-xs rounded-xl border flex items-center gap-1.5 transition ${
+                    isLight 
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' 
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  }`}
                 >
-                  <Plus className="w-4 h-4 text-indigo-400" />
+                  <Plus className="w-4 h-4 text-indigo-500" />
                   <span>{isTh ? 'เพิ่มจุดวัด' : 'Add Item'}</span>
                 </button>
 
                 <button
                   onClick={saveProfileSetting}
-                  className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition shadow-md shadow-indigo-600/30 flex items-center gap-1.5"
+                  className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition shadow-md shadow-indigo-600/30 flex items-center gap-1.5"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isTh ? 'บันทึก Spec เคมี' : 'Save Chemical Spec'}</span>
@@ -1396,26 +1579,30 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
           </div>
 
           {/* List of Configured Specs */}
-          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+          <div className={`p-6 rounded-2xl border space-y-4 ${
+            isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-900 border-slate-800'
+          }`}>
+            <h3 className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>
               {isTh ? 'รายการ Spec เคมีที่บันทึกแล้ว' : 'Configured Chemical Specs'} ({Object.keys(specs).length})
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.keys(specs).map((key) => (
-                <div key={key} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                <div key={key} className={`p-4 rounded-xl border space-y-3 ${
+                  isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+                }`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-indigo-300 font-mono">{key}</span>
+                    <span className={`text-sm font-bold font-mono ${isLight ? 'text-indigo-700' : 'text-indigo-300'}`}>{key}</span>
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => editProfile(key)}
-                        className="p-1 text-slate-400 hover:text-indigo-400"
+                        className={`p-1 ${isLight ? 'text-slate-500 hover:text-indigo-600' : 'text-slate-400 hover:text-indigo-400'}`}
                       >
                         <Settings className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => deleteProfile(key)}
-                        className="p-1 text-slate-400 hover:text-rose-400"
+                        className={`p-1 ${isLight ? 'text-slate-500 hover:text-rose-600' : 'text-slate-400 hover:text-rose-400'}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -1424,7 +1611,11 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
                   <div className="flex flex-wrap gap-1.5">
                     {specs[key].map((item, i) => (
-                      <span key={i} className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
+                      <span key={i} className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border ${
+                        isLight 
+                          ? 'bg-white text-slate-700 border-slate-200 shadow-2xs' 
+                          : 'bg-slate-900 text-slate-300 border-slate-800'
+                      }`}>
                         {item.item}: {item.min}-{item.max}
                       </span>
                     ))}
@@ -1438,22 +1629,28 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
       {/* PASSWORD PROMPT MODAL FOR EDITING HISTORY */}
       {isHistoryAuthOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${
+          isLight ? 'bg-slate-900/40' : 'bg-slate-950/80'
+        }`}>
+          <div className={`border rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+          }`}>
             <button 
               onClick={() => setIsHistoryAuthOpen(false)} 
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200"
+              className={`absolute top-4 right-4 ${isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}`}
             >
               <X className="w-5 h-5" />
             </button>
-            <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl flex items-center justify-center mx-auto">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto border ${
+              isLight ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+            }`}>
               <Lock className="w-6 h-6" />
             </div>
             <div className="text-center space-y-1">
-              <h4 className="font-bold text-white text-base">
+              <h4 className={`font-bold text-base ${isLight ? 'text-slate-900' : 'text-white'}`}>
                 {isTh ? 'ยืนยันรหัสผ่านเพื่อแก้ไขข้อมูล' : 'Password Required for Editing'}
               </h4>
-              <p className="text-xs text-slate-400">
+              <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh 
                   ? `ต้องการแก้ไข Batch/Lot ${targetEditHistoryItem?.batch_lot || ''} กรุณาใส่รหัสผ่าน` 
                   : `Enter admin password to edit Batch ${targetEditHistoryItem?.batch_lot || ''}`}
@@ -1467,10 +1664,14 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
                 value={historyAuthPassword}
                 onChange={(e) => setHistoryAuthPassword(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-center font-mono text-sm text-white focus:outline-none focus:border-amber-500"
+                className={`w-full border rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none ${
+                  isLight 
+                    ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500' 
+                    : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                }`}
               />
               {historyAuthError && (
-                <p className="text-xs text-rose-400 font-semibold text-center">
+                <p className="text-xs text-rose-500 font-semibold text-center">
                   {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
                 </p>
               )}
@@ -1478,13 +1679,15 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsHistoryAuthOpen(false)}
-                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-2.5 rounded-xl transition"
+                  className={`flex-1 font-bold text-xs py-2.5 rounded-xl transition border ${
+                    isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                  }`}
                 >
                   {isTh ? 'ยกเลิก' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-2.5 rounded-xl transition shadow-md shadow-amber-500/20"
+                  className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs py-2.5 rounded-xl transition shadow-md shadow-amber-500/20"
                 >
                   {isTh ? 'ยืนยันเพื่อเข้าแก้ไข' : 'Unlock & Edit'}
                 </button>
@@ -1496,18 +1699,24 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
       {/* EDIT RECORD MODAL */}
       {editingHistoryItem && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-6 my-8 shadow-2xl relative">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className={`fixed inset-0 z-50 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto ${
+          isLight ? 'bg-slate-900/50' : 'bg-slate-950/85'
+        }`}>
+          <div className={`border rounded-2xl max-w-2xl w-full p-6 space-y-6 my-8 shadow-2xl relative ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+          }`}>
+            <div className={`flex items-center justify-between border-b pb-4 ${
+              isLight ? 'border-slate-200' : 'border-slate-800'
+            }`}>
               <div className="flex items-center gap-2">
-                <Edit3 className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-bold text-white">
+                <Edit3 className="w-5 h-5 text-amber-500" />
+                <h3 className={`text-base font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? `แก้ไขข้อมูลประวัติ Batch/Lot: ${editingHistoryItem.batch_lot}` : `Edit Inspection Record - ${editingHistoryItem.batch_lot}`}
                 </h3>
               </div>
               <button 
                 onClick={() => setEditingHistoryItem(null)} 
-                className="text-slate-400 hover:text-slate-200"
+                className={`transition ${isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}`}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1515,84 +1724,98 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1">Chemical Code</label>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Chemical Code</label>
                 <input
                   type="text"
                   value={editingHistoryItem.chemical || ''}
                   onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, chemical: e.target.value.toUpperCase() } : null)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-indigo-300 font-bold focus:outline-none focus:border-amber-500 uppercase"
+                  className={`w-full border rounded-xl px-3 py-2 font-bold focus:outline-none uppercase ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-300 text-indigo-700 focus:border-amber-500' 
+                      : 'bg-slate-950 border-slate-800 text-indigo-300 focus:border-amber-500'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1">Batch / Lot No.</label>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Batch / Lot No.</label>
                 <input
                   type="text"
                   value={editingHistoryItem.batch_lot || ''}
                   onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, batch_lot: e.target.value } : null)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-amber-500"
+                  className={`w-full border rounded-xl px-3 py-2 font-mono font-bold focus:outline-none ${
+                    isLight ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500' : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1">Supplier</label>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Supplier</label>
                 <input
                   type="text"
                   value={editingHistoryItem.supplier || ''}
                   onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, supplier: e.target.value } : null)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  className={`w-full border rounded-xl px-3 py-2 focus:outline-none ${
+                    isLight ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-amber-500' : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1">Inspector</label>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Inspector</label>
                 <input
                   type="text"
                   value={editingHistoryItem.inspector || ''}
                   onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, inspector: e.target.value } : null)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  className={`w-full border rounded-xl px-3 py-2 focus:outline-none ${
+                    isLight ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-amber-500' : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1">Weight (kg)</label>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Weight (kg)</label>
                 <input
                   type="text"
                   value={editingHistoryItem.weight || ''}
                   onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, weight: e.target.value } : null)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
+                  className={`w-full border rounded-xl px-3 py-2 font-mono focus:outline-none ${
+                    isLight ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-amber-500' : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1">Quantity (pcs)</label>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Quantity (pcs)</label>
                 <input
                   type="text"
                   value={editingHistoryItem.qty || ''}
                   onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, qty: e.target.value } : null)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
+                  className={`w-full border rounded-xl px-3 py-2 font-mono focus:outline-none ${
+                    isLight ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-amber-500' : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
                 />
               </div>
             </div>
 
             {/* Test Items Table */}
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
+              <label className={`text-[10px] font-bold uppercase tracking-wider block ${isLight ? 'text-amber-700' : 'text-amber-400'}`}>
                 Chemical Measurement Parameters
               </label>
-              <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950">
+              <div className={`border rounded-xl overflow-hidden ${isLight ? 'bg-white border-slate-200' : 'bg-slate-950 border-slate-800'}`}>
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-900 text-slate-400 font-bold border-b border-slate-800">
+                  <thead className={`font-bold border-b ${isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-slate-900 text-slate-400 border-slate-800'}`}>
                     <tr>
                       <th className="px-3 py-2">Parameter</th>
                       <th className="px-3 py-2 text-center w-32">Measured Value</th>
                       <th className="px-3 py-2 text-center w-24">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-slate-800'}`}>
                     {editingHistoryItem.items.map((row, idx) => (
                       <tr key={idx}>
-                        <td className="px-3 py-2 font-bold text-indigo-300">{row.description}</td>
+                        <td className={`px-3 py-2 font-bold ${isLight ? 'text-indigo-700' : 'text-indigo-300'}`}>{row.description}</td>
                         <td className="px-3 py-2">
                           <input
                             type="text"
@@ -1606,12 +1829,16 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                                 return { ...prev, items: itemsCopy };
                               });
                             }}
-                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-center font-mono font-bold text-cyan-300 focus:outline-none focus:border-amber-500"
+                            className={`w-full border rounded px-2 py-1 text-center font-mono font-bold focus:outline-none ${
+                              isLight ? 'bg-slate-50 border-slate-300 text-indigo-700 focus:border-amber-500' : 'bg-slate-900 border-slate-800 text-cyan-300 focus:border-amber-500'
+                            }`}
                           />
                         </td>
                         <td className="px-3 py-2 text-center">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            row.status === 'PASS' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                            row.status === 'PASS' 
+                              ? isLight ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-emerald-500/20 text-emerald-400' 
+                              : isLight ? 'bg-rose-100 text-rose-800 border border-rose-200' : 'bg-rose-500/20 text-rose-400'
                           }`}>
                             {row.status}
                           </span>
@@ -1623,16 +1850,18 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            <div className={`flex justify-end gap-3 pt-4 border-t ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
               <button
                 onClick={() => setEditingHistoryItem(null)}
-                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition"
+                className={`px-5 py-2.5 text-xs font-bold rounded-xl transition border ${
+                  isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
               >
                 {isTh ? 'ยกเลิก' : 'Cancel'}
               </button>
               <button
                 onClick={handleSaveEditedHistory}
-                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition shadow-lg shadow-amber-500/20 flex items-center gap-2"
+                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-xl transition shadow-md shadow-amber-500/20 flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />
                 <span>{isTh ? 'บันทึกการแก้ไข' : 'Save Changes'}</span>
@@ -1642,45 +1871,86 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
         </div>
       )}
 
-      {/* GLOBAL CONFIRMATION MODAL */}
+      {/* GLOBAL CONFIRMATION MODAL WITH PASSWORD (admin2026) */}
       {confirmModal.isOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+        <div className={`fixed inset-0 z-50 backdrop-blur-sm flex items-center justify-center p-4 ${
+          isLight ? 'bg-slate-900/40' : 'bg-slate-950/80'
+        }`}>
+          <div className={`border rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+          }`}>
             <button 
               onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} 
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200"
+              className={`absolute top-4 right-4 ${isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}`}
             >
               <X className="w-5 h-5" />
             </button>
-            <div className="w-12 h-12 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-2xl flex items-center justify-center mx-auto">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto border ${
+              isLight ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+            }`}>
               <AlertTriangle className="w-6 h-6" />
             </div>
             <div className="text-center space-y-1.5">
-              <h4 className="font-bold text-white text-base">
+              <h4 className={`font-bold text-base ${isLight ? 'text-slate-900' : 'text-white'}`}>
                 {confirmModal.title}
               </h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {confirmModal.message}
               </p>
             </div>
 
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-2.5 rounded-xl transition"
-              >
-                {confirmModal.cancelText || (isTh ? 'ยกเลิก' : 'Cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={confirmModal.onConfirm}
-                className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-md shadow-rose-600/30 flex items-center justify-center gap-1.5"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>{confirmModal.confirmText || (isTh ? 'ลบข้อมูล' : 'Delete')}</span>
-              </button>
-            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (deleteConfirmPassword === "admin2026") {
+                  setDeleteConfirmPasswordError(false);
+                  confirmModal.onConfirm();
+                } else {
+                  setDeleteConfirmPasswordError(true);
+                  setDeleteConfirmPassword("");
+                }
+              }}
+              className="space-y-3"
+            >
+              <div>
+                <input
+                  type="password"
+                  autoFocus
+                  placeholder={isTh ? "ใส่รหัสผ่าน admin2026 เพื่อยืนยัน" : "Enter password (admin2026)"}
+                  value={deleteConfirmPassword}
+                  onChange={(e) => setDeleteConfirmPassword(e.target.value)}
+                  className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-rose-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-rose-500'
+                  }`}
+                />
+                {deleteConfirmPasswordError && (
+                  <p className="text-xs text-rose-500 font-semibold text-center mt-1.5">
+                    {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                  className={`flex-1 font-bold text-xs py-2.5 rounded-xl transition border ${
+                    isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                  }`}
+                >
+                  {confirmModal.cancelText || (isTh ? 'ยกเลิก' : 'Cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-md shadow-rose-600/30 flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{confirmModal.confirmText || (isTh ? 'ลบข้อมูล' : 'Delete')}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

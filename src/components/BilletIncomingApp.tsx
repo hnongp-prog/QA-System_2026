@@ -38,7 +38,9 @@ import {
   PackageCheck,
   Sparkles,
   QrCode,
-  X
+  X,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 import { 
@@ -46,7 +48,8 @@ import {
   GradeSpecMap, 
   ChemElementKey, 
   Language, 
-  InspectionActivity 
+  InspectionActivity,
+  ThemeMode
 } from '../types';
 import { analyzeBilletCertClient, getGeminiApiKey } from '../services/geminiClient';
 
@@ -54,6 +57,8 @@ interface BilletIncomingAppProps {
   onBackToPortal?: () => void;
   onLogNewActivity?: (activity: InspectionActivity) => void;
   language?: Language;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 const chemElements: ChemElementKey[] = ["Si", "Fe", "Cu", "Mn", "Mg", "Cr", "Zn", "Ti", "Pb", "Cd", "Al"];
@@ -216,9 +221,12 @@ const INITIAL_HISTORY: BilletInspectionItem[] = [
 export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   onBackToPortal,
   onLogNewActivity,
-  language = 'th'
+  language = 'th',
+  theme = 'light',
+  onToggleTheme
 }) => {
   const isTh = language === 'th';
+  const isLight = theme === 'light';
   const [activeTab, setActiveTab] = useState<'scan' | 'history' | 'config'>('scan');
 
   // Scanning & Extracted items
@@ -262,6 +270,13 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   const [historyAuthError, setHistoryAuthError] = useState(false);
   const [targetEditHistoryItem, setTargetEditHistoryItem] = useState<BilletInspectionItem | null>(null);
   const [editingHistoryItem, setEditingHistoryItem] = useState<BilletInspectionItem | null>(null);
+
+  // History Item Deletion State (Protected with password admin2026)
+  const [isDeleteAuthOpen, setIsDeleteAuthOpen] = useState(false);
+  const [deleteAuthPassword, setDeleteAuthPassword] = useState("");
+  const [deleteAuthError, setDeleteAuthError] = useState(false);
+  const [targetDeleteHistoryItem, setTargetDeleteHistoryItem] = useState<BilletInspectionItem | null>(null);
+  const [targetDeleteGrade, setTargetDeleteGrade] = useState<string | null>(null);
 
   // Persist local history
   useEffect(() => {
@@ -569,6 +584,53 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
     });
   };
 
+  // Trigger Delete Record (Requires password admin2026)
+  const handleRequestDeleteHistory = (item: BilletInspectionItem) => {
+    setTargetDeleteHistoryItem(item);
+    setTargetDeleteGrade(null);
+    setDeleteAuthPassword("");
+    setDeleteAuthError(false);
+    setIsDeleteAuthOpen(true);
+  };
+
+  // Trigger Delete Grade (Requires password admin2026)
+  const handleRequestDeleteGrade = (gradeName: string) => {
+    setTargetDeleteGrade(gradeName);
+    setTargetDeleteHistoryItem(null);
+    setDeleteAuthPassword("");
+    setDeleteAuthError(false);
+    setIsDeleteAuthOpen(true);
+  };
+
+  // Verify password and perform delete
+  const handleVerifyDeletePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (deleteAuthPassword === "admin2026") {
+      if (targetDeleteHistoryItem) {
+        const heatNo = targetDeleteHistoryItem.heat_number;
+        setHistory(prev => prev.filter(h => h.id !== targetDeleteHistoryItem.id));
+        setStatus({
+          type: 'info',
+          message: isTh ? `ลบประวัติการตรวจรับ Heat No. ${heatNo} เรียบร้อยแล้ว` : `Deleted inspection record for Heat No. ${heatNo}`
+        });
+      } else if (targetDeleteGrade) {
+        deleteGrade(targetDeleteGrade);
+        setStatus({
+          type: 'info',
+          message: isTh ? `ลบ Grade Specification ${targetDeleteGrade} เรียบร้อยแล้ว` : `Deleted Grade Spec ${targetDeleteGrade}`
+        });
+      }
+      setIsDeleteAuthOpen(false);
+      setDeleteAuthError(false);
+      setTargetDeleteHistoryItem(null);
+      setTargetDeleteGrade(null);
+      setDeleteAuthPassword("");
+    } else {
+      setDeleteAuthError(true);
+      setDeleteAuthPassword("");
+    }
+  };
+
   // Config Add / Edit / Delete Grade
   const prepareNewGrade = () => {
     setEditingGrade("NEW_GRADE_PENDING");
@@ -776,18 +838,26 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 sm:p-6 space-y-6">
+    <div className={`min-h-screen font-sans p-4 sm:p-6 space-y-6 transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
+    }`}>
       
       {/* Top Application Bar */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b ${
+        isLight ? 'border-slate-200' : 'border-slate-800'
+      }`}>
         <div className="flex items-center gap-3">
           {onBackToPortal && (
             <button
               onClick={onBackToPortal}
-              className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition flex items-center gap-1.5 text-xs font-semibold"
+              className={`p-2.5 rounded-xl transition flex items-center gap-1.5 text-xs font-semibold border ${
+                isLight
+                  ? 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-xs'
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800'
+              }`}
               title="Return to QA Main Portal"
             >
-              <ArrowLeft className="w-4 h-4 text-cyan-400" />
+              <ArrowLeft className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
               <span>{isTh ? 'กลับสู่เมนูหลัก QA' : 'Back to Portal'}</span>
             </button>
           )}
@@ -798,14 +868,18 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                  isLight
+                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                    : 'bg-blue-950 text-blue-300 border-blue-800'
+                }`}>
                   IQC-01
                 </span>
-                <h1 className="text-xl font-bold text-white tracking-tight">
+                <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? 'ระบบตรวจรับวัตถุดิบ Billet (Billet Incoming Inspection)' : 'Billet Incoming Inspection System'}
                 </h1>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh 
                   ? 'ตรวจสอบใบรับรองคุณภาพ (Mill Test Cert), วิเคราะห์ส่วนผสมเคมี, ขนาดมิติ และออก QR Code Label' 
                   : 'Mill Test Cert AI OCR, Chemical Spec Verification, Dimension & QR Code Tagging'}
@@ -814,29 +888,48 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
           </div>
         </div>
 
-        {/* Status Badge */}
-        <div className="flex items-center gap-3">
-          <div className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border shadow-sm transition ${
+        {/* Status Badge & Theme Toggle */}
+        <div className="flex items-center gap-2.5">
+          <div className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border shadow-xs transition ${
             status.type === 'success' 
-              ? 'bg-emerald-950/80 border-emerald-800 text-emerald-300' 
+              ? isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-emerald-950/80 border-emerald-800 text-emerald-300' 
               : status.type === 'error' 
-                ? 'bg-rose-950/80 border-rose-800 text-rose-300' 
-                : 'bg-slate-900 border-slate-800 text-cyan-300'
+                ? isLight ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-rose-950/80 border-rose-800 text-rose-300' 
+                : isLight ? 'bg-white border-slate-200 text-slate-700' : 'bg-slate-900 border-slate-800 text-cyan-300'
           }`}>
-            <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
+            <Sparkles className={`w-4 h-4 shrink-0 ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
             <span>{status.message}</span>
           </div>
+
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-xs font-bold ${
+                isLight 
+                  ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-xs' 
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
+              }`}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            >
+              {isLight ? <Moon className="w-4 h-4 text-slate-600" /> : <Sun className="w-4 h-4 text-amber-400" />}
+              <span className="hidden sm:inline">{isLight ? 'Dark' : 'Light'}</span>
+            </button>
+          )}
         </div>
       </header>
 
       {/* Tabs */}
-      <div className="flex space-x-2 border-b border-slate-800 pb-2 overflow-x-auto">
+      <div className={`flex space-x-2 border-b pb-2 overflow-x-auto ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
         <button
           onClick={() => setActiveTab('scan')}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'scan'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <ScanLine className="w-4 h-4" />
@@ -847,14 +940,22 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
           onClick={() => setActiveTab('history')}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'history'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <BarChart3 className="w-4 h-4" />
           <span>{isTh ? '2. สรุปแดชบอร์ด & ประวัติ (Dashboard & History)' : '2. Dashboard & History'}</span>
           {history.length > 0 && (
-            <span className="ml-1 bg-slate-950 text-cyan-300 px-2 py-0.5 rounded-full text-[10px] font-mono border border-cyan-800">
+            <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+              isLight
+                ? 'bg-blue-100 text-blue-800 border-blue-200'
+                : 'bg-slate-950 text-cyan-300 border-cyan-800'
+            }`}>
               {history.length}
             </span>
           )}
@@ -864,8 +965,12 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
           onClick={() => setActiveTab('config')}
           className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
             activeTab === 'config'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
         >
           <Settings className="w-4 h-4" />
@@ -879,35 +984,41 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
           
           {/* Left Upload Panel */}
           <div className="lg:col-span-4 space-y-4">
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4 shadow-md sticky top-6">
+            <div className={`p-5 rounded-2xl border space-y-4 shadow-xs sticky top-6 ${
+              isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800 shadow-md'
+            }`}>
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-cyan-400" />
+                <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${
+                  isLight ? 'text-slate-900' : 'text-white'
+                }`}>
+                  <Upload className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
                   {isTh ? 'อัปโหลดใบรับรอง Mill Test Cert' : 'Upload Mill Test Certificate'}
                 </h3>
               </div>
 
               {/* Upload Drop Area */}
               <div className={`relative border-2 border-dashed rounded-xl p-4 min-h-[220px] flex flex-col items-center justify-center transition ${
-                image ? 'border-cyan-500/50 bg-slate-950' : 'border-slate-800 hover:border-slate-700 bg-slate-950/50'
+                image 
+                  ? isLight ? 'border-blue-400 bg-blue-50/30' : 'border-cyan-500/50 bg-slate-950' 
+                  : isLight ? 'border-slate-300 hover:border-blue-400 bg-slate-50/50' : 'border-slate-800 hover:border-slate-700 bg-slate-950/50'
               }`}>
                 {image ? (
                   imageMimeType.startsWith('image/') ? (
                     <img src={image} alt="Cert Preview" className="max-h-[240px] w-full object-contain rounded-lg" />
                   ) : (
                     <div className="p-4 text-center space-y-2">
-                      <FileText className="w-12 h-12 text-cyan-400 mx-auto" />
-                      <p className="text-xs font-semibold text-slate-200">PDF Document Loaded</p>
-                      <p className="text-[10px] text-slate-400">{isTh ? 'พร้อมวิเคราะห์ด้วย Gemini AI' : 'Ready for Gemini AI Extraction'}</p>
+                      <FileText className={`w-12 h-12 mx-auto ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
+                      <p className={`text-xs font-semibold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>PDF Document Loaded</p>
+                      <p className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{isTh ? 'พร้อมวิเคราะห์ด้วย Gemini AI' : 'Ready for Gemini AI Extraction'}</p>
                     </div>
                   )
                 ) : (
                   <div className="text-center p-4 space-y-2">
-                    <Upload className="mx-auto w-10 h-10 text-slate-600 mb-2" />
-                    <p className="font-semibold text-xs text-slate-300">
+                    <Upload className={`mx-auto w-10 h-10 mb-2 ${isLight ? 'text-slate-400' : 'text-slate-600'}`} />
+                    <p className={`font-semibold text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
                       {isTh ? 'ลากไฟล์รูปภาพหรือ PDF Certificate มาวาง หรือคลิกเพื่ออัปโหลด' : 'Upload Mill Test Cert Image or PDF'}
                     </p>
-                    <p className="text-[10px] text-slate-500">
+                    <p className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
                       {isTh ? 'รองรับ PNG, JPG, JPEG, PDF (อ่านค่าส่วนผสมเคมีทุก Heat)' : 'Supports PNG, JPG, JPEG, PDF'}
                     </p>
                   </div>
@@ -926,7 +1037,11 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                 <button
                   onClick={extractData}
                   disabled={isProcessing}
-                  className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition shadow-md shadow-cyan-500/20 active:scale-95 disabled:opacity-50"
+                  className={`w-full text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition active:scale-95 disabled:opacity-50 ${
+                    isLight
+                      ? 'bg-blue-600 hover:bg-blue-700 shadow-xs'
+                      : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-md shadow-cyan-500/20'
+                  }`}
                 >
                   {isProcessing ? <Loader2 className="animate-spin w-4 h-4" /> : <RefreshCw className="w-4 h-4" />}
                   <span>{isTh ? 'วิเคราะห์ด้วย Gemini AI (Gemini Extract)' : 'Analyze with Gemini AI'}</span>
@@ -934,9 +1049,13 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
                 <button
                   onClick={loadDemoData}
-                  className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs py-2 rounded-xl flex items-center justify-center gap-2 transition border border-slate-700"
+                  className={`w-full font-medium text-xs py-2 rounded-xl flex items-center justify-center gap-2 transition border ${
+                    isLight 
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200' 
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                  }`}
                 >
-                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <Zap className="w-3.5 h-3.5 text-amber-500" />
                   <span>{isTh ? '⚡ โหลดเอกสารตัวอย่าง (Demo Cert Data)' : '⚡ Load Demo Cert Data'}</span>
                 </button>
               </div>
@@ -947,7 +1066,9 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
           <div className="lg:col-span-8 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                <h3 className={`text-xs font-bold uppercase tracking-wider ${
+                  isLight ? 'text-slate-700' : 'text-slate-300'
+                }`}>
                   {isTh ? 'รายการ Heat Number ที่รอดำเนินการ' : 'Scanned Inspection Pool'} ({extractedItems.length})
                 </h3>
               </div>
@@ -956,7 +1077,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                 <button
                   onClick={saveSelectedToHistory}
                   disabled={selectedIndices.length === 0}
-                  className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 transition shadow-md shadow-emerald-950/50"
+                  className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 transition shadow-xs"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>{isTh ? `บันทึกรายการที่เลือก (${selectedIndices.length})` : `Save Selected (${selectedIndices.length})`}</span>
@@ -965,12 +1086,14 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
             </div>
 
             {extractedItems.length === 0 && !isProcessing && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-16 text-center text-slate-500 space-y-3">
-                <Database className="w-12 h-12 mx-auto text-slate-700" />
-                <p className="text-xs font-semibold text-slate-400">
+              <div className={`border rounded-2xl p-16 text-center space-y-3 ${
+                isLight ? 'bg-white border-slate-200 text-slate-500 shadow-xs' : 'bg-slate-900 border-slate-800 text-slate-500'
+              }`}>
+                <Database className={`w-12 h-12 mx-auto ${isLight ? 'text-slate-400' : 'text-slate-700'}`} />
+                <p className={`text-xs font-semibold ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>
                   {isTh ? 'ยังไม่มีรายการ Billet ที่สแกน' : 'No scanned billet items yet'}
                 </p>
-                <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                <p className={`text-[11px] max-w-sm mx-auto ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
                   {isTh 
                     ? 'โปรดอัปโหลดรูปภาพใบ Certificate ทางด้านซ้าย หรือกดปุ่ม "⚡ โหลดเอกสารตัวอย่าง" เพื่อเริ่มต้น' 
                     : 'Upload a Mill Test Cert image or click "Load Demo Cert Data" to test.'}
@@ -984,13 +1107,15 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                 const isSelected = selectedIndices.includes(idx);
                 const spec = findMatchingSpec(item.grade);
                 const judgement = performJudgement(item);
-                const gradeBorderColor = spec?.color || '#334155';
+                const gradeBorderColor = spec?.color || (isLight ? '#2563eb' : '#38bdf8');
 
                 return (
                   <div 
                     key={idx}
-                    className={`relative bg-slate-900 border rounded-2xl p-5 transition shadow-sm ${
-                      isSelected ? 'border-cyan-500/80 bg-slate-900/90' : 'border-slate-800 opacity-80'
+                    className={`relative border rounded-2xl p-5 transition shadow-xs ${
+                      isSelected 
+                        ? isLight ? 'border-blue-400 bg-white shadow-sm' : 'border-cyan-500/80 bg-slate-900/90' 
+                        : isLight ? 'border-slate-200 bg-white/90' : 'border-slate-800 bg-slate-900 opacity-80'
                     }`}
                     style={{ borderLeftWidth: '6px', borderLeftColor: gradeBorderColor }}
                   >
@@ -998,7 +1123,9 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                     <button
                       onClick={() => toggleSelection(idx)}
                       className={`absolute top-4 left-4 p-1 rounded-lg transition ${
-                        isSelected ? 'text-cyan-400' : 'text-slate-600 hover:text-slate-400'
+                        isSelected 
+                          ? isLight ? 'text-blue-600' : 'text-cyan-400' 
+                          : isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-600 hover:text-slate-400'
                       }`}
                     >
                       {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
@@ -1007,10 +1134,14 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                     {/* Print Tag Action */}
                     <button
                       onClick={() => handlePrintTag(item)}
-                      className="absolute top-4 right-4 bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-xl transition border border-slate-700 flex items-center gap-1.5 text-xs font-medium"
+                      className={`absolute top-4 right-4 p-2 rounded-xl transition border flex items-center gap-1.5 text-xs font-medium ${
+                        isLight 
+                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' 
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                      }`}
                       title="Print Quality Tag"
                     >
-                      <Printer className="w-4 h-4 text-cyan-400" />
+                      <Printer className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
                       <span className="hidden sm:inline">{isTh ? 'พิมพ์แท็ก QR' : 'Print Tag'}</span>
                     </button>
 
@@ -1018,19 +1149,27 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                       {/* Top Row: Heat No & Grade Specs */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">
+                          <label className={`text-[10px] font-bold block uppercase mb-1 ${
+                            isLight ? 'text-slate-500' : 'text-slate-400'
+                          }`}>
                             Heat Number
                           </label>
                           <input
                             type="text"
                             value={item.heat_number || ''}
                             onChange={(e) => updateItemField(idx, 'heat_number', e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-500"
+                            className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold focus:outline-none border ${
+                              isLight
+                                ? 'bg-slate-50 border-slate-300 text-blue-700 focus:border-blue-500'
+                                : 'bg-slate-950 border-slate-800 text-cyan-300 focus:border-cyan-500'
+                            }`}
                           />
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">
+                          <label className={`text-[10px] font-bold block uppercase mb-1 ${
+                            isLight ? 'text-slate-500' : 'text-slate-400'
+                          }`}>
                             Grade / Billet Size
                           </label>
                           <div className="flex gap-1.5 items-center">
@@ -1039,27 +1178,41 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                               value={item.grade || ''}
                               onChange={(e) => updateItemField(idx, 'grade', e.target.value)}
                               style={{ color: spec?.color }}
-                              className="w-1/2 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none focus:border-cyan-500"
+                              className={`w-1/2 rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none border ${
+                                isLight
+                                  ? 'bg-slate-50 border-slate-300 focus:border-blue-500'
+                                  : 'bg-slate-950 border-slate-800 focus:border-cyan-500'
+                              }`}
                             />
-                            <span className="text-slate-600">/</span>
+                            <span className={isLight ? 'text-slate-400' : 'text-slate-600'}>/</span>
                             <input
                               type="text"
                               value={item.billet_size || ''}
                               onChange={(e) => updateItemField(idx, 'billet_size', e.target.value)}
-                              className="w-1/2 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-200 focus:outline-none focus:border-cyan-500"
+                              className={`w-1/2 rounded-lg px-2 py-1.5 text-xs font-semibold focus:outline-none border ${
+                                isLight
+                                  ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-blue-500'
+                                  : 'bg-slate-950 border-slate-800 text-slate-200 focus:border-cyan-500'
+                              }`}
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">
+                          <label className={`text-[10px] font-bold block uppercase mb-1 ${
+                            isLight ? 'text-slate-500' : 'text-slate-400'
+                          }`}>
                             Judgement Status
                           </label>
                           <div className="flex items-center gap-2 pt-1">
                             <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
                               judgement === 'PASS'
-                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                                : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                                ? isLight 
+                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                : isLight
+                                  ? 'bg-rose-100 text-rose-800 border-rose-300'
+                                  : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                             }`}>
                               {judgement === 'PASS' ? '✓ PASS' : '✕ FAIL / REJECT'}
                             </span>
@@ -1068,61 +1221,87 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                       </div>
 
                       {/* Middle Logistics Fields */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 text-xs">
+                      <div className={`grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 p-3 rounded-xl border text-xs ${
+                        isLight
+                          ? 'bg-slate-50 border-slate-200'
+                          : 'bg-slate-950/60 border-slate-800/80'
+                      }`}>
                         <div>
-                          <label className="text-[10px] text-slate-400 block">Supplier</label>
+                          <label className={`text-[10px] block ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Supplier</label>
                           <input
                             type="text"
                             value={item.supplier_name || ''}
                             onChange={(e) => updateItemField(idx, 'supplier_name', e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 mt-0.5"
+                            className={`w-full rounded px-2 py-1 mt-0.5 border ${
+                              isLight
+                                ? 'bg-white border-slate-300 text-slate-800'
+                                : 'bg-slate-900 border-slate-800 text-slate-200'
+                            }`}
                           />
                         </div>
 
                         <div>
-                          <label className="text-[10px] text-slate-400 block">Invoice / Batch</label>
+                          <label className={`text-[10px] block ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Invoice / Batch</label>
                           <div className="flex gap-1">
                             <input
                               type="text"
                               placeholder="INV"
                               value={item.invoice_no || ''}
                               onChange={(e) => updateItemField(idx, 'invoice_no', e.target.value)}
-                              className="w-1/2 bg-slate-900 border border-slate-800 rounded px-1.5 py-1 text-slate-200 mt-0.5"
+                              className={`w-1/2 rounded px-1.5 py-1 mt-0.5 border ${
+                                isLight
+                                  ? 'bg-white border-slate-300 text-slate-800'
+                                  : 'bg-slate-900 border-slate-800 text-slate-200'
+                              }`}
                             />
                             <input
                               type="text"
                               placeholder="Batch"
                               value={item.batch_no || ''}
                               onChange={(e) => updateItemField(idx, 'batch_no', e.target.value)}
-                              className="w-1/2 bg-slate-900 border border-slate-800 rounded px-1.5 py-1 text-slate-200 mt-0.5"
+                              className={`w-1/2 rounded px-1.5 py-1 mt-0.5 border ${
+                                isLight
+                                  ? 'bg-white border-slate-300 text-slate-800'
+                                  : 'bg-slate-900 border-slate-800 text-slate-200'
+                              }`}
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-[10px] text-slate-400 block">Qty (pcs)</label>
+                          <label className={`text-[10px] block ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Qty (pcs)</label>
                           <input
                             type="number"
                             value={item.quantity_pcs || ''}
                             onChange={(e) => updateItemField(idx, 'quantity_pcs', e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 mt-0.5 font-mono"
+                            className={`w-full rounded px-2 py-1 mt-0.5 font-mono border ${
+                              isLight
+                                ? 'bg-white border-slate-300 text-slate-800'
+                                : 'bg-slate-900 border-slate-800 text-slate-200'
+                            }`}
                           />
                         </div>
 
                         <div>
-                          <label className="text-[10px] text-slate-400 block">Weight (kg)</label>
+                          <label className={`text-[10px] block ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Weight (kg)</label>
                           <input
                             type="number"
                             value={item.weight_kg || ''}
                             onChange={(e) => updateItemField(idx, 'weight_kg', e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-cyan-300 font-bold mt-0.5 font-mono"
+                            className={`w-full rounded px-2 py-1 mt-0.5 font-mono font-bold border ${
+                              isLight
+                                ? 'bg-white border-slate-300 text-blue-700'
+                                : 'bg-slate-900 border-slate-800 text-cyan-300'
+                            }`}
                           />
                         </div>
                       </div>
 
                       {/* Chemical Elements Matrix */}
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider block mb-1.5 ${
+                          isLight ? 'text-slate-600' : 'text-slate-400'
+                        }`}>
                           Chemical Composition Analysis (%) vs {item.grade || 'Spec'}
                         </span>
                         <div className="grid grid-cols-6 sm:grid-cols-11 gap-1 text-[11px]">
@@ -1139,10 +1318,14 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                               <div 
                                 key={el} 
                                 className={`p-1.5 rounded-lg border text-center ${
-                                  isOut ? 'bg-rose-950/80 border-rose-500/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-slate-200'
+                                  isOut 
+                                    ? isLight ? 'bg-rose-50 border-rose-300 text-rose-700 font-bold' : 'bg-rose-950/80 border-rose-500/80 text-rose-300' 
+                                    : isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-slate-950 border-slate-800 text-slate-200'
                                 }`}
                               >
-                                <span className="block text-[9px] font-bold text-slate-400 mb-0.5">{el}</span>
+                                <span className={`block text-[9px] font-bold mb-0.5 ${
+                                  isLight ? 'text-slate-500' : 'text-slate-400'
+                                }`}>{el}</span>
                                 <input
                                   type="text"
                                   value={valStr}
@@ -1170,49 +1353,67 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
         <div className="space-y-6">
           {/* KPI Ribbon */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-              <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Inspected</span>
+            <div className={`p-4 rounded-2xl border shadow-xs ${
+              isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+            }`}>
+              <span className={`text-[10px] font-bold uppercase block ${
+                isLight ? 'text-slate-500' : 'text-slate-400'
+              }`}>Total Inspected</span>
               <div className="flex items-baseline justify-between mt-1">
-                <span className="text-2xl font-bold text-white">{dashboardStats.total}</span>
-                <span className="text-xs text-slate-400">Heats</span>
+                <span className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{dashboardStats.total}</span>
+                <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Heats</span>
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-emerald-900/40 p-4 rounded-2xl">
-              <span className="text-[10px] font-bold text-emerald-400 uppercase block">Judgement OK</span>
+            <div className={`p-4 rounded-2xl border shadow-xs ${
+              isLight ? 'bg-white border-emerald-200' : 'bg-slate-900 border-emerald-900/40'
+            }`}>
+              <span className="text-[10px] font-bold text-emerald-600 uppercase block">Judgement OK</span>
               <div className="flex items-baseline justify-between mt-1">
-                <span className="text-2xl font-bold text-emerald-400">{dashboardStats.ok}</span>
-                <span className="text-xs text-emerald-400">Passed</span>
+                <span className="text-2xl font-bold text-emerald-600">{dashboardStats.ok}</span>
+                <span className="text-xs text-emerald-600">Passed</span>
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-rose-900/40 p-4 rounded-2xl">
-              <span className="text-[10px] font-bold text-rose-400 uppercase block">Judgement NG</span>
+            <div className={`p-4 rounded-2xl border shadow-xs ${
+              isLight ? 'bg-white border-rose-200' : 'bg-slate-900 border-rose-900/40'
+            }`}>
+              <span className="text-[10px] font-bold text-rose-600 uppercase block">Judgement NG</span>
               <div className="flex items-baseline justify-between mt-1">
-                <span className="text-2xl font-bold text-rose-400">{dashboardStats.ng}</span>
-                <span className="text-xs text-rose-400">Rejects</span>
+                <span className="text-2xl font-bold text-rose-600">{dashboardStats.ng}</span>
+                <span className="text-xs text-rose-600">Rejects</span>
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-cyan-900/40 p-4 rounded-2xl">
-              <span className="text-[10px] font-bold text-cyan-400 uppercase block">Pass Rate</span>
+            <div className={`p-4 rounded-2xl border shadow-xs ${
+              isLight ? 'bg-white border-blue-200' : 'bg-slate-900 border-cyan-900/40'
+            }`}>
+              <span className={`text-[10px] font-bold uppercase block ${
+                isLight ? 'text-blue-600' : 'text-cyan-400'
+              }`}>Quality Pass Rate</span>
               <div className="flex items-baseline justify-between mt-1">
-                <span className="text-2xl font-bold text-cyan-400">{dashboardStats.okRate}%</span>
-                <span className="text-xs text-cyan-400">Yield</span>
+                <span className={`text-2xl font-bold ${isLight ? 'text-blue-600' : 'text-cyan-400'}`}>{dashboardStats.okRate}%</span>
+                <span className={`text-xs ${isLight ? 'text-blue-600' : 'text-cyan-400'}`}>Yield</span>
               </div>
             </div>
           </div>
 
           {/* Search & Export Toolbar */}
-          <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+          }`}>
             <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${isLight ? 'text-slate-400' : 'text-slate-400'}`} />
               <input
                 type="text"
                 placeholder={isTh ? "ค้นหา Heat No, Grade, Supplier..." : "Search Heat No, Grade..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+                className={`w-full rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none border ${
+                  isLight
+                    ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-blue-500'
+                    : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-cyan-500'
+                }`}
               />
             </div>
 
@@ -1220,7 +1421,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               <button
                 onClick={exportToCSV}
                 disabled={filteredHistory.length === 0}
-                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 transition"
+                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 transition shadow-xs"
               >
                 <FileSpreadsheet className="w-4 h-4" />
                 <span>{isTh ? 'ส่งออก CSV (Export CSV)' : 'Export CSV'}</span>
@@ -1229,16 +1430,22 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
           </div>
 
           {/* Summary Table by Grade */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-              <PieChart className="w-4 h-4 text-cyan-400" />
+          <div className={`border rounded-2xl p-5 space-y-3 shadow-xs ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+          }`}>
+            <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${
+              isLight ? 'text-slate-800' : 'text-slate-200'
+            }`}>
+              <PieChart className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
               {isTh ? 'สรุปน้ำหนักตามชนิดเกรด (Summary by Aluminum Grade)' : 'Summary by Aluminum Grade'}
             </h3>
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
+                  <tr className={`border-b text-[11px] ${
+                    isLight ? 'border-slate-200 text-slate-500' : 'border-slate-800 text-slate-400'
+                  }`}>
                     <th className="pb-3">Aluminum Grade</th>
                     <th className="pb-3 text-center">Invoices</th>
                     <th className="pb-3 text-center">Heat Count</th>
@@ -1246,24 +1453,24 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                     <th className="pb-3 text-right">Total Weight (kg)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className={`divide-y ${isLight ? 'divide-slate-100' : 'divide-slate-800/60'}`}>
                   {dashboardStats.gradeSummary.map((gs, i) => {
                     const spec = findMatchingSpec(gs.grade);
                     return (
-                      <tr key={i} className="hover:bg-slate-950/40">
-                        <td className="py-2.5 font-bold" style={{ color: spec?.color || '#38bdf8' }}>
+                      <tr key={i} className={isLight ? 'hover:bg-slate-50/80' : 'hover:bg-slate-950/40'}>
+                        <td className="py-2.5 font-bold" style={{ color: spec?.color || (isLight ? '#2563eb' : '#38bdf8') }}>
                           {gs.grade}
                         </td>
-                        <td className="py-2.5 text-center text-slate-400 font-mono">
+                        <td className={`py-2.5 text-center font-mono ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                           {Array.from(gs.invoices).join(', ') || '-'}
                         </td>
-                        <td className="py-2.5 text-center font-semibold text-slate-200">
+                        <td className={`py-2.5 text-center font-semibold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
                           {gs.heats.size} Heats
                         </td>
-                        <td className="py-2.5 text-center font-semibold text-slate-200">
+                        <td className={`py-2.5 text-center font-semibold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
                           {gs.pcs.toLocaleString()} pcs
                         </td>
-                        <td className="py-2.5 text-right font-bold text-cyan-300 font-mono">
+                        <td className={`py-2.5 text-right font-bold font-mono ${isLight ? 'text-blue-700' : 'text-cyan-300'}`}>
                           {gs.weight.toLocaleString(undefined, { minimumFractionDigits: 2 })} kg
                         </td>
                       </tr>
@@ -1275,17 +1482,25 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
           </div>
 
           {/* Detailed History Table */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-            <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-cyan-400" />
+          <div className={`border rounded-2xl overflow-hidden shadow-xs ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+          }`}>
+            <div className={`p-4 border-b flex items-center justify-between ${
+              isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+            }`}>
+              <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${
+                isLight ? 'text-slate-800' : 'text-slate-200'
+              }`}>
+                <ClipboardList className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
                 {isTh ? 'ประวัติการตรวจรับ Billet ทั้งหมด' : 'Historical Billet Inspection Logs'}
               </h3>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-950 text-slate-400 font-mono text-[10px] uppercase">
+                <thead className={`font-mono text-[10px] uppercase ${
+                  isLight ? 'bg-slate-50 text-slate-500 border-b border-slate-200' : 'bg-slate-950 text-slate-400'
+                }`}>
                   <tr>
                     <th className="p-3">Heat No / Grade</th>
                     <th className="p-3">Supplier / Inspector</th>
@@ -1295,30 +1510,34 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                     <th className="p-3 text-right">Timestamp</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/80">
+                <tbody className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-slate-800/80'}`}>
                   {filteredHistory.map((entry) => {
                     const spec = findMatchingSpec(entry.grade);
                     return (
-                      <tr key={entry.id} className="hover:bg-slate-950/50 transition">
+                      <tr key={entry.id} className={`transition ${isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-950/50'}`}>
                         <td className="p-3">
-                          <span className="font-bold text-white font-mono block">{entry.heat_number}</span>
-                          <span className="text-[11px] font-semibold" style={{ color: spec?.color || '#38bdf8' }}>
+                          <span className={`font-bold font-mono block ${isLight ? 'text-slate-900' : 'text-white'}`}>{entry.heat_number}</span>
+                          <span className="text-[11px] font-semibold" style={{ color: spec?.color || (isLight ? '#2563eb' : '#38bdf8') }}>
                             {entry.grade} ({entry.billet_size})
                           </span>
                         </td>
                         <td className="p-3">
-                          <span className="text-slate-200 block font-medium">{entry.supplier_name || '-'}</span>
-                          <span className="text-[10px] text-slate-400">{entry.inspector_name || 'QA'}</span>
+                          <span className={`block font-medium ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{entry.supplier_name || '-'}</span>
+                          <span className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{entry.inspector_name || 'QA'}</span>
                         </td>
                         <td className="p-3 text-center font-mono">
-                          <span className="text-slate-200 block">{entry.quantity_pcs} pcs</span>
-                          <span className="font-bold text-cyan-300">{entry.weight_kg} kg</span>
+                          <span className={`block ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{entry.quantity_pcs} pcs</span>
+                          <span className={`font-bold ${isLight ? 'text-blue-700' : 'text-cyan-300'}`}>{entry.weight_kg} kg</span>
                         </td>
                         <td className="p-3 text-center">
                           <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
                             entry.judgement === 'PASS'
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                              ? isLight 
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : isLight
+                                ? 'bg-rose-100 text-rose-800 border-rose-300'
+                                : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                           }`}>
                             {entry.judgement}
                           </span>
@@ -1327,7 +1546,11 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                           <div className="flex items-center justify-center gap-1.5">
                             <button
                               onClick={() => handleRequestEditHistory(entry)}
-                              className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg transition border border-amber-500/30 flex items-center gap-1 text-[11px] font-bold"
+                              className={`p-1.5 rounded-lg transition border flex items-center gap-1 text-[11px] font-bold ${
+                                isLight
+                                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-300'
+                                  : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30'
+                              }`}
                               title={isTh ? "แก้ไขข้อมูล (ใส่รหัส admin2026)" : "Edit Record (Password required)"}
                             >
                               <Edit3 className="w-3.5 h-3.5" />
@@ -1335,21 +1558,29 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                             </button>
                             <button
                               onClick={() => handlePrintTag(entry)}
-                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 rounded-lg transition border border-slate-700"
+                              className={`p-1.5 rounded-lg transition border ${
+                                isLight
+                                  ? 'bg-slate-100 hover:bg-slate-200 text-blue-600 border-slate-300'
+                                  : 'bg-slate-800 hover:bg-slate-700 text-cyan-400 border-slate-700'
+                              }`}
                               title="Print Tag"
                             >
                               <Printer className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => setHistory(prev => prev.filter(h => h.id !== entry.id))}
-                              className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition border border-rose-500/30"
-                              title="Delete Record"
+                              onClick={() => handleRequestDeleteHistory(entry)}
+                              className={`p-1.5 rounded-lg transition border ${
+                                isLight
+                                  ? 'bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-300'
+                                  : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30'
+                              }`}
+                              title={isTh ? "ลบรายการ (ต้องใส่รหัส admin2026)" : "Delete Record (Password required)"}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </td>
-                        <td className="p-3 text-right font-mono text-[10px] text-slate-400">
+                        <td className={`p-3 text-right font-mono text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                           {entry.timestamp}
                         </td>
                       </tr>
@@ -1360,24 +1591,112 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
             </div>
           </div>
 
-          {/* PASSWORD PROMPT MODAL FOR EDITING HISTORY */}
-          {isHistoryAuthOpen && (
-            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+          {/* PASSWORD PROMPT MODAL FOR DELETING RECORD / GRADE */}
+          {isDeleteAuthOpen && (
+            <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
+              isLight ? 'bg-slate-900/40 backdrop-blur-xs' : 'bg-slate-950/80 backdrop-blur-sm'
+            }`}>
+              <div className={`rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative border ${
+                isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+              }`}>
                 <button 
-                  onClick={() => setIsHistoryAuthOpen(false)} 
-                  className="absolute top-4 right-4 text-slate-400 hover:text-slate-200"
+                  onClick={() => setIsDeleteAuthOpen(false)} 
+                  className={`absolute top-4 right-4 ${isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}`}
                 >
                   <X className="w-5 h-5" />
                 </button>
-                <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl flex items-center justify-center mx-auto">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto border ${
+                  isLight 
+                    ? 'bg-rose-50 border-rose-200 text-rose-600' 
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                }`}>
+                  <Trash2 className="w-6 h-6" />
+                </div>
+                <div className="text-center space-y-1">
+                  <h4 className={`font-bold text-base ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                    {isTh ? 'ยืนยันรหัสผ่านเพื่อลบข้อมูล' : 'Password Required for Deletion'}
+                  </h4>
+                  <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {targetDeleteHistoryItem ? (
+                      isTh 
+                        ? `ต้องการลบประวัติ Heat No. ${targetDeleteHistoryItem.heat_number} กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน` 
+                        : `Enter admin password admin2026 to delete Heat No. ${targetDeleteHistoryItem.heat_number}`
+                    ) : (
+                      isTh 
+                        ? `ต้องการลบ Grade Spec ${targetDeleteGrade} กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน` 
+                        : `Enter admin password admin2026 to delete Grade Spec ${targetDeleteGrade}`
+                    )}
+                  </p>
+                </div>
+
+                <form onSubmit={handleVerifyDeletePassword} className="space-y-3">
+                  <input
+                    type="password"
+                    autoFocus
+                    placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
+                    value={deleteAuthPassword}
+                    onChange={(e) => setDeleteAuthPassword(e.target.value)}
+                    className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
+                      isLight
+                        ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-rose-500'
+                        : 'bg-slate-950 border-slate-800 text-white focus:border-rose-500'
+                    }`}
+                  />
+                  {deleteAuthError && (
+                    <p className="text-xs text-rose-500 font-semibold text-center">
+                      {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
+                    </p>
+                  )}
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsDeleteAuthOpen(false)}
+                      className={`flex-1 font-bold text-xs py-2.5 rounded-xl transition ${
+                        isLight
+                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                      }`}
+                    >
+                      {isTh ? 'ยกเลิก' : 'Cancel'}
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-xs"
+                    >
+                      {isTh ? 'ยืนยันลบข้อมูล' : 'Verify & Delete'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* PASSWORD PROMPT MODAL FOR EDITING HISTORY */}
+          {isHistoryAuthOpen && (
+            <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
+              isLight ? 'bg-slate-900/40 backdrop-blur-xs' : 'bg-slate-950/80 backdrop-blur-sm'
+            }`}>
+              <div className={`rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative border ${
+                isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+              }`}>
+                <button 
+                  onClick={() => setIsHistoryAuthOpen(false)} 
+                  className={`absolute top-4 right-4 ${isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto border ${
+                  isLight 
+                    ? 'bg-amber-50 border-amber-200 text-amber-600' 
+                    : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                }`}>
                   <Lock className="w-6 h-6" />
                 </div>
                 <div className="text-center space-y-1">
-                  <h4 className="font-bold text-white text-base">
+                  <h4 className={`font-bold text-base ${isLight ? 'text-slate-900' : 'text-white'}`}>
                     {isTh ? 'ยืนยันรหัสผ่านเพื่อแก้ไขข้อมูล' : 'Password Required for Editing'}
                   </h4>
-                  <p className="text-xs text-slate-400">
+                  <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     {isTh 
                       ? `ต้องการแก้ไข Heat No. ${targetEditHistoryItem?.heat_number || ''} กรุณาใส่รหัสผ่าน` 
                       : `Enter admin password to edit Heat No. ${targetEditHistoryItem?.heat_number || ''}`}
@@ -1391,10 +1710,14 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                     placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
                     value={historyAuthPassword}
                     onChange={(e) => setHistoryAuthPassword(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-center font-mono text-sm text-white focus:outline-none focus:border-amber-500"
+                    className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
+                      isLight
+                        ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                        : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                    }`}
                   />
                   {historyAuthError && (
-                    <p className="text-xs text-rose-400 font-semibold text-center">
+                    <p className="text-xs text-rose-500 font-semibold text-center">
                       {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
                     </p>
                   )}
@@ -1402,13 +1725,17 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                     <button
                       type="button"
                       onClick={() => setIsHistoryAuthOpen(false)}
-                      className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-2.5 rounded-xl transition"
+                      className={`flex-1 font-bold text-xs py-2.5 rounded-xl transition ${
+                        isLight
+                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                      }`}
                     >
                       {isTh ? 'ยกเลิก' : 'Cancel'}
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-2.5 rounded-xl transition shadow-md shadow-amber-500/20"
+                      className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-2.5 rounded-xl transition shadow-xs"
                     >
                       {isTh ? 'ยืนยันเพื่อเข้าแก้ไข' : 'Unlock & Edit'}
                     </button>
@@ -1420,18 +1747,24 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
           {/* EDIT RECORD MODAL */}
           {editingHistoryItem && (
-            <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 space-y-6 my-8 shadow-2xl relative">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto ${
+              isLight ? 'bg-slate-900/40 backdrop-blur-xs' : 'bg-slate-950/85 backdrop-blur-md'
+            }`}>
+              <div className={`border rounded-2xl max-w-3xl w-full p-6 space-y-6 my-8 shadow-2xl relative ${
+                isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+              }`}>
+                <div className={`flex items-center justify-between border-b pb-4 ${
+                  isLight ? 'border-slate-200' : 'border-slate-800'
+                }`}>
                   <div className="flex items-center gap-2">
-                    <Edit3 className="w-5 h-5 text-amber-400" />
-                    <h3 className="text-base font-bold text-white">
+                    <Edit3 className="w-5 h-5 text-amber-500" />
+                    <h3 className={`text-base font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
                       {isTh ? `แก้ไขข้อมูลบันทึก Heat No. ${editingHistoryItem.heat_number}` : `Edit Inspection Record - ${editingHistoryItem.heat_number}`}
                     </h3>
                   </div>
                   <button 
                     onClick={() => setEditingHistoryItem(null)} 
-                    className="text-slate-400 hover:text-slate-200"
+                    className={isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -1439,105 +1772,143 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Heat Number</label>
+                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Heat Number</label>
                     <input
                       type="text"
                       value={editingHistoryItem.heat_number || ''}
                       onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, heat_number: e.target.value } : null)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-amber-500"
+                      className={`w-full rounded-xl px-3 py-2 font-mono font-bold focus:outline-none border ${
+                        isLight
+                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                      }`}
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Grade</label>
+                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Grade</label>
                     <input
                       type="text"
                       value={editingHistoryItem.grade || ''}
                       onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, grade: e.target.value } : null)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500"
+                      className={`w-full rounded-xl px-3 py-2 font-bold focus:outline-none border ${
+                        isLight
+                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                      }`}
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Billet Size</label>
+                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Billet Size</label>
                     <input
                       type="text"
                       value={editingHistoryItem.billet_size || ''}
                       onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, billet_size: e.target.value } : null)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                      className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                        isLight
+                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                      }`}
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Supplier Name</label>
+                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Supplier Name</label>
                     <input
                       type="text"
                       value={editingHistoryItem.supplier_name || ''}
                       onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, supplier_name: e.target.value } : null)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                      className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                        isLight
+                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                      }`}
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Inspector</label>
+                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Inspector</label>
                     <input
                       type="text"
                       value={editingHistoryItem.inspector_name || ''}
                       onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, inspector_name: e.target.value } : null)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                      className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                        isLight
+                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                      }`}
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Invoice No.</label>
+                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Invoice No.</label>
                     <input
                       type="text"
                       value={editingHistoryItem.invoice_no || ''}
                       onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, invoice_no: e.target.value } : null)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                      className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                        isLight
+                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                      }`}
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Quantity (pcs)</label>
+                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Quantity (pcs)</label>
                     <input
                       type="number"
                       value={editingHistoryItem.quantity_pcs || 0}
                       onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, quantity_pcs: Number(e.target.value) } : null)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
+                      className={`w-full rounded-xl px-3 py-2 font-mono focus:outline-none border ${
+                        isLight
+                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                      }`}
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Weight (kg)</label>
+                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Weight (kg)</label>
                     <input
                       type="number"
                       value={editingHistoryItem.weight_kg || 0}
                       onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, weight_kg: Number(e.target.value) } : null)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
+                      className={`w-full rounded-xl px-3 py-2 font-mono focus:outline-none border ${
+                        isLight
+                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                      }`}
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Diameter</label>
+                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Diameter</label>
                     <input
                       type="text"
                       value={editingHistoryItem.diameter || ''}
                       onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, diameter: e.target.value } : null)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                      className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                        isLight
+                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                      }`}
                     />
                   </div>
                 </div>
 
                 {/* Chemical Composition Matrix */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
+                  <label className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">
                     Chemical Composition Analysis (%)
                   </label>
                   <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-11 gap-1.5 text-xs">
                     {chemElements.map(el => (
-                      <div key={el} className="bg-slate-950 p-2 rounded-xl border border-slate-800 text-center">
-                        <span className="block text-[10px] font-bold text-slate-400 mb-1">{el}</span>
+                      <div key={el} className={`p-2 rounded-xl border text-center ${
+                        isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+                      }`}>
+                        <span className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{el}</span>
                         <input
                           type="text"
                           value={editingHistoryItem.chemical_composition?.[el] ?? ''}
@@ -1554,23 +1925,31 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                               };
                             });
                           }}
-                          className="w-full bg-slate-900 border border-slate-800 rounded text-center text-xs font-mono text-cyan-300 font-bold focus:outline-none focus:border-amber-500"
+                          className={`w-full rounded text-center text-xs font-mono font-bold focus:outline-none border ${
+                            isLight
+                              ? 'bg-white border-slate-300 text-blue-700 focus:border-amber-500'
+                              : 'bg-slate-900 border-slate-800 text-cyan-300 focus:border-amber-500'
+                          }`}
                         />
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+                <div className={`flex justify-end gap-3 pt-4 border-t ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
                   <button
                     onClick={() => setEditingHistoryItem(null)}
-                    className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition"
+                    className={`px-5 py-2.5 text-xs font-bold rounded-xl transition ${
+                      isLight
+                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                    }`}
                   >
                     {isTh ? 'ยกเลิก' : 'Cancel'}
                   </button>
                   <button
                     onClick={handleSaveEditedHistory}
-                    className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition shadow-lg shadow-amber-500/20 flex items-center gap-2"
+                    className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-2"
                   >
                     <Save className="w-4 h-4" />
                     <span>{isTh ? 'บันทึกการแก้ไข' : 'Save Changes'}</span>
@@ -1584,17 +1963,23 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
       {/* TAB 3: CONFIGURATION (PROTECTED) */}
       {activeTab === 'config' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-md">
-          <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-              <Settings className="w-4 h-4 text-cyan-400" />
+        <div className={`border rounded-2xl overflow-hidden shadow-xs ${
+          isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+        }`}>
+          <div className={`p-4 border-b flex items-center justify-between ${
+            isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+          }`}>
+            <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${
+              isLight ? 'text-slate-800' : 'text-slate-200'
+            }`}>
+              <Settings className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
               {isTh ? 'การตั้งค่าเกณฑ์ส่วนผสมเคมี (Chemical Spec Thresholds)' : 'Grade Chemical Spec Config'}
             </h3>
 
             {isAdminAuthenticated && (
               <button
                 onClick={() => setIsAdminAuthenticated(false)}
-                className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 font-semibold"
+                className="text-xs text-rose-500 hover:text-rose-600 flex items-center gap-1 font-semibold"
               >
                 <Lock className="w-3.5 h-3.5" />
                 <span>{isTh ? 'ออกจากระบบ Admin' : 'Lock Admin'}</span>
@@ -1605,13 +1990,15 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
           {!isAdminAuthenticated ? (
             /* Admin Login */
             <div className="p-12 text-center max-w-sm mx-auto space-y-4">
-              <div className="w-12 h-12 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-2xl flex items-center justify-center mx-auto">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto border ${
+                isLight ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
+              }`}>
                 <Lock className="w-6 h-6" />
               </div>
-              <h4 className="font-bold text-white text-base">
+              <h4 className={`font-bold text-base ${isLight ? 'text-slate-900' : 'text-white'}`}>
                 {isTh ? 'สิทธิ์ผู้ดูแลระบบ (Admin Access Required)' : 'Admin Access Required'}
               </h4>
-              <p className="text-xs text-slate-400">
+              <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh ? 'กรอกรหัสผ่านเพื่อแก้ไขเกณฑ์ Min/Max ส่วนผสมเคมี' : 'Enter password to edit Grade Spec limits.'}
               </p>
 
@@ -1621,16 +2008,24 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                   placeholder={isTh ? "รหัสผ่าน (admin2026)" : "Password (admin2026)"}
                   value={adminPasswordInput}
                   onChange={(e) => setAdminPasswordInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-center font-mono text-sm text-white focus:outline-none focus:border-cyan-500"
+                  className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-cyan-500'
+                  }`}
                 />
                 {passwordError && (
-                  <p className="text-xs text-rose-400 font-semibold">
+                  <p className="text-xs text-rose-500 font-semibold">
                     {isTh ? 'รหัสผ่านไม่ถูกต้อง (ลองใส่ admin2026)' : 'Invalid password (try admin2026)'}
                   </p>
                 )}
                 <button
                   type="submit"
-                  className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs py-2.5 rounded-xl transition shadow-md shadow-cyan-500/20"
+                  className={`w-full font-bold text-xs py-2.5 rounded-xl transition shadow-xs ${
+                    isLight
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                      : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+                  }`}
                 >
                   {isTh ? 'ยืนยันรหัสผ่าน' : 'Authenticate'}
                 </button>
@@ -1638,13 +2033,21 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
             </div>
           ) : (
             /* Spec Management Editor */
-            <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-800 min-h-[400px]">
+            <div className={`flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x min-h-[400px] ${
+              isLight ? 'divide-slate-200' : 'divide-slate-800'
+            }`}>
               
               {/* Grade List Sidebar */}
-              <div className="w-full md:w-64 p-4 space-y-2 bg-slate-950/50">
+              <div className={`w-full md:w-64 p-4 space-y-2 ${
+                isLight ? 'bg-slate-50' : 'bg-slate-950/50'
+              }`}>
                 <button
                   onClick={prepareNewGrade}
-                  className="w-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 font-bold text-xs py-2 px-3 rounded-xl border border-cyan-500/40 flex items-center justify-center gap-2 transition"
+                  className={`w-full font-bold text-xs py-2 px-3 rounded-xl border flex items-center justify-center gap-2 transition ${
+                    isLight
+                      ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300'
+                      : 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border-cyan-500/40'
+                  }`}
                 >
                   <Plus className="w-4 h-4" />
                   <span>{isTh ? 'เพิ่มเกณฑ์เกรดใหม่ (+ Grade)' : '+ Add Grade Spec'}</span>
@@ -1659,8 +2062,12 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                       onClick={() => setEditingGrade(grade)}
                       className={`p-3 rounded-xl cursor-pointer transition flex items-center justify-between border ${
                         isSelected 
-                          ? 'bg-slate-800 text-white font-bold border-cyan-500/50 shadow-sm' 
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                          ? isLight 
+                            ? 'bg-white text-blue-700 font-bold border-blue-400 shadow-xs' 
+                            : 'bg-slate-800 text-white font-bold border-cyan-500/50 shadow-sm' 
+                          : isLight 
+                            ? 'bg-white/70 text-slate-600 border-slate-200 hover:bg-white' 
+                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
                       }`}
                     >
                       <div className="flex items-center gap-2">
@@ -1680,8 +2087,10 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                 {editingGrade ? (
                   <div className="space-y-6">
                     {editingGrade === "NEW_GRADE_PENDING" ? (
-                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-                        <label className="text-xs font-bold text-cyan-300 block">
+                      <div className={`p-4 rounded-xl border space-y-3 ${
+                        isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+                      }`}>
+                        <label className={`text-xs font-bold block ${isLight ? 'text-blue-700' : 'text-cyan-300'}`}>
                           {isTh ? 'ตั้งชื่อเกรดใหม่' : 'Enter Grade Name'}
                         </label>
                         <div className="flex gap-2">
@@ -1690,21 +2099,31 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                             placeholder="e.g. 6061, 6082"
                             value={tempGradeName}
                             onChange={(e) => setTempGradeName(e.target.value)}
-                            className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white font-bold font-mono focus:outline-none focus:border-cyan-500"
+                            className={`border rounded-lg px-3 py-1.5 text-xs font-bold font-mono focus:outline-none ${
+                              isLight
+                                ? 'bg-white border-slate-300 text-slate-900 focus:border-blue-500'
+                                : 'bg-slate-900 border-slate-800 text-white focus:border-cyan-500'
+                            }`}
                           />
                           <button
                             onClick={handleSaveNewGrade}
                             disabled={!tempGradeName.trim()}
-                            className="bg-cyan-500 text-slate-950 font-bold text-xs px-4 py-1.5 rounded-lg"
+                            className={`font-bold text-xs px-4 py-1.5 rounded-lg ${
+                              isLight ? 'bg-blue-600 text-white' : 'bg-cyan-500 text-slate-950'
+                            }`}
                           >
                             {isTh ? 'บันทึกชื่อ' : 'Save'}
                           </button>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                      <div className={`flex items-center justify-between border-b pb-4 ${
+                        isLight ? 'border-slate-200' : 'border-slate-800'
+                      }`}>
                         <div className="flex items-center gap-4">
-                          <h4 className="text-lg font-bold text-white font-mono flex items-center gap-2">
+                          <h4 className={`text-lg font-bold font-mono flex items-center gap-2 ${
+                            isLight ? 'text-slate-900' : 'text-white'
+                          }`}>
                             <span 
                               className="w-3.5 h-3.5 rounded-full" 
                               style={{ backgroundColor: gradeSpecs[editingGrade]?.color }}
@@ -1713,7 +2132,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                           </h4>
 
                           <div className="flex items-center gap-2 text-xs">
-                            <Palette className="w-4 h-4 text-slate-400" />
+                            <Palette className={`w-4 h-4 ${isLight ? 'text-slate-400' : 'text-slate-400'}`} />
                             <input
                               type="color"
                               value={gradeSpecs[editingGrade]?.color || '#4f46e5'}
@@ -1724,8 +2143,8 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                         </div>
 
                         <button
-                          onClick={() => deleteGrade(editingGrade)}
-                          className="text-xs text-rose-400 hover:text-rose-300 p-2 bg-rose-500/10 rounded-lg border border-rose-500/30 font-semibold"
+                          onClick={() => handleRequestDeleteGrade(editingGrade)}
+                          className="text-xs text-rose-500 hover:text-rose-600 p-2 bg-rose-50 rounded-lg border border-rose-200 font-semibold"
                         >
                           {isTh ? 'ลบเกรดนี้' : 'Delete Grade'}
                         </button>
@@ -1736,20 +2155,22 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs text-left">
                         <thead>
-                          <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                          <tr className={`border-b text-[10px] uppercase ${
+                            isLight ? 'border-slate-200 text-slate-500' : 'border-slate-800 text-slate-400'
+                          }`}>
                             <th className="pb-3">Element</th>
                             <th className="pb-3 text-center">Min Threshold (%)</th>
                             <th className="pb-3 text-center">Max Threshold (%)</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800/60">
+                        <tbody className={`divide-y ${isLight ? 'divide-slate-100' : 'divide-slate-800/60'}`}>
                           {chemElements.map((el) => {
                             const minVal = gradeSpecs[editingGrade]?.elements?.[el]?.min ?? 0;
                             const maxVal = gradeSpecs[editingGrade]?.elements?.[el]?.max ?? 0;
 
                             return (
-                              <tr key={el} className="hover:bg-slate-950/40">
-                                <td className="py-2.5 font-bold font-mono text-cyan-300">
+                              <tr key={el} className={isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-950/40'}>
+                                <td className={`py-2.5 font-bold font-mono ${isLight ? 'text-blue-700' : 'text-cyan-300'}`}>
                                   {el}
                                 </td>
                                 <td className="py-2.5 text-center">
@@ -1758,7 +2179,11 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                                     step="0.001"
                                     value={minVal}
                                     onChange={(e) => updateSpecValue(el, 'min', e.target.value)}
-                                    className="w-24 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-center font-mono font-bold text-slate-200"
+                                    className={`w-24 border rounded px-2 py-1 text-center font-mono font-bold ${
+                                      isLight
+                                        ? 'bg-white border-slate-300 text-slate-800'
+                                        : 'bg-slate-950 border-slate-800 text-slate-200'
+                                    }`}
                                   />
                                 </td>
                                 <td className="py-2.5 text-center">
@@ -1767,7 +2192,11 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                                     step="0.001"
                                     value={maxVal}
                                     onChange={(e) => updateSpecValue(el, 'max', e.target.value)}
-                                    className="w-24 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-center font-mono font-bold text-slate-200"
+                                    className={`w-24 border rounded px-2 py-1 text-center font-mono font-bold ${
+                                      isLight
+                                        ? 'bg-white border-slate-300 text-slate-800'
+                                        : 'bg-slate-950 border-slate-800 text-slate-200'
+                                    }`}
                                   />
                                 </td>
                               </tr>
@@ -1778,7 +2207,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-16 text-slate-500 text-xs">
+                  <div className={`text-center py-16 text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                     {isTh ? 'เลือกเกรดจากรายการด้านซ้ายเพื่อแก้ไขค่ามิติ Min/Max' : 'Select a grade from left sidebar to configure specs'}
                   </div>
                 )}

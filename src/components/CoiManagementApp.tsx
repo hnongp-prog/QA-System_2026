@@ -11,12 +11,15 @@ import {
   RotateCcw,
   CheckCircle2,
   Building2,
-  Info
+  Info,
+  Sun,
+  Moon
 } from 'lucide-react';
 import {
   CoiCustomerTemplate,
   CoiIssueRecord,
-  InspectionActivity
+  InspectionActivity,
+  ThemeMode
 } from '../types';
 import {
   getCustomerTemplates,
@@ -37,6 +40,8 @@ interface CoiManagementAppProps {
   onBackToMenu?: () => void;
   onLogNewActivity?: (activity: Omit<InspectionActivity, 'id' | 'timestamp'>) => void;
   language?: 'th' | 'en';
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 type TabType = 'DESIGN' | 'ISSUE' | 'VIEW_DOCUMENT' | 'HISTORY';
@@ -45,9 +50,12 @@ export const CoiManagementApp: React.FC<CoiManagementAppProps> = ({
   onBackToPortal,
   onBackToMenu,
   onLogNewActivity,
-  language = 'th'
+  language = 'th',
+  theme = 'light',
+  onToggleTheme
 }) => {
   const isTh = language === 'th';
+  const isLight = theme === 'light';
   const handleBackToMain = onBackToPortal || onBackToMenu;
   const [activeTab, setActiveTab] = useState<TabType>('DESIGN');
 
@@ -116,27 +124,39 @@ export const CoiManagementApp: React.FC<CoiManagementAppProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6">
+    <div className={`min-h-screen p-4 sm:p-6 lg:p-8 space-y-6 transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
+    }`}>
       {/* Top Main Navigation Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className={`border rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-colors ${
+        isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-900 border-slate-800 shadow-xl'
+      }`}>
         <div className="flex items-center gap-3">
           <button
             onClick={handleBackToMain}
-            className="flex items-center gap-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 px-3.5 py-2 rounded-xl border border-slate-700 transition cursor-pointer"
+            className={`flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border transition cursor-pointer ${
+              isLight
+                ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-300'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+            }`}
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 text-blue-600" />
             {isTh ? 'กลับสู่หน้ารวมระบบ' : 'Back to Portal'}
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <span className="bg-cyan-500/10 text-cyan-400 font-mono text-xs font-bold px-2.5 py-0.5 rounded border border-cyan-500/20">
+              <span className={`font-mono text-xs font-bold px-2.5 py-0.5 rounded border ${
+                isLight ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+              }`}>
                 COI-01
               </span>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              <h1 className={`text-xl sm:text-2xl font-black tracking-tight ${
+                isLight ? 'text-slate-900' : 'text-white'
+              }`}>
                 {isTh ? 'ระบบออกใบรับรองผลการตรวจคุณภาพ COI' : 'Certificate of Inspection (COI) System'}
               </h1>
             </div>
-            <p className="text-slate-400 text-xs mt-1">
+            <p className={`text-xs mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
               {isTh
                 ? 'ออกแบบเลย์เอาต์แยกตามลูกค้า • ดึงข้อมูลอัตโนมัติจาก IQA / IPQA • ออกเอกสารมาตรฐาน'
                 : 'Customer-specific COI layout design, automated IQA/IPQA data linkage, and certificate issuance.'}
@@ -144,57 +164,92 @@ export const CoiManagementApp: React.FC<CoiManagementAppProps> = ({
           </div>
         </div>
 
-        {/* Global Navigation Tabs */}
-        <div className="flex flex-wrap items-center gap-1.5 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800">
-          <button
-            onClick={() => setActiveTab('DESIGN')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
-              activeTab === 'DESIGN'
-                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-850'
-            }`}
-          >
-            <Sliders className="w-4 h-4" />
-            <span>{isTh ? '1. ออกแบบผัง (Design Layout)' : '1. Design Layout'}</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('ISSUE')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
-              activeTab === 'ISSUE'
-                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-850'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>{isTh ? '2. ระบุรายละเอียด & ดึงข้อมูล (Issue COI)' : '2. Issue COI'}</span>
-          </button>
-
-          {currentViewingRecord && (
+        {/* Global Navigation Tabs & Theme Toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {onToggleTheme && (
             <button
-              onClick={() => setActiveTab('VIEW_DOCUMENT')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
-                activeTab === 'VIEW_DOCUMENT'
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-850'
+              onClick={onToggleTheme}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition ${
+                isLight
+                  ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 shadow-xs'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
               }`}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}
             >
-              <Printer className="w-4 h-4" />
-              <span>{isTh ? '3. ใบรับรอง (Official Document)' : '3. Official Doc'}</span>
+              {isLight ? <Moon className="w-3.5 h-3.5 text-indigo-600" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
+              <span>{isLight ? (isTh ? 'โหมดสว่าง' : 'Light') : (isTh ? 'โหมดมืด' : 'Dark')}</span>
             </button>
           )}
 
-          <button
-            onClick={() => setActiveTab('HISTORY')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
-              activeTab === 'HISTORY'
-                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-850'
-            }`}
-          >
-            <History className="w-4 h-4" />
-            <span>{isTh ? `4. ประวัติ (${records.length})` : `4. History (${records.length})`}</span>
-          </button>
+          <div className={`flex flex-wrap items-center gap-1.5 p-1.5 rounded-xl border ${
+            isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800'
+          }`}>
+            <button
+              onClick={() => setActiveTab('DESIGN')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
+                activeTab === 'DESIGN'
+                  ? isLight
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md'
+                  : isLight
+                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-850'
+              }`}
+            >
+              <Sliders className="w-4 h-4" />
+              <span>{isTh ? '1. ออกแบบผัง (Design Layout)' : '1. Design Layout'}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('ISSUE')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
+                activeTab === 'ISSUE'
+                  ? isLight
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md'
+                  : isLight
+                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-850'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>{isTh ? '2. ระบุรายละเอียด & ดึงข้อมูล (Issue COI)' : '2. Issue COI'}</span>
+            </button>
+
+            {currentViewingRecord && (
+              <button
+                onClick={() => setActiveTab('VIEW_DOCUMENT')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
+                  activeTab === 'VIEW_DOCUMENT'
+                    ? isLight
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md'
+                    : isLight
+                      ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-850'
+                }`}
+              >
+                <Printer className="w-4 h-4" />
+                <span>{isTh ? '3. ใบรับรอง (Official Document)' : '3. Official Doc'}</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setActiveTab('HISTORY')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
+                activeTab === 'HISTORY'
+                  ? isLight
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md'
+                  : isLight
+                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-850'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              <span>{isTh ? `4. ประวัติ (${records.length})` : `4. History (${records.length})`}</span>
+            </button>
+          </div>
         </div>
       </div>
 
