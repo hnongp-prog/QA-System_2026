@@ -48,6 +48,7 @@ import {
   ThemeMode
 } from '../types';
 import { analyzeZnWireCertClient } from '../services/geminiClient';
+import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
 
 interface ZnWireIncomingAppProps {
   onBackToPortal?: () => void;
@@ -166,12 +167,37 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
     return saved ? JSON.parse(saved) : INITIAL_HISTORY;
   });
 
+  // Real-time Cloud Subscriptions (Firebase Firestore)
   useEffect(() => {
-    localStorage.setItem('zn_wire_specs', JSON.stringify(gradeSpecs));
+    const unsubHistory = subscribeToCloudData<ZnWireInspectionRecord[]>(
+      'zn_wire_history',
+      (data) => {
+        if (Array.isArray(data)) setHistory(data);
+      },
+      INITIAL_HISTORY
+    );
+
+    const unsubSpecs = subscribeToCloudData<ZnWireGradeSpecMap>(
+      'zn_wire_specs',
+      (data) => {
+        if (data && typeof data === 'object') setGradeSpecs(data);
+      },
+      DEFAULT_GRADE_SPECS
+    );
+
+    return () => {
+      unsubHistory();
+      unsubSpecs();
+    };
+  }, []);
+
+  // Save to Cloud & Local Storage
+  useEffect(() => {
+    saveCloudData('zn_wire_specs', gradeSpecs);
   }, [gradeSpecs]);
 
   useEffect(() => {
-    localStorage.setItem('zn_wire_history', JSON.stringify(history));
+    saveCloudData('zn_wire_history', history);
   }, [history]);
 
   // Scan & Processing States

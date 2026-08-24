@@ -1,4 +1,5 @@
 import { NcrRecord, NcrSeverity, NcrStatus } from '../types';
+import { saveCloudData, subscribeToCloudData } from '../services/firestoreSync';
 
 export const INITIAL_NCR_RECORDS: NcrRecord[] = [
   {
@@ -139,7 +140,7 @@ export function getStoredNcrRecords(): NcrRecord[] {
 }
 
 /**
- * Save NCR records to localStorage
+ * Save NCR records to localStorage and Cloud Firestore
  */
 export function saveNcrRecords(records: NcrRecord[]): void {
   try {
@@ -151,6 +152,26 @@ export function saveNcrRecords(records: NcrRecord[]): void {
   } catch (err) {
     console.error('Failed to save NCR records:', err);
   }
+
+  // Sync to Firebase Cloud Firestore for multi-device sync
+  saveCloudData<NcrRecord[]>(LOCAL_STORAGE_KEY, records).catch((err) => {
+    console.warn('Failed to sync NCR records to Firestore:', err);
+  });
+}
+
+/**
+ * Subscribe to real-time NCR records updates from Firestore
+ */
+export function subscribeToNcrRecords(callback: (records: NcrRecord[]) => void) {
+  return subscribeToCloudData<NcrRecord[]>(
+    LOCAL_STORAGE_KEY,
+    (records) => {
+      if (Array.isArray(records)) {
+        callback(records);
+      }
+    },
+    INITIAL_NCR_RECORDS
+  );
 }
 
 /**

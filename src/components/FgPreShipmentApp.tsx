@@ -37,6 +37,7 @@ import {
   InspectionActivity 
 } from '../types';
 import { analyzeFgPreShipmentLabelClient } from '../services/geminiClient';
+import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
 
 interface FgPreShipmentAppProps {
   onBackToPortal?: () => void;
@@ -174,26 +175,41 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
     return saved ? JSON.parse(saved) : INITIAL_HISTORY;
   });
 
+  // Real-time Cloud Subscriptions (Firebase Firestore)
   useEffect(() => {
-    try {
-      localStorage.setItem('fg_profile_specs', JSON.stringify(profileSpecs));
-    } catch (e) {
-      console.warn('Failed to save fg_profile_specs to localStorage:', e);
-    }
+    const unsubSpecs = subscribeToCloudData<FgProfileSpec[]>(
+      'fg_profile_specs',
+      (data) => {
+        if (Array.isArray(data)) setProfileSpecs(data);
+      },
+      INITIAL_PROFILES
+    );
+
+    const unsubHistory = subscribeToCloudData<FgPreShipmentRecord[]>(
+      'fg_inspection_history',
+      (data) => {
+        if (Array.isArray(data)) setHistoryList(data);
+      },
+      INITIAL_HISTORY
+    );
+
+    return () => {
+      unsubSpecs();
+      unsubHistory();
+    };
+  }, []);
+
+  useEffect(() => {
+    saveCloudData('fg_profile_specs', profileSpecs);
   }, [profileSpecs]);
 
   useEffect(() => {
-    try {
-      // Store purely text records without image payloads to optimize storage and performance
-      const pureTextHistory = historyList.map(item => ({
-        ...item,
-        refImage: undefined,
-        testImage: undefined
-      }));
-      localStorage.setItem('fg_inspection_history', JSON.stringify(pureTextHistory));
-    } catch (err) {
-      console.warn('Failed to save inspection history to localStorage:', err);
-    }
+    const pureTextHistory = historyList.map(item => ({
+      ...item,
+      refImage: undefined,
+      testImage: undefined
+    }));
+    saveCloudData('fg_inspection_history', pureTextHistory);
   }, [historyList]);
 
   // Image & AI State

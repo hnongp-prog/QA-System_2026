@@ -33,6 +33,7 @@ import {
   Language, 
   InspectionActivity 
 } from '../types';
+import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
 
 interface CuttingDimensionAppProps {
   onBackToPortal?: () => void;
@@ -199,12 +200,38 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     return saved ? JSON.parse(saved) : INITIAL_INSPECTIONS;
   });
 
+  // Real-time Cloud Subscriptions (Firebase Firestore)
   useEffect(() => {
-    localStorage.setItem('cutting_qc_profiles', JSON.stringify(savedProfiles));
+    const unsubProfiles = subscribeToCloudData<CuttingProfileSpec[]>(
+      'cutting_qc_profiles',
+      (data) => {
+        if (Array.isArray(data)) setSavedProfiles(data);
+      },
+      DEFAULT_PROFILES
+    );
+
+    const unsubInspections = subscribeToCloudData<CuttingInspectionRecord[]>(
+      'cutting_qc_inspections',
+      (data) => {
+        if (Array.isArray(data)) setInspections(data);
+      },
+      INITIAL_INSPECTIONS
+    );
+
+    return () => {
+      unsubProfiles();
+      unsubInspections();
+    };
+  }, []);
+
+  // Save Profiles to Cloud & Local Storage
+  useEffect(() => {
+    saveCloudData('cutting_qc_profiles', savedProfiles);
   }, [savedProfiles]);
 
+  // Save Inspections to Cloud & Local Storage
   useEffect(() => {
-    localStorage.setItem('cutting_qc_inspections', JSON.stringify(inspections));
+    saveCloudData('cutting_qc_inspections', inspections);
   }, [inspections]);
 
   // Auth State for Settings

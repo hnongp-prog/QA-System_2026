@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Header 
 } from './components/Header';
@@ -56,6 +56,7 @@ import { ThicknessWallApp } from './components/ThicknessWallApp';
 import { NcrManagementApp } from './components/NcrManagementApp';
 import { CoiManagementApp } from './components/CoiManagementApp';
 import { createNcrFromFailInspection, getStoredNcrRecords } from './utils/ncrStorage';
+import { subscribeToCloudData, saveCloudData, logCloudInspectionActivity } from './services/firestoreSync';
 
 import { 
   Layers, 
@@ -80,6 +81,34 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<UserProfile>(MOCK_USER_PROFILE);
   const [shiftInfo, setShiftInfo] = useState<ShiftInfo>(MOCK_SHIFT_INFO);
 
+  // Real-time Cloud Data Subscriptions (Firebase Firestore)
+  useEffect(() => {
+    const unsubActivities = subscribeToCloudData<InspectionActivity[]>(
+      'inspection_activities_list',
+      (data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setActivities(data);
+        }
+      },
+      INITIAL_ACTIVITIES
+    );
+
+    const unsubModules = subscribeToCloudData<QAModule[]>(
+      'qa_system_modules',
+      (data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setModules(data);
+        }
+      },
+      INITIAL_MODULES
+    );
+
+    return () => {
+      unsubActivities();
+      unsubModules();
+    };
+  }, []);
+
   // Active Sub-App state
   const [activeSubApp, setActiveSubApp] = useState<string | null>(null);
 
@@ -103,19 +132,32 @@ export default function App() {
 
   // Toggle Module Pin
   const handleTogglePin = (id: string) => {
-    setModules(prev =>
-      prev.map(m => (m.id === id ? { ...m, pinned: !m.pinned } : m))
-    );
+    setModules(prev => {
+      const updated = prev.map(m => (m.id === id ? { ...m, pinned: !m.pinned } : m));
+      saveCloudData('qa_system_modules', updated);
+      return updated;
+    });
   };
 
   // Add new Custom Sub-App Module
   const handleAddModule = (newMod: QAModule) => {
-    setModules(prev => [newMod, ...prev]);
+    setModules(prev => {
+      const updated = [newMod, ...prev];
+      saveCloudData('qa_system_modules', updated);
+      return updated;
+    });
   };
 
   // Add Test Activity from Sandbox or Sub-App
   const handleAddTestActivity = (newAct: InspectionActivity) => {
-    setActivities(prev => [newAct, ...prev]);
+    setActivities(prev => {
+      const updated = [newAct, ...prev];
+      saveCloudData('inspection_activities_list', updated);
+      return updated;
+    });
+
+    // Also log event document to collection for audit trail
+    logCloudInspectionActivity(newAct);
 
     const isFail = newAct.result === 'FAIL' || newAct.result === 'REJECT';
 

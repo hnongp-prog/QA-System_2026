@@ -31,6 +31,7 @@ import {
   Language, 
   InspectionActivity 
 } from '../types';
+import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
 
 interface MixingInspectionAppProps {
   onBackToPortal?: () => void;
@@ -192,12 +193,38 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
     return saved ? JSON.parse(saved) : INITIAL_INSPECTIONS;
   });
 
+  // Real-time Cloud Subscriptions (Firebase Firestore)
   useEffect(() => {
-    localStorage.setItem('mixing_qc_profiles', JSON.stringify(savedCoatingTypes));
+    const unsubProfiles = subscribeToCloudData<MixingCoatingSpec[]>(
+      'mixing_qc_profiles',
+      (data) => {
+        if (Array.isArray(data)) setSavedCoatingTypes(data);
+      },
+      DEFAULT_COATING_SPECS
+    );
+
+    const unsubInspections = subscribeToCloudData<MixingInspectionRecord[]>(
+      'mixing_qc_inspections',
+      (data) => {
+        if (Array.isArray(data)) setInspections(data);
+      },
+      INITIAL_INSPECTIONS
+    );
+
+    return () => {
+      unsubProfiles();
+      unsubInspections();
+    };
+  }, []);
+
+  // Save Profiles to Cloud & Local Storage
+  useEffect(() => {
+    saveCloudData('mixing_qc_profiles', savedCoatingTypes);
   }, [savedCoatingTypes]);
 
+  // Save Inspections to Cloud & Local Storage
   useEffect(() => {
-    localStorage.setItem('mixing_qc_inspections', JSON.stringify(inspections));
+    saveCloudData('mixing_qc_inspections', inspections);
   }, [inspections]);
 
   // Auth State for Admin Settings

@@ -53,6 +53,7 @@ import {
   TensileElongMode,
   ThemeMode
 } from '../types';
+import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
 
 export const formatElongationSpec = (spec: TensileQualitySpec): string => {
   const mode = spec.elong_mode || 'min';
@@ -313,13 +314,38 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  // Save Specs to Local Storage
+  // Real-time Cloud Subscriptions (Firebase Firestore)
   useEffect(() => {
-    localStorage.setItem('tensile_qc_specs', JSON.stringify(specs));
+    const unsubSpecs = subscribeToCloudData<TensileQualitySpec[]>(
+      'tensile_qc_specs',
+      (data) => {
+        if (Array.isArray(data)) setSpecs(data);
+      },
+      DEFAULT_TENSILE_SPECS
+    );
+
+    const unsubRecords = subscribeToCloudData<TensileRecord[]>(
+      'tensile_qc_records',
+      (data) => {
+        if (Array.isArray(data)) setRecords(data);
+      },
+      INITIAL_RECORDS
+    );
+
+    return () => {
+      unsubSpecs();
+      unsubRecords();
+    };
+  }, []);
+
+  // Save Specs to Cloud & Local Storage
+  useEffect(() => {
+    saveCloudData('tensile_qc_specs', specs);
   }, [specs]);
 
+  // Save Records to Cloud & Local Storage
   useEffect(() => {
-    localStorage.setItem('tensile_qc_records', JSON.stringify(records));
+    saveCloudData('tensile_qc_records', records);
   }, [records]);
 
   // Spec Matcher

@@ -42,6 +42,7 @@ import {
   Sun,
   Moon
 } from 'lucide-react';
+import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
 
 import { 
   BilletInspectionItem, 
@@ -278,14 +279,38 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   const [targetDeleteHistoryItem, setTargetDeleteHistoryItem] = useState<BilletInspectionItem | null>(null);
   const [targetDeleteGrade, setTargetDeleteGrade] = useState<string | null>(null);
 
-  // Persist local history
+  // Real-time Cloud Subscriptions (Firebase Firestore)
   useEffect(() => {
-    localStorage.setItem('billet_qc_history', JSON.stringify(history));
+    const unsubHistory = subscribeToCloudData<BilletInspectionItem[]>(
+      'billet_qc_history',
+      (data) => {
+        if (Array.isArray(data)) setHistory(data);
+      },
+      INITIAL_HISTORY
+    );
+
+    const unsubSpecs = subscribeToCloudData<GradeSpecMap>(
+      'billet_qc_grade_specs',
+      (data) => {
+        if (data && typeof data === 'object') setGradeSpecs(data);
+      },
+      DEFAULT_GRADE_SPECS
+    );
+
+    return () => {
+      unsubHistory();
+      unsubSpecs();
+    };
+  }, []);
+
+  // Persist history to cloud & local
+  useEffect(() => {
+    saveCloudData('billet_qc_history', history);
   }, [history]);
 
-  // Persist specs
+  // Persist specs to cloud & local
   useEffect(() => {
-    localStorage.setItem('billet_qc_grade_specs', JSON.stringify(gradeSpecs));
+    saveCloudData('billet_qc_grade_specs', gradeSpecs);
   }, [gradeSpecs]);
 
   // Spec Matcher

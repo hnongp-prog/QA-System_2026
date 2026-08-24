@@ -27,7 +27,9 @@ import {
   deleteCustomerTemplate,
   resetCustomerTemplates,
   getCoiRecords,
-  deleteCoiRecord
+  deleteCoiRecord,
+  subscribeToCustomerTemplates,
+  subscribeToCoiRecords
 } from '../utils/coiStorage';
 
 import { CoiLayoutDesigner } from './coi/CoiLayoutDesigner';
@@ -73,14 +75,31 @@ export const CoiManagementApp: React.FC<CoiManagementAppProps> = ({
     return recs.length > 0 ? recs[0] : null;
   });
 
-  // Reload data from local storage on mount
+  // Real-time Cloud Sync from Firestore
   useEffect(() => {
-    const loadedTemplates = getCustomerTemplates();
-    setTemplates(loadedTemplates);
-    if (loadedTemplates.length > 0 && !loadedTemplates.some(t => t.id === selectedTemplateId)) {
-      setSelectedTemplateId(loadedTemplates[0].id);
-    }
-    setRecords(getCoiRecords());
+    const unsubTemplates = subscribeToCustomerTemplates((loadedTemplates) => {
+      setTemplates(loadedTemplates);
+      if (loadedTemplates.length > 0 && !loadedTemplates.some(t => t.id === selectedTemplateId)) {
+        setSelectedTemplateId(loadedTemplates[0].id);
+      }
+    });
+
+    const unsubRecords = subscribeToCoiRecords((recs) => {
+      setRecords(recs);
+      setCurrentViewingRecord(prev => {
+        if (!prev && recs.length > 0) return recs[0];
+        if (prev) {
+          const matched = recs.find(r => r.id === prev.id);
+          return matched || (recs.length > 0 ? recs[0] : null);
+        }
+        return null;
+      });
+    });
+
+    return () => {
+      unsubTemplates();
+      unsubRecords();
+    };
   }, []);
 
   const handleSaveTemplate = (template: CoiCustomerTemplate) => {

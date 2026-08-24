@@ -5,6 +5,7 @@ import {
   DetailedCoiMeasuredData,
   CoiDataSourceModule
 } from '../types';
+import { saveCloudData, subscribeToCloudData } from '../services/firestoreSync';
 
 const STORAGE_PROFILES_KEY = 'coi_profiles_master_v1';
 const STORAGE_RECORDS_KEY = 'coi_issued_records_v1';
@@ -372,6 +373,7 @@ export function saveCustomerTemplate(template: CoiCustomerTemplate): CoiCustomer
   } catch (e) {
     console.error('Failed to save customer template', e);
   }
+  saveCloudData(STORAGE_CUSTOMER_TEMPLATES_KEY, updated).catch(err => console.warn(err));
   return updated;
 }
 
@@ -383,6 +385,7 @@ export function deleteCustomerTemplate(id: string): CoiCustomerTemplate[] {
   } catch (e) {
     console.error('Failed to delete customer template', e);
   }
+  saveCloudData(STORAGE_CUSTOMER_TEMPLATES_KEY, updated).catch(err => console.warn(err));
   return updated;
 }
 
@@ -392,7 +395,18 @@ export function resetCustomerTemplates(): CoiCustomerTemplate[] {
   } catch (e) {
     console.error(e);
   }
+  saveCloudData(STORAGE_CUSTOMER_TEMPLATES_KEY, DEFAULT_CUSTOMER_TEMPLATES).catch(err => console.warn(err));
   return DEFAULT_CUSTOMER_TEMPLATES;
+}
+
+export function subscribeToCustomerTemplates(callback: (templates: CoiCustomerTemplate[]) => void) {
+  return subscribeToCloudData<CoiCustomerTemplate[]>(
+    STORAGE_CUSTOMER_TEMPLATES_KEY,
+    (data) => {
+      if (Array.isArray(data)) callback(data);
+    },
+    DEFAULT_CUSTOMER_TEMPLATES
+  );
 }
 
 // ----------------------------------------------------
@@ -678,6 +692,7 @@ export function saveCoiProfile(profile: CoiProfileDesign): CoiProfileDesign[] {
   } catch (e) {
     console.error('Failed to save COI profile', e);
   }
+  saveCloudData(STORAGE_PROFILES_KEY, updated).catch(err => console.warn(err));
   return updated;
 }
 
@@ -689,6 +704,7 @@ export function deleteCoiProfile(profileId: string): CoiProfileDesign[] {
   } catch (e) {
     console.error('Failed to delete COI profile', e);
   }
+  saveCloudData(STORAGE_PROFILES_KEY, updated).catch(err => console.warn(err));
   return updated;
 }
 
@@ -698,7 +714,18 @@ export function resetCoiProfilesToDefault(): CoiProfileDesign[] {
   } catch (e) {
     console.error(e);
   }
+  saveCloudData(STORAGE_PROFILES_KEY, DEFAULT_COI_PROFILES).catch(err => console.warn(err));
   return DEFAULT_COI_PROFILES;
+}
+
+export function subscribeToCoiProfiles(callback: (profiles: CoiProfileDesign[]) => void) {
+  return subscribeToCloudData<CoiProfileDesign[]>(
+    STORAGE_PROFILES_KEY,
+    (data) => {
+      if (Array.isArray(data)) callback(data);
+    },
+    DEFAULT_COI_PROFILES
+  );
 }
 
 export function getCoiRecords(): CoiIssueRecord[] {
@@ -730,6 +757,7 @@ export function saveCoiRecord(record: CoiIssueRecord): CoiIssueRecord[] {
   } catch (e) {
     console.error('Failed to save COI record', e);
   }
+  saveCloudData(STORAGE_RECORDS_KEY, updated).catch(err => console.warn(err));
   return updated;
 }
 
@@ -741,7 +769,18 @@ export function deleteCoiRecord(recordId: string): CoiIssueRecord[] {
   } catch (e) {
     console.error('Failed to delete COI record', e);
   }
+  saveCloudData(STORAGE_RECORDS_KEY, updated).catch(err => console.warn(err));
   return updated;
+}
+
+export function subscribeToCoiRecords(callback: (records: CoiIssueRecord[]) => void) {
+  return subscribeToCloudData<CoiIssueRecord[]>(
+    STORAGE_RECORDS_KEY,
+    (data) => {
+      if (Array.isArray(data)) callback(data);
+    },
+    INITIAL_COI_RECORDS
+  );
 }
 
 export function generateNextCoiNumber(): string {

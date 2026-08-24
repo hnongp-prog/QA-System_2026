@@ -50,6 +50,7 @@ import {
   InspectionActivity 
 } from '../types';
 import { analyzeChemicalCertClient } from '../services/geminiClient';
+import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
 
 interface ChemicalIncomingAppProps {
   onBackToPortal?: () => void;
@@ -312,13 +313,37 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     });
   };
 
-  // Persist Local Storage
+  // Real-time Cloud Subscriptions (Firebase Firestore)
   useEffect(() => {
-    localStorage.setItem('chem_qc_history', JSON.stringify(history));
+    const unsubHistory = subscribeToCloudData<ChemicalInspectionEntry[]>(
+      'chem_qc_history',
+      (data) => {
+        if (Array.isArray(data)) setHistory(data);
+      },
+      INITIAL_HISTORY
+    );
+
+    const unsubSpecs = subscribeToCloudData<ChemicalSpecMap>(
+      'chem_qc_specs',
+      (data) => {
+        if (data && typeof data === 'object') setSpecs(data);
+      },
+      DEFAULT_SPECS
+    );
+
+    return () => {
+      unsubHistory();
+      unsubSpecs();
+    };
+  }, []);
+
+  // Persist Local Storage & Cloud Firestore
+  useEffect(() => {
+    saveCloudData('chem_qc_history', history);
   }, [history]);
 
   useEffect(() => {
-    localStorage.setItem('chem_qc_specs', JSON.stringify(specs));
+    saveCloudData('chem_qc_specs', specs);
   }, [specs]);
 
   // Validate single item row against selected coating chemical spec

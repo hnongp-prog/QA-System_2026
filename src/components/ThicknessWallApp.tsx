@@ -37,6 +37,7 @@ import {
   InspectionActivity 
 } from '../types';
 import { extractThicknessWallClient } from '../services/geminiClient';
+import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
 
 interface ThicknessWallAppProps {
   onBackToPortal?: () => void;
@@ -154,12 +155,38 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
     return saved ? JSON.parse(saved) : INITIAL_RECORDS;
   });
 
+  // Real-time Cloud Subscriptions (Firebase Firestore)
   useEffect(() => {
-    localStorage.setItem('tw_profile_specs', JSON.stringify(profileSpecs));
+    const unsubSpecs = subscribeToCloudData<Record<string, ThicknessWallProfileItemSpec[]>>(
+      'tw_profile_specs',
+      (data) => {
+        if (data && typeof data === 'object') setProfileSpecs(data);
+      },
+      INITIAL_PROFILES
+    );
+
+    const unsubRecords = subscribeToCloudData<ThicknessWallRecord[]>(
+      'tw_measurement_records',
+      (data) => {
+        if (Array.isArray(data)) setSavedRecords(data);
+      },
+      INITIAL_RECORDS
+    );
+
+    return () => {
+      unsubSpecs();
+      unsubRecords();
+    };
+  }, []);
+
+  // Save Specs to Cloud & Local Storage
+  useEffect(() => {
+    saveCloudData('tw_profile_specs', profileSpecs);
   }, [profileSpecs]);
 
+  // Save Records to Cloud & Local Storage
   useEffect(() => {
-    localStorage.setItem('tw_measurement_records', JSON.stringify(savedRecords));
+    saveCloudData('tw_measurement_records', savedRecords);
   }, [savedRecords]);
 
   // File Upload & AI State

@@ -45,7 +45,8 @@ import {
   getStoredNcrRecords, 
   saveNcrRecords, 
   addNcrRecord, 
-  exportNcrToCsv 
+  exportNcrToCsv,
+  subscribeToNcrRecords
 } from '../utils/ncrStorage';
 
 interface NcrManagementAppProps {
@@ -128,10 +129,11 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
   const [newAssignedTo, setNewAssignedTo] = useState('');
   const [newTargetClosureDate, setNewTargetClosureDate] = useState('');
 
-  // Load initial data and attach event listener for cross-subapp sync
+  // Load initial data and attach real-time Firestore listener
   useEffect(() => {
-    const records = getStoredNcrRecords();
-    setNcrList(records);
+    const unsub = subscribeToNcrRecords((records) => {
+      setNcrList(records);
+    });
 
     const handleUpdate = (e: any) => {
       if (e?.detail) {
@@ -143,6 +145,7 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
 
     window.addEventListener('ncr_records_updated', handleUpdate);
     return () => {
+      unsub();
       window.removeEventListener('ncr_records_updated', handleUpdate);
     };
   }, []);

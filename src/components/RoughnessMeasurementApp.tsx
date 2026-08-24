@@ -39,6 +39,7 @@ import {
   InspectionActivity,
   ThemeMode
 } from '../types';
+import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
 
 interface RoughnessMeasurementAppProps {
   onBackToPortal?: () => void;
@@ -212,12 +213,38 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     return saved ? JSON.parse(saved) : INITIAL_INSPECTIONS;
   });
 
+  // Real-time Cloud Subscriptions (Firebase Firestore)
   useEffect(() => {
-    localStorage.setItem('roughness_qc_profiles', JSON.stringify(savedProfiles));
+    const unsubProfiles = subscribeToCloudData<RoughnessProfileSpec[]>(
+      'roughness_qc_profiles',
+      (data) => {
+        if (Array.isArray(data)) setSavedProfiles(data);
+      },
+      DEFAULT_PROFILES
+    );
+
+    const unsubInspections = subscribeToCloudData<RoughnessInspectionRecord[]>(
+      'roughness_qc_inspections',
+      (data) => {
+        if (Array.isArray(data)) setInspections(data);
+      },
+      INITIAL_INSPECTIONS
+    );
+
+    return () => {
+      unsubProfiles();
+      unsubInspections();
+    };
+  }, []);
+
+  // Save Profiles to Cloud & Local Storage
+  useEffect(() => {
+    saveCloudData('roughness_qc_profiles', savedProfiles);
   }, [savedProfiles]);
 
+  // Save Inspections to Cloud & Local Storage
   useEffect(() => {
-    localStorage.setItem('roughness_qc_inspections', JSON.stringify(inspections));
+    saveCloudData('roughness_qc_inspections', inspections);
   }, [inspections]);
 
   // Point Configuration
