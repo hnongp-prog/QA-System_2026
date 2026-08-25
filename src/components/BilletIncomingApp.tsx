@@ -42,7 +42,7 @@ import {
   Sun,
   Moon
 } from 'lucide-react';
-import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
+import { useCloudState } from '../services/firestoreSync';
 
 import { 
   BilletInspectionItem, 
@@ -244,10 +244,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
   // Printing & History
   const [activePrintItem, setActivePrintItem] = useState<BilletInspectionItem | null>(null);
-  const [history, setHistory] = useState<BilletInspectionItem[]>(() => {
-    const saved = localStorage.getItem('billet_qc_history');
-    return saved ? JSON.parse(saved) : INITIAL_HISTORY;
-  });
+  const [history, setHistory] = useCloudState<BilletInspectionItem[]>('billet_qc_history', INITIAL_HISTORY);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState("");
@@ -255,10 +252,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   const [filterYear, setFilterYear] = useState("");
 
   // Spec Configuration State
-  const [gradeSpecs, setGradeSpecs] = useState<GradeSpecMap>(() => {
-    const saved = localStorage.getItem('billet_qc_grade_specs');
-    return saved ? JSON.parse(saved) : DEFAULT_GRADE_SPECS;
-  });
+  const [gradeSpecs, setGradeSpecs] = useCloudState<GradeSpecMap>('billet_qc_grade_specs', DEFAULT_GRADE_SPECS);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState(false);
@@ -278,40 +272,6 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   const [deleteAuthError, setDeleteAuthError] = useState(false);
   const [targetDeleteHistoryItem, setTargetDeleteHistoryItem] = useState<BilletInspectionItem | null>(null);
   const [targetDeleteGrade, setTargetDeleteGrade] = useState<string | null>(null);
-
-  // Real-time Cloud Subscriptions (Firebase Firestore)
-  useEffect(() => {
-    const unsubHistory = subscribeToCloudData<BilletInspectionItem[]>(
-      'billet_qc_history',
-      (data) => {
-        if (Array.isArray(data)) setHistory(data);
-      },
-      INITIAL_HISTORY
-    );
-
-    const unsubSpecs = subscribeToCloudData<GradeSpecMap>(
-      'billet_qc_grade_specs',
-      (data) => {
-        if (data && typeof data === 'object') setGradeSpecs(data);
-      },
-      DEFAULT_GRADE_SPECS
-    );
-
-    return () => {
-      unsubHistory();
-      unsubSpecs();
-    };
-  }, []);
-
-  // Persist history to cloud & local
-  useEffect(() => {
-    saveCloudData('billet_qc_history', history);
-  }, [history]);
-
-  // Persist specs to cloud & local
-  useEffect(() => {
-    saveCloudData('billet_qc_grade_specs', gradeSpecs);
-  }, [gradeSpecs]);
 
   // Spec Matcher
   const findMatchingSpec = (scannedGrade: string) => {

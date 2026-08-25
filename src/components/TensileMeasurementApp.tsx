@@ -53,7 +53,7 @@ import {
   TensileElongMode,
   ThemeMode
 } from '../types';
-import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
+import { useCloudState } from '../services/firestoreSync';
 
 export const formatElongationSpec = (spec: TensileQualitySpec): string => {
   const mode = spec.elong_mode || 'min';
@@ -206,16 +206,10 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   const [activeTab, setActiveTab] = useState<'entry' | 'history' | 'dashboard' | 'specs'>('entry');
 
   // Quality Specs state
-  const [specs, setSpecs] = useState<TensileQualitySpec[]>(() => {
-    const saved = localStorage.getItem('tensile_qc_specs');
-    return saved ? JSON.parse(saved) : DEFAULT_TENSILE_SPECS;
-  });
+  const [specs, setSpecs] = useCloudState<TensileQualitySpec[]>('tensile_qc_specs', DEFAULT_TENSILE_SPECS);
 
   // Test Records state
-  const [records, setRecords] = useState<TensileRecord[]>(() => {
-    const saved = localStorage.getItem('tensile_qc_records');
-    return saved ? JSON.parse(saved) : INITIAL_RECORDS;
-  });
+  const [records, setRecords] = useCloudState<TensileRecord[]>('tensile_qc_records', INITIAL_RECORDS);
 
   // Entry Form Header Fields
   const [mainProfile, setMainProfile] = useState('');
@@ -313,40 +307,6 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
-
-  // Real-time Cloud Subscriptions (Firebase Firestore)
-  useEffect(() => {
-    const unsubSpecs = subscribeToCloudData<TensileQualitySpec[]>(
-      'tensile_qc_specs',
-      (data) => {
-        if (Array.isArray(data)) setSpecs(data);
-      },
-      DEFAULT_TENSILE_SPECS
-    );
-
-    const unsubRecords = subscribeToCloudData<TensileRecord[]>(
-      'tensile_qc_records',
-      (data) => {
-        if (Array.isArray(data)) setRecords(data);
-      },
-      INITIAL_RECORDS
-    );
-
-    return () => {
-      unsubSpecs();
-      unsubRecords();
-    };
-  }, []);
-
-  // Save Specs to Cloud & Local Storage
-  useEffect(() => {
-    saveCloudData('tensile_qc_specs', specs);
-  }, [specs]);
-
-  // Save Records to Cloud & Local Storage
-  useEffect(() => {
-    saveCloudData('tensile_qc_records', records);
-  }, [records]);
 
   // Spec Matcher
   const matchedSpec = useMemo(() => {

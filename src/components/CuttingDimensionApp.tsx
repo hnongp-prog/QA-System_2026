@@ -24,16 +24,25 @@ import {
   Edit3,
   X,
   FileSpreadsheet,
-  RotateCcw
+  RotateCcw,
+  Sparkles,
+  SlidersHorizontal,
+  Tag,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  FileCheck2
 } from 'lucide-react';
 
 import { 
   CuttingProfileSpec, 
   CuttingInspectionRecord, 
+  CuttingCustomPointSpec,
+  CuttingEvaluationType,
   Language, 
   InspectionActivity 
 } from '../types';
-import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
+import { useCloudState } from '../services/firestoreSync';
 
 interface CuttingDimensionAppProps {
   onBackToPortal?: () => void;
@@ -120,7 +129,29 @@ const DEFAULT_PROFILES: CuttingProfileSpec[] = [
     lengthTarget: '2000.00', lengthTolPlus: '2.00', lengthTolMinus: '2.00',
     bendingMax: '1.50',
     camberMax: '1.00',
-    twistMax: '0.50'
+    twistMax: '0.50',
+    customControlPoints: [
+      {
+        id: 'cp-w2',
+        name: 'ความกว้าง W2 (Side Width)',
+        unit: 'mm',
+        evalType: 'target_tol',
+        target: '25.00',
+        tolPlus: '0.20',
+        tolMinus: '0.20',
+        description: 'วัดความกว้างปีกข้าง'
+      },
+      {
+        id: 'cp-angle',
+        name: 'มุมตัด (Cut Chamfer Angle)',
+        unit: 'deg',
+        evalType: 'target_tol',
+        target: '45.00',
+        tolPlus: '1.00',
+        tolMinus: '1.00',
+        description: 'มุมบากหัวตัด'
+      }
+    ]
   },
   {
     name: 'HEAVY-CUT-PROFILE-200', 
@@ -130,7 +161,28 @@ const DEFAULT_PROFILES: CuttingProfileSpec[] = [
     lengthTarget: '3000.00', lengthTolPlus: '3.00', lengthTolMinus: '3.00',
     bendingMax: '2.00',
     camberMax: '1.50',
-    twistMax: '1.00'
+    twistMax: '1.00',
+    customControlPoints: [
+      {
+        id: 'cp-flange-t',
+        name: 'ความหนาปีก (Flange Thickness)',
+        unit: 'mm',
+        evalType: 'min_max',
+        minLimit: '3.80',
+        maxLimit: '4.20',
+        description: 'ความหนาปีกช่วงกลาง'
+      },
+      {
+        id: 'cp-pitch',
+        name: 'ระยะรูเจาะ (Hole Pitch)',
+        unit: 'mm',
+        evalType: 'target_tol',
+        target: '50.00',
+        tolPlus: '0.30',
+        tolMinus: '0.30',
+        description: 'ระยะห่างระหว่างจุดศูนย์กลางรู'
+      }
+    ]
   }
 ];
 
@@ -148,6 +200,10 @@ const INITIAL_INSPECTIONS: CuttingInspectionRecord[] = [
     bending: '0.80',
     camber: '0.40',
     twist: '0.20',
+    customPointValues: {
+      'cp-w2': '25.08',
+      'cp-angle': '45.2'
+    },
     status: 'Pass',
     profileName: 'CUT-PROFILE-STD-100',
     inspectorName: 'Anan S.',
@@ -169,6 +225,10 @@ const INITIAL_INSPECTIONS: CuttingInspectionRecord[] = [
     bending: '2.80',
     camber: '1.50',
     twist: '0.80',
+    customPointValues: {
+      'cp-w2': '25.35',
+      'cp-angle': '46.8'
+    },
     status: 'Fail',
     remarks: 'Width & Bending exceed maximum allowed tolerances',
     profileName: 'CUT-PROFILE-STD-100',
@@ -189,50 +249,9 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   const [activeTab, setActiveTab] = useState<'new-batch' | 'settings' | 'dashboard' | 'history'>('new-batch');
   const tableRef = useRef<HTMLDivElement>(null);
 
-  // Profiles and Inspections local state
-  const [savedProfiles, setSavedProfiles] = useState<CuttingProfileSpec[]>(() => {
-    const saved = localStorage.getItem('cutting_qc_profiles');
-    return saved ? JSON.parse(saved) : DEFAULT_PROFILES;
-  });
-
-  const [inspections, setInspections] = useState<CuttingInspectionRecord[]>(() => {
-    const saved = localStorage.getItem('cutting_qc_inspections');
-    return saved ? JSON.parse(saved) : INITIAL_INSPECTIONS;
-  });
-
-  // Real-time Cloud Subscriptions (Firebase Firestore)
-  useEffect(() => {
-    const unsubProfiles = subscribeToCloudData<CuttingProfileSpec[]>(
-      'cutting_qc_profiles',
-      (data) => {
-        if (Array.isArray(data)) setSavedProfiles(data);
-      },
-      DEFAULT_PROFILES
-    );
-
-    const unsubInspections = subscribeToCloudData<CuttingInspectionRecord[]>(
-      'cutting_qc_inspections',
-      (data) => {
-        if (Array.isArray(data)) setInspections(data);
-      },
-      INITIAL_INSPECTIONS
-    );
-
-    return () => {
-      unsubProfiles();
-      unsubInspections();
-    };
-  }, []);
-
-  // Save Profiles to Cloud & Local Storage
-  useEffect(() => {
-    saveCloudData('cutting_qc_profiles', savedProfiles);
-  }, [savedProfiles]);
-
-  // Save Inspections to Cloud & Local Storage
-  useEffect(() => {
-    saveCloudData('cutting_qc_inspections', inspections);
-  }, [inspections]);
+  // Profiles and Inspections with Real-time Cloud Sync
+  const [savedProfiles, setSavedProfiles] = useCloudState<CuttingProfileSpec[]>('cutting_qc_profiles', DEFAULT_PROFILES);
+  const [inspections, setInspections] = useCloudState<CuttingInspectionRecord[]>('cutting_qc_inspections', INITIAL_INSPECTIONS);
 
   // Auth State for Settings
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -240,8 +259,30 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminAuthError, setAdminAuthError] = useState(false);
 
-  // Header Metadata State (Clean initial state)
-  const [headerInfo, setHeaderInfo] = useState({
+  // Header Metadata State (including customControlPoints)
+  const [headerInfo, setHeaderInfo] = useState<{
+    inspectorName: string;
+    employeeName: string;
+    machine: string;
+    workOrder: string;
+    coilNo: string;
+    date: string;
+    profileName: string;
+    partNo: string;
+    widthTarget: string;
+    widthTolPlus: string;
+    widthTolMinus: string;
+    heightTarget: string;
+    heightTolPlus: string;
+    heightTolMinus: string;
+    lengthTarget: string;
+    lengthTolPlus: string;
+    lengthTolMinus: string;
+    bendingMax: string;
+    camberMax: string;
+    twistMax: string;
+    customControlPoints: CuttingCustomPointSpec[];
+  }>({
     inspectorName: '',
     employeeName: '',
     machine: '',
@@ -255,13 +296,27 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     lengthTarget: '', lengthTolPlus: '', lengthTolMinus: '',
     bendingMax: '',
     camberMax: '',
-    twistMax: ''
+    twistMax: '',
+    customControlPoints: []
   });
 
   const [profileStatus, setProfileStatus] = useState<'found' | 'not-found'>('not-found');
 
-  // Batch Rows Data Entry State (Clean initial state)
-  const [batchItems, setBatchItems] = useState([
+  // Batch Rows Data Entry State with customPointValues
+  const [batchItems, setBatchItems] = useState<Array<{
+    id: number;
+    sampleName: string;
+    width: string;
+    heightLeft: string;
+    heightRight: string;
+    length: string;
+    bending: string;
+    camber: string;
+    twist: string;
+    customPointValues: Record<string, string>;
+    status: 'Pass' | 'Fail' | 'Pending';
+    remarks: string;
+  }>>([
     {
       id: Date.now(),
       sampleName: 'Sample 1',
@@ -272,13 +327,15 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       bending: '',
       camber: '',
       twist: '',
-      status: 'Pending' as 'Pass' | 'Fail' | 'Pending',
+      customPointValues: {},
+      status: 'Pending',
       remarks: ''
     }
   ]);
 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'profile' | 'history'; id: string; label: string } | null>(null);
+  const [viewDetailRecord, setViewDetailRecord] = useState<CuttingInspectionRecord | null>(null);
 
   // History Edit Auth & Modal States
   const [targetEditHistoryItem, setTargetEditHistoryItem] = useState<CuttingInspectionRecord | null>(null);
@@ -492,7 +549,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       lengthTolMinus: formatSpecValue(profile.lengthTolMinus),
       bendingMax: formatSpecValue(profile.bendingMax),
       camberMax: formatSpecValue(profile.camberMax),
-      twistMax: formatSpecValue(profile.twistMax)
+      twistMax: formatSpecValue(profile.twistMax),
+      customControlPoints: profile.customControlPoints ? JSON.parse(JSON.stringify(profile.customControlPoints)) : []
     }));
     setProfileStatus('found');
   };
@@ -515,7 +573,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
           lengthTolMinus: formatSpecValue(match.lengthTolMinus),
           bendingMax: formatSpecValue(match.bendingMax),
           camberMax: formatSpecValue(match.camberMax),
-          twistMax: formatSpecValue(match.twistMax)
+          twistMax: formatSpecValue(match.twistMax),
+          customControlPoints: match.customControlPoints ? JSON.parse(JSON.stringify(match.customControlPoints)) : prev.customControlPoints
         }));
         setProfileStatus('found');
       } else {
@@ -525,6 +584,100 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       setProfileStatus('not-found');
     }
   }, [headerInfo.profileName, savedProfiles]);
+
+  const handleAddCustomPoint = () => {
+    const newId = `cp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newPoint: CuttingCustomPointSpec = {
+      id: newId,
+      name: `จุดควบคุมที่ ${headerInfo.customControlPoints.length + 1}`,
+      unit: 'mm',
+      evalType: 'target_tol',
+      target: '10.00',
+      tolPlus: '0.20',
+      tolMinus: '0.20',
+      description: ''
+    };
+    setHeaderInfo(prev => ({
+      ...prev,
+      customControlPoints: [...prev.customControlPoints, newPoint]
+    }));
+    showNotification(isTh ? 'เพิ่มจุดควบคุมกำหนดเองใหม่แล้ว' : 'Added new custom control point');
+  };
+
+  const handleApplyCustomPointTemplate = (templateType: string) => {
+    const newId = `cp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    let newPoint: CuttingCustomPointSpec;
+    if (templateType === 'w2') {
+      newPoint = { id: newId, name: 'ความกว้าง W2 (Side Width)', unit: 'mm', evalType: 'target_tol', target: '25.00', tolPlus: '0.20', tolMinus: '0.20', description: 'วัดความกว้างปีกข้างตำแหน่งที่ 2' };
+    } else if (templateType === 'flange') {
+      newPoint = { id: newId, name: 'ความหนาปีก (Flange Thickness)', unit: 'mm', evalType: 'min_max', minLimit: '3.80', maxLimit: '4.20', description: 'ความหนาปีกหน้าแปลน' };
+    } else if (templateType === 'angle') {
+      newPoint = { id: newId, name: 'มุมตัด (Cut Angle / Chamfer)', unit: 'deg', evalType: 'target_tol', target: '45.00', tolPlus: '1.00', tolMinus: '1.00', description: 'มุมเอียงหน้าตัดชิ้นงาน' };
+    } else if (templateType === 'radius') {
+      newPoint = { id: newId, name: 'รัศมีมุม R (Corner Radius)', unit: 'mm', evalType: 'max_only', maxLimit: '2.50', description: 'ความโค้งรัศมีมุมตัด' };
+    } else if (templateType === 'pitch') {
+      newPoint = { id: newId, name: 'ระยะ Pitch รูเจาะ (Hole Pitch)', unit: 'mm', evalType: 'target_tol', target: '50.00', tolPlus: '0.30', tolMinus: '0.30', description: 'ระยะกึ่งกลางระหว่างรู' };
+    } else if (templateType === 'flatness') {
+      newPoint = { id: newId, name: 'ความเรียบผิว (Surface Flatness)', unit: 'mm', evalType: 'max_only', maxLimit: '0.30', description: 'ความเรียบแนวระนาบ' };
+    } else {
+      newPoint = { id: newId, name: 'จุดควบคุมพิเศษ', unit: 'mm', evalType: 'target_tol', target: '10.00', tolPlus: '0.10', tolMinus: '0.10', description: '' };
+    }
+
+    setHeaderInfo(prev => ({
+      ...prev,
+      customControlPoints: [...prev.customControlPoints, newPoint]
+    }));
+    showNotification(isTh ? `เพิ่มจุดควบคุม "${newPoint.name}" สำเร็จ` : `Added ${newPoint.name}`);
+  };
+
+  const handleRemoveCustomPoint = (pointId: string) => {
+    setHeaderInfo(prev => ({
+      ...prev,
+      customControlPoints: prev.customControlPoints.filter(p => p.id !== pointId)
+    }));
+  };
+
+  const handleUpdateCustomPoint = (pointId: string, field: keyof CuttingCustomPointSpec, value: any) => {
+    setHeaderInfo(prev => ({
+      ...prev,
+      customControlPoints: prev.customControlPoints.map(p => {
+        if (p.id === pointId) {
+          return { ...p, [field]: value };
+        }
+        return p;
+      })
+    }));
+  };
+
+  const validateCustomPoint = (valStr: string | undefined, point: CuttingCustomPointSpec): 'Pass' | 'Fail' | 'Pending' => {
+    if (!valStr || valStr.trim() === '') return 'Pending';
+    const v = parseFloat(valStr);
+    if (isNaN(v)) return 'Pending';
+
+    if (point.evalType === 'target_tol') {
+      const t = parseFloat(point.target || '0');
+      const tp = parseFloat(point.tolPlus || '0');
+      const tm = parseFloat(point.tolMinus || '0');
+      if (t > 0 || (point.target !== undefined && point.target !== '')) {
+        if (v > t + tp || v < t - tm) return 'Fail';
+        return 'Pass';
+      }
+    } else if (point.evalType === 'max_only') {
+      const mx = parseFloat(point.maxLimit || '0');
+      if (v > mx) return 'Fail';
+      return 'Pass';
+    } else if (point.evalType === 'min_only') {
+      const mn = parseFloat(point.minLimit || '0');
+      if (v < mn) return 'Fail';
+      return 'Pass';
+    } else if (point.evalType === 'min_max') {
+      const mn = parseFloat(point.minLimit || '0');
+      const mx = parseFloat(point.maxLimit || '0');
+      if (v < mn || v > mx) return 'Fail';
+      return 'Pass';
+    }
+    return 'Pass';
+  };
 
   const handleResetForm = () => {
     setHeaderInfo({
@@ -541,7 +694,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       lengthTarget: '', lengthTolPlus: '', lengthTolMinus: '',
       bendingMax: '',
       camberMax: '',
-      twistMax: ''
+      twistMax: '',
+      customControlPoints: []
     });
     setProfileStatus('not-found');
     setBatchItems([
@@ -555,6 +709,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         bending: '',
         camber: '',
         twist: '',
+        customPointValues: {},
         status: 'Pending' as 'Pass' | 'Fail' | 'Pending',
         remarks: ''
       }
@@ -582,7 +737,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       lengthTolMinus: headerInfo.lengthTolMinus,
       bendingMax: headerInfo.bendingMax,
       camberMax: headerInfo.camberMax,
-      twistMax: headerInfo.twistMax
+      twistMax: headerInfo.twistMax,
+      customControlPoints: headerInfo.customControlPoints
     };
 
     setSavedProfiles(prev => {
@@ -595,13 +751,13 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       return [...prev, newProfile];
     });
 
-    showNotification(isTh ? `บันทึก Profile "${newProfile.name}" เรียบร้อยแล้ว` : `Saved Profile "${newProfile.name}"`);
+    showNotification(isTh ? `บันทึก Profile "${newProfile.name}" พร้อม ${headerInfo.customControlPoints.length} จุดควบคุมเรียบร้อยแล้ว` : `Saved Profile "${newProfile.name}" with ${headerInfo.customControlPoints.length} custom points`);
   };
 
   const handleDeleteProfile = (profileName: string) => {
     setSavedProfiles(prev => prev.filter(p => p.name !== profileName));
     if (headerInfo.profileName === profileName) {
-      setHeaderInfo(prev => ({ ...prev, profileName: '' }));
+      setHeaderInfo(prev => ({ ...prev, profileName: '', customControlPoints: [] }));
       setProfileStatus('not-found');
     }
     showNotification(isTh ? `ลบ Profile สำเร็จ` : `Deleted profile`);
@@ -647,7 +803,21 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     checkMaxLimit(item.camber, headerInfo.camberMax);
     checkMaxLimit(item.twist, headerInfo.twistMax);
 
-    if (!item.sampleName && !item.width && !item.length) return 'Pending';
+    // Validate Custom Control Points
+    if (headerInfo.customControlPoints && headerInfo.customControlPoints.length > 0) {
+      for (const point of headerInfo.customControlPoints) {
+        const val = item.customPointValues?.[point.id];
+        if (val !== undefined && val.trim() !== '') {
+          const res = validateCustomPoint(val, point);
+          if (res === 'Fail') {
+            pass = false;
+          }
+        }
+      }
+    }
+
+    const hasAnyCustomVal = Object.values(item.customPointValues || {}).some(v => v && v.trim() !== '');
+    if (!item.sampleName && !item.width && !item.length && !hasAnyCustomVal) return 'Pending';
 
     return pass ? 'Pass' : 'Fail';
   };
@@ -659,6 +829,16 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
   const addRow = () => {
     const nextNum = batchItems.length + 1;
+    // Pre-populate custom point values if target exists
+    const initialCustomVals: Record<string, string> = {};
+    headerInfo.customControlPoints.forEach(cp => {
+      if (cp.evalType === 'target_tol' && cp.target) {
+        initialCustomVals[cp.id] = cp.target;
+      } else {
+        initialCustomVals[cp.id] = '';
+      }
+    });
+
     setBatchItems(prev => [
       ...prev,
       {
@@ -671,6 +851,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         bending: '',
         camber: '',
         twist: '',
+        customPointValues: initialCustomVals,
         status: 'Pending' as 'Pass' | 'Fail' | 'Pending',
         remarks: ''
       }
@@ -691,8 +872,27 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     }));
   };
 
+  const handleCustomPointValueChange = (itemId: number, pointId: string, value: string) => {
+    setBatchItems(prevItems => prevItems.map(item => {
+      if (item.id === itemId) {
+        return {
+          ...item,
+          customPointValues: {
+            ...(item.customPointValues || {}),
+            [pointId]: value
+          }
+        };
+      }
+      return item;
+    }));
+  };
+
   const saveBatch = () => {
-    const validItems = batchItems.filter(item => (item.sampleName || item.width || item.length) && judgeStatus(item) !== 'Pending');
+    const validItems = batchItems.filter(item => {
+      const hasCustom = Object.values(item.customPointValues || {}).some(v => v && v.trim() !== '');
+      return (item.sampleName || item.width || item.length || hasCustom) && judgeStatus(item) !== 'Pending';
+    });
+
     if (validItems.length === 0) {
       showNotification(isTh ? 'กรุณากรอกข้อมูลให้ครบถ้วนอย่างน้อย 1 รายการ' : 'Please enter inspection data', 'error');
       return;
@@ -716,6 +916,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         bending: item.bending,
         camber: item.camber,
         twist: item.twist,
+        customPointValues: { ...(item.customPointValues || {}) },
         status: decision,
         remarks: item.remarks,
         profileName: headerInfo.profileName,
@@ -728,16 +929,21 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
       if (onLogNewActivity) {
         const isPass = decision === 'Pass';
+        const customPointsSummary = headerInfo.customControlPoints.map(cp => {
+          const val = item.customPointValues?.[cp.id];
+          return `${cp.name}: ${val || '-'}${cp.unit}`;
+        }).join(', ');
+
         const resText = isPass 
-          ? 'PASS (Dimensions, length & bending within tolerances)' 
-          : `FAIL / Out of Spec: W:${item.width || '-'}mm, H:${item.heightLeft || '-'}mm, L:${item.length || '-'}mm, Bending:${item.bending || '-'}mm`;
+          ? `PASS (Standard & ${headerInfo.customControlPoints.length} Custom Points within tolerances)` 
+          : `FAIL / Out of Spec: W:${item.width || '-'}mm, H:${item.heightLeft || '-'}mm, L:${item.length || '-'}mm, Bending:${item.bending || '-'}mm ${customPointsSummary ? `[${customPointsSummary}]` : ''}`;
 
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           moduleCode: 'IPQC-05',
-          moduleTitleTh: 'ตรวจสอบขนาดตัดชิ้นงาน (Cutting Dimension & Tolerance)',
-          moduleTitleEn: 'Cutting Dimension & Tolerance Inspection',
+          moduleTitleTh: 'ตรวจสอบขนาดตัดชิ้นงาน (Cutting Dimension & Dynamic Profile Points)',
+          moduleTitleEn: 'Cutting Dimension & Dynamic Profile Points Inspection',
           inspector: headerInfo.inspectorName || 'Cutting Inspector',
           batchLot: `Coil: ${headerInfo.coilNo || '-'} (Profile: ${headerInfo.profileName})`,
           result: isPass ? 'PASS' : 'REJECT',
@@ -768,6 +974,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         bending: '',
         camber: '',
         twist: '',
+        customPointValues: {},
         status: 'Pending' as 'Pass' | 'Fail' | 'Pending',
         remarks: ''
       }
@@ -782,28 +989,57 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       return;
     }
 
-    const headers = [
+    // Collect all unique custom control point ids & names across saved profiles & inspections
+    const allCustomPointMap: Record<string, string> = {};
+    savedProfiles.forEach(p => {
+      p.customControlPoints?.forEach(cp => {
+        allCustomPointMap[cp.id] = `${cp.name} (${cp.unit || 'mm'})`;
+      });
+    });
+    inspections.forEach(ins => {
+      if (ins.customPointValues) {
+        Object.keys(ins.customPointValues).forEach(k => {
+          if (!allCustomPointMap[k]) {
+            allCustomPointMap[k] = `Point ${k}`;
+          }
+        });
+      }
+    });
+
+    const customPointKeys = Object.keys(allCustomPointMap);
+
+    const baseHeaders = [
       'Timestamp', 'Inspector', 'Employee', 'Machine', 'Work Order', 'Coil No', 'Profile Name', 'Part No', 'Sample Name', 
-      'Width (mm)', 'H-Left (mm)', 'H-Right (mm)', 'Length (mm)', 'Bending (mm/m)', 'Camber (mm/m)', 'Twist (deg/m)', 'Status', 'Remarks'
+      'Width (mm)', 'H-Left (mm)', 'H-Right (mm)', 'Length (mm)', 'Bending (mm/m)', 'Camber (mm/m)', 'Twist (deg/m)'
     ];
 
-    const csvRows = inspections.map(ins => [
-      `"${ins.timestamp}"`,
-      `"${ins.inspectorName}"`,
-      `"${ins.employeeName || '-'}"`,
-      `"${ins.machine || '-'}"`,
-      `"${ins.workOrder || '-'}"`,
-      `"${ins.lotNumber}"`,
-      `"${ins.profileName}"`,
-      `"${ins.partId}"`,
-      `"${ins.sampleName || '-'}"`,
-      ins.width || '-', ins.heightLeft || '-', ins.heightRight || '-', ins.length || '-',
-      ins.bending || '-', ins.camber || '-', ins.twist || '-',
-      `"${ins.status}"`,
-      `"${ins.remarks || '-'}"`
-    ]);
+    const customHeaders = customPointKeys.map(k => `"${allCustomPointMap[k]}"`);
+    const finalHeaders = [...baseHeaders, ...customHeaders, 'Status', 'Remarks'];
 
-    const csvContent = [headers.join(','), ...csvRows.map(e => e.join(','))].join('\n');
+    const csvRows = inspections.map(ins => {
+      const baseValues = [
+        `"${ins.timestamp}"`,
+        `"${ins.inspectorName}"`,
+        `"${ins.employeeName || '-'}"`,
+        `"${ins.machine || '-'}"`,
+        `"${ins.workOrder || '-'}"`,
+        `"${ins.lotNumber}"`,
+        `"${ins.profileName}"`,
+        `"${ins.partId}"`,
+        `"${ins.sampleName || '-'}"`,
+        ins.width || '-', ins.heightLeft || '-', ins.heightRight || '-', ins.length || '-',
+        ins.bending || '-', ins.camber || '-', ins.twist || '-'
+      ];
+
+      const customValues = customPointKeys.map(k => {
+        const val = ins.customPointValues?.[k];
+        return val ? `"${val}"` : `"-"`;
+      });
+
+      return [...baseValues, ...customValues, `"${ins.status}"`, `"${ins.remarks || '-'}"`];
+    });
+
+    const csvContent = [finalHeaders.join(','), ...csvRows.map(e => e.join(','))].join('\n');
     
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -1178,14 +1414,40 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
             </div>
 
             {/* Loaded Target Limits Quick Bar */}
-            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-slate-300">
-              <div><span className="text-slate-500">Width:</span> <strong className="text-indigo-300">{headerInfo.widthTarget ? `${headerInfo.widthTarget} (+${headerInfo.widthTolPlus}/-${headerInfo.widthTolMinus}) mm` : '-'}</strong></div>
-              <div><span className="text-slate-500">Height:</span> <strong className="text-indigo-300">{headerInfo.heightTarget ? `${headerInfo.heightTarget} (+${headerInfo.heightTolPlus}/-${headerInfo.heightTolMinus}) mm` : '-'}</strong></div>
-              <div><span className="text-slate-500">Length:</span> <strong className="text-indigo-300">{headerInfo.lengthTarget ? `${headerInfo.lengthTarget} (+${headerInfo.lengthTolPlus}/-${headerInfo.lengthTolMinus}) mm` : '-'}</strong></div>
-              <div><span className="text-slate-500">Bending:</span> <strong className="text-amber-300">{headerInfo.bendingMax ? `≤ ${headerInfo.bendingMax} mm/m` : '-'}</strong></div>
-              <div><span className="text-slate-500">Camber:</span> <strong className="text-amber-300">{headerInfo.camberMax ? `≤ ${headerInfo.camberMax} mm/m` : '-'}</strong></div>
-              <div><span className="text-slate-500">Twist:</span> <strong className="text-amber-300">{headerInfo.twistMax ? `≤ ${headerInfo.twistMax} deg/m` : '-'}</strong></div>
-              <div><span className="text-slate-500">Part No:</span> <strong className="text-purple-300">{headerInfo.partNo || '-'}</strong></div>
+            <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800/80 text-xs space-y-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-slate-300">
+                <div><span className="text-slate-500">Width:</span> <strong className="text-indigo-300">{headerInfo.widthTarget ? `${headerInfo.widthTarget} (+${headerInfo.widthTolPlus}/-${headerInfo.widthTolMinus}) mm` : '-'}</strong></div>
+                <div><span className="text-slate-500">Height:</span> <strong className="text-indigo-300">{headerInfo.heightTarget ? `${headerInfo.heightTarget} (+${headerInfo.heightTolPlus}/-${headerInfo.heightTolMinus}) mm` : '-'}</strong></div>
+                <div><span className="text-slate-500">Length:</span> <strong className="text-indigo-300">{headerInfo.lengthTarget ? `${headerInfo.lengthTarget} (+${headerInfo.lengthTolPlus}/-${headerInfo.lengthTolMinus}) mm` : '-'}</strong></div>
+                <div><span className="text-slate-500">Bending:</span> <strong className="text-amber-300">{headerInfo.bendingMax ? `≤ ${headerInfo.bendingMax} mm/m` : '-'}</strong></div>
+                <div><span className="text-slate-500">Camber:</span> <strong className="text-amber-300">{headerInfo.camberMax ? `≤ ${headerInfo.camberMax} mm/m` : '-'}</strong></div>
+                <div><span className="text-slate-500">Twist:</span> <strong className="text-amber-300">{headerInfo.twistMax ? `≤ ${headerInfo.twistMax} deg/m` : '-'}</strong></div>
+                <div><span className="text-slate-500">Part No:</span> <strong className="text-purple-300">{headerInfo.partNo || '-'}</strong></div>
+              </div>
+
+              {/* Dynamic Custom Control Points Bar */}
+              {headerInfo.customControlPoints && headerInfo.customControlPoints.length > 0 && (
+                <div className="pt-2 border-t border-slate-800/60 flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-[11px]">
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>{isTh ? 'จุดควบคุมพิเศษประจำ Profile:' : 'Custom Profile Points:'}</span>
+                  </div>
+                  {headerInfo.customControlPoints.map((cp, cIdx) => (
+                    <span 
+                      key={cp.id || cIdx} 
+                      className="px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-800/80 text-cyan-300 text-[11px] font-mono flex items-center gap-1.5"
+                    >
+                      <span className="font-sans font-bold text-slate-300">{cp.name}:</span>
+                      <strong className="text-cyan-200">
+                        {cp.evalType === 'target_tol' && `${cp.target} (+${cp.tolPlus}/-${cp.tolMinus}) ${cp.unit}`}
+                        {cp.evalType === 'max_only' && `≤ ${cp.maxLimit} ${cp.unit}`}
+                        {cp.evalType === 'min_only' && `≥ ${cp.minLimit} ${cp.unit}`}
+                        {cp.evalType === 'min_max' && `${cp.minLimit} - ${cp.maxLimit} ${cp.unit}`}
+                      </strong>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1240,6 +1502,23 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                       <th className="p-2.5 min-w-[100px] text-center">{isTh ? 'Bending (mm/m)' : 'Bending'}</th>
                       <th className="p-2.5 min-w-[100px] text-center">{isTh ? 'Camber (mm/m)' : 'Camber'}</th>
                       <th className="p-2.5 min-w-[100px] text-center">{isTh ? 'Twist (deg/m)' : 'Twist'}</th>
+                      
+                      {/* Dynamic Columns for Custom Control Points */}
+                      {headerInfo.customControlPoints?.map((cp) => (
+                        <th key={cp.id} className="p-2.5 min-w-[120px] text-center bg-cyan-950/40 text-cyan-300 border-x border-cyan-900/40">
+                          <div className="font-bold flex items-center justify-center gap-1">
+                            <Tag className="w-3 h-3 text-cyan-400" />
+                            <span>{cp.name}</span>
+                          </div>
+                          <div className="text-[9px] font-mono text-cyan-400 font-normal mt-0.5">
+                            {cp.evalType === 'target_tol' && `${cp.target} ±${cp.tolPlus} ${cp.unit}`}
+                            {cp.evalType === 'max_only' && `≤${cp.maxLimit} ${cp.unit}`}
+                            {cp.evalType === 'min_only' && `≥${cp.minLimit} ${cp.unit}`}
+                            {cp.evalType === 'min_max' && `${cp.minLimit}-${cp.maxLimit} ${cp.unit}`}
+                          </div>
+                        </th>
+                      ))}
+
                       <th className="p-2.5 w-24 text-center">{isTh ? 'ผลการตรวจ' : 'Status'}</th>
                       <th className="p-2.5 min-w-[130px]">{isTh ? 'หมายเหตุ' : 'Remarks'}</th>
                       <th className="p-2.5 w-12 text-center"></th>
@@ -1347,6 +1626,38 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                             />
                           </td>
 
+                          {/* Dynamic Custom Control Point Input Cells */}
+                          {headerInfo.customControlPoints?.map((cp) => {
+                            const val = item.customPointValues?.[cp.id] || '';
+                            const cpStatus = validateCustomPoint(val, cp);
+                            const hasVal = val.trim() !== '';
+
+                            let borderClass = 'border-slate-800 text-cyan-200';
+                            if (hasVal) {
+                              if (cpStatus === 'Pass') borderClass = 'border-emerald-500/80 bg-emerald-950/30 text-emerald-200';
+                              else if (cpStatus === 'Fail') borderClass = 'border-rose-500/80 bg-rose-950/40 text-rose-200';
+                            }
+
+                            const placeholderText = cp.evalType === 'target_tol' ? (cp.target || '0.00')
+                              : cp.evalType === 'max_only' ? `≤ ${cp.maxLimit}`
+                              : cp.evalType === 'min_only' ? `≥ ${cp.minLimit}`
+                              : `${cp.minLimit}-${cp.maxLimit}`;
+
+                            return (
+                              <td key={cp.id} className="p-2 bg-cyan-950/10 border-x border-cyan-900/30">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={val}
+                                  onChange={(e) => handleCustomPointValueChange(item.id, cp.id, e.target.value)}
+                                  placeholder={placeholderText}
+                                  title={`${cp.name} (${cp.unit})`}
+                                  className={`w-full bg-slate-950 border font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-cyan-400 font-semibold ${borderClass}`}
+                                />
+                              </td>
+                            );
+                          })}
+
                           {/* Status Badge */}
                           <td className="p-2 text-center">
                             {currentStatus === 'Pass' ? (
@@ -1447,7 +1758,14 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                       }`}
                     >
                       <div>
-                        <div className="font-bold text-xs">{p.name}</div>
+                        <div className="font-bold text-xs flex items-center gap-1.5">
+                          <span>{p.name}</span>
+                          {p.customControlPoints && p.customControlPoints.length > 0 && (
+                            <span className="px-1.5 py-0.2 text-[9px] rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">
+                              +{p.customControlPoints.length} Custom
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] text-slate-400 mt-0.5">Part: {p.partNo || 'N/A'}</div>
                       </div>
 
@@ -1668,6 +1986,312 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* DYNAMIC CUSTOM CONTROL POINTS BUILDER */}
+                <div className="bg-slate-950 p-5 rounded-2xl border border-cyan-900/50 space-y-4 shadow-lg">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <SlidersHorizontal className="w-4 h-4 text-cyan-400" />
+                        <h4 className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                          {isTh ? 'จุดควบคุมกำหนดเองเฉพาะ Profile (Custom Control Points)' : 'Profile Custom Control Points'}
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                          {headerInfo.customControlPoints?.length || 0} {isTh ? 'จุด' : 'points'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        {isTh 
+                          ? 'เพิ่มจุดวัดขนาดเฉพาะของ Profile นี้ เช่น ความกว้างที่ 2, ความหนาปีก, องศามุมตัด, หรือระยะรูเจาะ' 
+                          : 'Define custom dimension measurement points specific to this profile'}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAddCustomPoint}
+                      className="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-600/20"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{isTh ? '+ เพิ่มจุดควบคุมใหม่' : '+ Add Custom Point'}</span>
+                    </button>
+                  </div>
+
+                  {/* Preset Template Quick-Add Chips */}
+                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{isTh ? 'เทมเพลตสำเร็จรูปยอดนิยม (คลิกเพื่อเพิ่มทันที):' : 'Quick Presets (Click to add):'}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { name: 'Width 2 (W2)', unit: 'mm', evalType: 'target_tol' as const, target: '25.00', tolPlus: '0.20', tolMinus: '0.20', description: 'ความกว้างช่วงที่ 2' },
+                        { name: 'Flange Thickness (tf)', unit: 'mm', evalType: 'target_tol' as const, target: '4.00', tolPlus: '0.15', tolMinus: '0.15', description: 'ความหนาปีก' },
+                        { name: 'Web Thickness (tw)', unit: 'mm', evalType: 'target_tol' as const, target: '3.20', tolPlus: '0.15', tolMinus: '0.15', description: 'ความหนาเอว' },
+                        { name: 'Cut Angle (องศาตัด)', unit: 'deg', evalType: 'target_tol' as const, target: '45.00', tolPlus: '1.00', tolMinus: '1.00', description: 'มุมตัดเฉียง' },
+                        { name: 'Hole Pitch (ระยะเจาะ)', unit: 'mm', evalType: 'target_tol' as const, target: '50.00', tolPlus: '0.50', tolMinus: '0.50', description: 'ระยะห่างรูเจาะ' },
+                        { name: 'Flatness (ความเรียบ)', unit: 'mm', evalType: 'max_only' as const, maxLimit: '0.50', description: 'ความโก่งเฉพาะจุด' },
+                        { name: 'Radius (รัศมีมุม R)', unit: 'mm', evalType: 'min_max' as const, minLimit: '1.50', maxLimit: '2.50', description: 'รัศมีขอบมุม R' },
+                      ].map((tpl, tIdx) => (
+                        <button
+                          key={tIdx}
+                          type="button"
+                          onClick={() => handleApplyCustomPointTemplate(tpl)}
+                          className="px-2.5 py-1 text-[11px] font-semibold bg-slate-950 hover:bg-slate-850 text-slate-300 hover:text-cyan-300 rounded-lg border border-slate-700/80 hover:border-cyan-500/60 transition flex items-center gap-1.5"
+                        >
+                          <Plus className="w-3 h-3 text-cyan-400" />
+                          <span>{tpl.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* List of Custom Control Points */}
+                  {(!headerInfo.customControlPoints || headerInfo.customControlPoints.length === 0) ? (
+                    <div className="p-8 text-center bg-slate-900/40 rounded-xl border border-dashed border-slate-800 space-y-2">
+                      <div className="w-10 h-10 rounded-xl bg-slate-800 text-slate-500 flex items-center justify-center mx-auto">
+                        <SlidersHorizontal className="w-5 h-5" />
+                      </div>
+                      <p className="text-xs text-slate-400 font-semibold">
+                        {isTh 
+                          ? 'ยังไม่มีจุดควบคุมพิเศษสำหรับ Profile นี้ (ใช้ค่ามาตรฐาน 6 ค่า: Width, Height, Length, Bending, Camber, Twist)' 
+                          : 'No custom control points defined for this profile'}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        {isTh ? 'กดปุ่ม "+ เพิ่มจุดควบคุมใหม่" หรือเลือกเทมเพลตด้านบนเพื่อเริ่มกำหนด' : 'Click "+ Add Custom Point" or choose a preset above'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {headerInfo.customControlPoints.map((cp, cpIdx) => (
+                        <div 
+                          key={cp.id} 
+                          className="bg-slate-900 p-4 rounded-xl border border-slate-800 hover:border-cyan-800/80 transition-colors space-y-3 relative group"
+                        >
+                          <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800/60">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-md bg-cyan-950 border border-cyan-800 text-cyan-400 text-[10px] font-mono font-bold flex items-center justify-center">
+                                #{cpIdx + 1}
+                              </span>
+                              <span className="text-xs font-bold text-white font-mono">{cp.name || `Custom Point ${cpIdx + 1}`}</span>
+                              <span className="text-[10px] text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                                {cp.evalType === 'target_tol' ? 'Target ± Tol' : cp.evalType === 'max_only' ? 'Max Limit (≤)' : cp.evalType === 'min_only' ? 'Min Limit (≥)' : 'Min-Max Range'}
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCustomPoint(cp.id)}
+                              className="p-1.5 text-slate-500 hover:text-rose-400 transition hover:bg-slate-800 rounded-lg"
+                              title={isTh ? 'ลบจุดควบคุมนี้' : 'Delete control point'}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                            {/* Point Name */}
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                                {isTh ? 'ชื่อจุดควบคุม (Point Name) *' : 'Point Name *'}
+                              </label>
+                              <input
+                                type="text"
+                                value={cp.name}
+                                onChange={(e) => handleUpdateCustomPoint(cp.id, 'name', e.target.value)}
+                                placeholder="e.g. Width 2, Angle 1"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-semibold focus:outline-none focus:border-cyan-500"
+                              />
+                            </div>
+
+                            {/* Evaluation Type */}
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                                {isTh ? 'รูปแบบการประเมิน (Eval Type)' : 'Evaluation Type'}
+                              </label>
+                              <select
+                                value={cp.evalType}
+                                onChange={(e) => handleUpdateCustomPoint(cp.id, 'evalType', e.target.value as any)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-cyan-300 font-semibold focus:outline-none focus:border-cyan-500"
+                              >
+                                <option value="target_tol">{isTh ? 'Target ± ค่าเผื่อ (Tol)' : 'Target ± Tolerance'}</option>
+                                <option value="max_only">{isTh ? 'กำหนดค่าสูงสุด (≤ Max Limit)' : 'Max Limit Only (≤)'}</option>
+                                <option value="min_only">{isTh ? 'กำหนดค่าต่ำสุด (≥ Min Limit)' : 'Min Limit Only (≥)'}</option>
+                                <option value="min_max">{isTh ? 'ช่วงต่ำสุด-สูงสุด (Min - Max Range)' : 'Min - Max Range'}</option>
+                              </select>
+                            </div>
+
+                            {/* Unit */}
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                                {isTh ? 'หน่วยวัด (Unit)' : 'Unit'}
+                              </label>
+                              <div className="flex gap-1.5">
+                                <input
+                                  type="text"
+                                  value={cp.unit}
+                                  onChange={(e) => handleUpdateCustomPoint(cp.id, 'unit', e.target.value)}
+                                  placeholder="mm, deg, mm/m"
+                                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+                                />
+                                <div className="flex gap-1">
+                                  {['mm', 'deg', 'mm/m'].map(u => (
+                                    <button
+                                      key={u}
+                                      type="button"
+                                      onClick={() => handleUpdateCustomPoint(cp.id, 'unit', u)}
+                                      className={`px-1.5 py-1 text-[10px] rounded border font-mono ${
+                                        cp.unit === u 
+                                          ? 'bg-cyan-950 text-cyan-300 border-cyan-700' 
+                                          : 'bg-slate-950 text-slate-500 border-slate-800 hover:text-slate-300'
+                                      }`}
+                                    >
+                                      {u}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Location Note / Description */}
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                                {isTh ? 'คำอธิบายจุดวัด (Description)' : 'Description'}
+                              </label>
+                              <input
+                                type="text"
+                                value={cp.description || ''}
+                                onChange={(e) => handleUpdateCustomPoint(cp.id, 'description', e.target.value)}
+                                placeholder={isTh ? 'เช่น จุดกึ่งกลางชิ้นงาน' : 'e.g. Center position'}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-300 text-xs focus:outline-none focus:border-cyan-500"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Dynamic Numeric Limit Inputs based on EvalType */}
+                          <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
+                            {cp.evalType === 'target_tol' && (
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="text-[10px] font-bold text-indigo-300 uppercase block mb-1">
+                                    {isTh ? `Target (${cp.unit}) *` : `Target (${cp.unit}) *`}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={cp.target || ''}
+                                    onChange={(e) => handleUpdateCustomPoint(cp.id, 'target', e.target.value)}
+                                    placeholder="100.00"
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-indigo-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-emerald-400 uppercase block mb-1">
+                                    {isTh ? `+ Tolerance (+${cp.unit})` : `+ Tolerance (+${cp.unit})`}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={cp.tolPlus || ''}
+                                    onChange={(e) => handleUpdateCustomPoint(cp.id, 'tolPlus', e.target.value)}
+                                    placeholder="0.50"
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-rose-400 uppercase block mb-1">
+                                    {isTh ? `- Tolerance (-${cp.unit})` : `- Tolerance (-${cp.unit})`}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={cp.tolMinus || ''}
+                                    onChange={(e) => handleUpdateCustomPoint(cp.id, 'tolMinus', e.target.value)}
+                                    placeholder="0.50"
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-rose-300 font-mono font-bold focus:outline-none focus:border-rose-500"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {cp.evalType === 'max_only' && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="text-[10px] font-bold text-amber-300 uppercase block mb-1">
+                                    {isTh ? `ค่าสูงสุดที่ยอมรับได้ (≤ Max Limit in ${cp.unit}) *` : `Max Acceptable Limit (≤ ${cp.unit}) *`}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={cp.maxLimit || ''}
+                                    onChange={(e) => handleUpdateCustomPoint(cp.id, 'maxLimit', e.target.value)}
+                                    placeholder="1.00"
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-500"
+                                  />
+                                </div>
+                                <div className="flex items-center text-xs text-slate-400 pt-5">
+                                  <span>{isTh ? `เกณฑ์ตัดสิน: ค่าที่วัดได้ต้องน้อยกว่าหรือเท่ากับ (≤) ${cp.maxLimit || '-'} ${cp.unit}` : `Criterion: Measured value ≤ ${cp.maxLimit || '-'} ${cp.unit}`}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {cp.evalType === 'min_only' && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="text-[10px] font-bold text-amber-300 uppercase block mb-1">
+                                    {isTh ? `ค่าต่ำสุดที่ยอมรับได้ (≥ Min Limit in ${cp.unit}) *` : `Min Acceptable Limit (≥ ${cp.unit}) *`}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={cp.minLimit || ''}
+                                    onChange={(e) => handleUpdateCustomPoint(cp.id, 'minLimit', e.target.value)}
+                                    placeholder="10.00"
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-500"
+                                  />
+                                </div>
+                                <div className="flex items-center text-xs text-slate-400 pt-5">
+                                  <span>{isTh ? `เกณฑ์ตัดสิน: ค่าที่วัดได้ต้องมากกว่าหรือเท่ากับ (≥) ${cp.minLimit || '-'} ${cp.unit}` : `Criterion: Measured value ≥ ${cp.minLimit || '-'} ${cp.unit}`}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {cp.evalType === 'min_max' && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="text-[10px] font-bold text-indigo-300 uppercase block mb-1">
+                                    {isTh ? `ช่วงต่ำสุด (Min Limit in ${cp.unit}) *` : `Min Limit (${cp.unit}) *`}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={cp.minLimit || ''}
+                                    onChange={(e) => handleUpdateCustomPoint(cp.id, 'minLimit', e.target.value)}
+                                    placeholder="1.50"
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-indigo-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-indigo-300 uppercase block mb-1">
+                                    {isTh ? `ช่วงสูงสุด (Max Limit in ${cp.unit}) *` : `Max Limit (${cp.unit}) *`}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={cp.maxLimit || ''}
+                                    onChange={(e) => handleUpdateCustomPoint(cp.id, 'maxLimit', e.target.value)}
+                                    placeholder="2.50"
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-indigo-500"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1863,11 +2487,18 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                       <td className="p-2.5 text-center font-mono font-semibold text-amber-300">{ins.bending || '-'}</td>
                       <td className="p-2.5 text-center font-mono font-semibold text-amber-300">{ins.camber || '-'}</td>
                       <td className="p-2.5 text-center font-mono font-semibold text-purple-300">{ins.twist || '-'}</td>
+                      
+                      {/* Status */}
                       <td className="p-2.5 text-center">
                         {ins.status === 'Pass' ? (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 border border-emerald-800 text-emerald-300">PASS</span>
                         ) : (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-950 border border-rose-800 text-rose-300">FAIL</span>
+                        )}
+                        {ins.customPointValues && Object.keys(ins.customPointValues).length > 0 && (
+                          <div className="text-[9px] text-cyan-400 font-mono mt-0.5" title={JSON.stringify(ins.customPointValues)}>
+                            +{Object.keys(ins.customPointValues).length} Custom
+                          </div>
                         )}
                       </td>
                       <td className="p-2.5 text-slate-300">
@@ -2117,6 +2748,40 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                     />
                   </div>
                 </div>
+
+                {/* Custom Points Values in Edit Modal */}
+                {editingHistoryItem.customPointValues && Object.keys(editingHistoryItem.customPointValues).length > 0 && (
+                  <div className="pt-3 border-t border-slate-800 space-y-2">
+                    <div className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>{isTh ? 'จุดควบคุมเฉพาะ Profile (Custom Control Points)' : 'Custom Control Points'}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                      {Object.entries(editingHistoryItem.customPointValues).map(([cpKey, cpVal]) => (
+                        <div key={cpKey}>
+                          <label className="text-[10px] font-bold text-cyan-300 uppercase block mb-1 truncate">
+                            {cpKey}
+                          </label>
+                          <input
+                            type="text"
+                            value={cpVal}
+                            onChange={(e) => {
+                              const updatedCustomValues = {
+                                ...(editingHistoryItem.customPointValues || {}),
+                                [cpKey]: e.target.value
+                              };
+                              setEditingHistoryItem({
+                                ...editingHistoryItem,
+                                customPointValues: updatedCustomValues
+                              });
+                            }}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-cyan-200 focus:outline-none focus:border-cyan-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

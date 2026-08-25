@@ -37,7 +37,7 @@ import {
   InspectionActivity 
 } from '../types';
 import { extractThicknessWallClient } from '../services/geminiClient';
-import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
+import { useCloudState } from '../services/firestoreSync';
 
 interface ThicknessWallAppProps {
   onBackToPortal?: () => void;
@@ -144,50 +144,9 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
   const [authError, setAuthError] = useState(false);
 
-  // Profile Specs & History Records State
-  const [profileSpecs, setProfileSpecs] = useState<Record<string, ThicknessWallProfileItemSpec[]>>(() => {
-    const saved = localStorage.getItem('tw_profile_specs');
-    return saved ? JSON.parse(saved) : INITIAL_PROFILES;
-  });
-
-  const [savedRecords, setSavedRecords] = useState<ThicknessWallRecord[]>(() => {
-    const saved = localStorage.getItem('tw_measurement_records');
-    return saved ? JSON.parse(saved) : INITIAL_RECORDS;
-  });
-
-  // Real-time Cloud Subscriptions (Firebase Firestore)
-  useEffect(() => {
-    const unsubSpecs = subscribeToCloudData<Record<string, ThicknessWallProfileItemSpec[]>>(
-      'tw_profile_specs',
-      (data) => {
-        if (data && typeof data === 'object') setProfileSpecs(data);
-      },
-      INITIAL_PROFILES
-    );
-
-    const unsubRecords = subscribeToCloudData<ThicknessWallRecord[]>(
-      'tw_measurement_records',
-      (data) => {
-        if (Array.isArray(data)) setSavedRecords(data);
-      },
-      INITIAL_RECORDS
-    );
-
-    return () => {
-      unsubSpecs();
-      unsubRecords();
-    };
-  }, []);
-
-  // Save Specs to Cloud & Local Storage
-  useEffect(() => {
-    saveCloudData('tw_profile_specs', profileSpecs);
-  }, [profileSpecs]);
-
-  // Save Records to Cloud & Local Storage
-  useEffect(() => {
-    saveCloudData('tw_measurement_records', savedRecords);
-  }, [savedRecords]);
+  // Profile Specs & History Records with Real-time Cloud Sync
+  const [profileSpecs, setProfileSpecs] = useCloudState<Record<string, ThicknessWallProfileItemSpec[]>>('tw_profile_specs', INITIAL_PROFILES);
+  const [savedRecords, setSavedRecords] = useCloudState<ThicknessWallRecord[]>('tw_measurement_records', INITIAL_RECORDS);
 
   // File Upload & AI State
   const [currentFileBase64, setCurrentFileBase64] = useState<string | null>(null);

@@ -39,7 +39,7 @@ import {
   InspectionActivity,
   ThemeMode
 } from '../types';
-import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
+import { useCloudState } from '../services/firestoreSync';
 
 interface RoughnessMeasurementAppProps {
   onBackToPortal?: () => void;
@@ -202,50 +202,9 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
   const isLight = theme === 'light';
   const [activeTab, setActiveTab] = useState<'new-batch' | 'profile-settings' | 'dashboard' | 'history'>('new-batch');
 
-  // Saved Profiles & Inspections in localStorage
-  const [savedProfiles, setSavedProfiles] = useState<RoughnessProfileSpec[]>(() => {
-    const saved = localStorage.getItem('roughness_qc_profiles');
-    return saved ? JSON.parse(saved) : DEFAULT_PROFILES;
-  });
-
-  const [inspections, setInspections] = useState<RoughnessInspectionRecord[]>(() => {
-    const saved = localStorage.getItem('roughness_qc_inspections');
-    return saved ? JSON.parse(saved) : INITIAL_INSPECTIONS;
-  });
-
-  // Real-time Cloud Subscriptions (Firebase Firestore)
-  useEffect(() => {
-    const unsubProfiles = subscribeToCloudData<RoughnessProfileSpec[]>(
-      'roughness_qc_profiles',
-      (data) => {
-        if (Array.isArray(data)) setSavedProfiles(data);
-      },
-      DEFAULT_PROFILES
-    );
-
-    const unsubInspections = subscribeToCloudData<RoughnessInspectionRecord[]>(
-      'roughness_qc_inspections',
-      (data) => {
-        if (Array.isArray(data)) setInspections(data);
-      },
-      INITIAL_INSPECTIONS
-    );
-
-    return () => {
-      unsubProfiles();
-      unsubInspections();
-    };
-  }, []);
-
-  // Save Profiles to Cloud & Local Storage
-  useEffect(() => {
-    saveCloudData('roughness_qc_profiles', savedProfiles);
-  }, [savedProfiles]);
-
-  // Save Inspections to Cloud & Local Storage
-  useEffect(() => {
-    saveCloudData('roughness_qc_inspections', inspections);
-  }, [inspections]);
+  // Saved Profiles & Inspections with Real-time Cloud Sync
+  const [savedProfiles, setSavedProfiles] = useCloudState<RoughnessProfileSpec[]>('roughness_qc_profiles', DEFAULT_PROFILES);
+  const [inspections, setInspections] = useCloudState<RoughnessInspectionRecord[]>('roughness_qc_inspections', INITIAL_INSPECTIONS);
 
   // Point Configuration
   const [pointConfig, setPointConfig] = useState({

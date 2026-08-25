@@ -50,7 +50,7 @@ import {
   InspectionActivity 
 } from '../types';
 import { analyzeChemicalCertClient } from '../services/geminiClient';
-import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
+import { useCloudState } from '../services/firestoreSync';
 
 interface ChemicalIncomingAppProps {
   onBackToPortal?: () => void;
@@ -166,15 +166,8 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
   const [tableItems, setTableItems] = useState<ChemicalMeasureItem[]>([]);
 
   // History & Specs
-  const [history, setHistory] = useState<ChemicalInspectionEntry[]>(() => {
-    const saved = localStorage.getItem('chem_qc_history');
-    return saved ? JSON.parse(saved) : INITIAL_HISTORY;
-  });
-
-  const [specs, setSpecs] = useState<ChemicalSpecMap>(() => {
-    const saved = localStorage.getItem('chem_qc_specs');
-    return saved ? JSON.parse(saved) : DEFAULT_SPECS;
-  });
+  const [history, setHistory] = useCloudState<ChemicalInspectionEntry[]>('chem_qc_history', INITIAL_HISTORY);
+  const [specs, setSpecs] = useCloudState<ChemicalSpecMap>('chem_qc_specs', DEFAULT_SPECS);
 
   // Admin Modal & State
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -313,39 +306,6 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     });
   };
 
-  // Real-time Cloud Subscriptions (Firebase Firestore)
-  useEffect(() => {
-    const unsubHistory = subscribeToCloudData<ChemicalInspectionEntry[]>(
-      'chem_qc_history',
-      (data) => {
-        if (Array.isArray(data)) setHistory(data);
-      },
-      INITIAL_HISTORY
-    );
-
-    const unsubSpecs = subscribeToCloudData<ChemicalSpecMap>(
-      'chem_qc_specs',
-      (data) => {
-        if (data && typeof data === 'object') setSpecs(data);
-      },
-      DEFAULT_SPECS
-    );
-
-    return () => {
-      unsubHistory();
-      unsubSpecs();
-    };
-  }, []);
-
-  // Persist Local Storage & Cloud Firestore
-  useEffect(() => {
-    saveCloudData('chem_qc_history', history);
-  }, [history]);
-
-  useEffect(() => {
-    saveCloudData('chem_qc_specs', specs);
-  }, [specs]);
-
   // Validate single item row against selected coating chemical spec
   const validateItemRow = (chemicalName: string, description: string, rawVal: string | number): 'PASS' | 'FAIL' | '-' => {
     if (!chemicalName) return '-';
@@ -459,7 +419,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
           const specRows = specs[chemCode] || DEFAULT_SPECS[chemCode] || DEFAULT_SPECS['A-001'] || [];
           tableList = specRows.map(s => ({
             description: s.item,
-            total: ((s.min + s.max) / 2).toFixed(1)
+            total: ((Number(s.min) + Number(s.max)) / 2).toFixed(1)
           }));
         }
 

@@ -48,7 +48,7 @@ import {
   ThemeMode
 } from '../types';
 import { analyzeZnWireCertClient } from '../services/geminiClient';
-import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
+import { useCloudState } from '../services/firestoreSync';
 
 interface ZnWireIncomingAppProps {
   onBackToPortal?: () => void;
@@ -157,48 +157,8 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
   const [activeTab, setActiveTab] = useState<'scan' | 'history' | 'config'>('scan');
   
   // Storage states
-  const [gradeSpecs, setGradeSpecs] = useState<ZnWireGradeSpecMap>(() => {
-    const saved = localStorage.getItem('zn_wire_specs');
-    return saved ? JSON.parse(saved) : DEFAULT_GRADE_SPECS;
-  });
-
-  const [history, setHistory] = useState<ZnWireInspectionRecord[]>(() => {
-    const saved = localStorage.getItem('zn_wire_history');
-    return saved ? JSON.parse(saved) : INITIAL_HISTORY;
-  });
-
-  // Real-time Cloud Subscriptions (Firebase Firestore)
-  useEffect(() => {
-    const unsubHistory = subscribeToCloudData<ZnWireInspectionRecord[]>(
-      'zn_wire_history',
-      (data) => {
-        if (Array.isArray(data)) setHistory(data);
-      },
-      INITIAL_HISTORY
-    );
-
-    const unsubSpecs = subscribeToCloudData<ZnWireGradeSpecMap>(
-      'zn_wire_specs',
-      (data) => {
-        if (data && typeof data === 'object') setGradeSpecs(data);
-      },
-      DEFAULT_GRADE_SPECS
-    );
-
-    return () => {
-      unsubHistory();
-      unsubSpecs();
-    };
-  }, []);
-
-  // Save to Cloud & Local Storage
-  useEffect(() => {
-    saveCloudData('zn_wire_specs', gradeSpecs);
-  }, [gradeSpecs]);
-
-  useEffect(() => {
-    saveCloudData('zn_wire_history', history);
-  }, [history]);
+  const [gradeSpecs, setGradeSpecs] = useCloudState<ZnWireGradeSpecMap>('zn_wire_specs', DEFAULT_GRADE_SPECS);
+  const [history, setHistory] = useCloudState<ZnWireInspectionRecord[]>('zn_wire_history', INITIAL_HISTORY);
 
   // Scan & Processing States
   const [image, setImage] = useState<string | null>(null);

@@ -406,6 +406,21 @@ export interface CoatingInspectionRecord {
 }
 
 // Cutting Dimension Measurement App Types (IPQC-05)
+export type CuttingEvaluationType = 'target_tol' | 'max_only' | 'min_only' | 'min_max';
+
+export interface CuttingCustomPointSpec {
+  id: string;
+  name: string;
+  unit: string;
+  evalType: CuttingEvaluationType;
+  target?: string;
+  tolPlus?: string;
+  tolMinus?: string;
+  maxLimit?: string;
+  minLimit?: string;
+  description?: string;
+}
+
 export interface CuttingProfileSpec {
   id?: string;
   name: string;
@@ -422,6 +437,7 @@ export interface CuttingProfileSpec {
   bendingMax: string;
   camberMax: string;
   twistMax: string;
+  customControlPoints?: CuttingCustomPointSpec[];
 }
 
 export interface CuttingInspectionRecord {
@@ -437,6 +453,7 @@ export interface CuttingInspectionRecord {
   bending?: string;
   camber?: string;
   twist?: string;
+  customPointValues?: Record<string, string>;
   status: 'Pass' | 'Fail' | 'Pending';
   remarks?: string;
   profileName: string;

@@ -37,7 +37,7 @@ import {
   InspectionActivity 
 } from '../types';
 import { analyzeFgPreShipmentLabelClient } from '../services/geminiClient';
-import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
+import { useCloudState } from '../services/firestoreSync';
 
 interface FgPreShipmentAppProps {
   onBackToPortal?: () => void;
@@ -164,53 +164,9 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
   // Navigation State
   const [activeTab, setActiveTab] = useState<'checker' | 'history' | 'dashboard' | 'profile'>('checker');
 
-  // Master Specs & History State
-  const [profileSpecs, setProfileSpecs] = useState<FgProfileSpec[]>(() => {
-    const saved = localStorage.getItem('fg_profile_specs');
-    return saved ? JSON.parse(saved) : INITIAL_PROFILES;
-  });
-
-  const [historyList, setHistoryList] = useState<FgPreShipmentRecord[]>(() => {
-    const saved = localStorage.getItem('fg_inspection_history');
-    return saved ? JSON.parse(saved) : INITIAL_HISTORY;
-  });
-
-  // Real-time Cloud Subscriptions (Firebase Firestore)
-  useEffect(() => {
-    const unsubSpecs = subscribeToCloudData<FgProfileSpec[]>(
-      'fg_profile_specs',
-      (data) => {
-        if (Array.isArray(data)) setProfileSpecs(data);
-      },
-      INITIAL_PROFILES
-    );
-
-    const unsubHistory = subscribeToCloudData<FgPreShipmentRecord[]>(
-      'fg_inspection_history',
-      (data) => {
-        if (Array.isArray(data)) setHistoryList(data);
-      },
-      INITIAL_HISTORY
-    );
-
-    return () => {
-      unsubSpecs();
-      unsubHistory();
-    };
-  }, []);
-
-  useEffect(() => {
-    saveCloudData('fg_profile_specs', profileSpecs);
-  }, [profileSpecs]);
-
-  useEffect(() => {
-    const pureTextHistory = historyList.map(item => ({
-      ...item,
-      refImage: undefined,
-      testImage: undefined
-    }));
-    saveCloudData('fg_inspection_history', pureTextHistory);
-  }, [historyList]);
+  // Master Specs & History State with Real-time Cloud Sync
+  const [profileSpecs, setProfileSpecs] = useCloudState<FgProfileSpec[]>('fg_profile_specs', INITIAL_PROFILES);
+  const [historyList, setHistoryList] = useCloudState<FgPreShipmentRecord[]>('fg_inspection_history', INITIAL_HISTORY);
 
   // Image & AI State
   const [refImage, setRefImage] = useState<string | null>(null);

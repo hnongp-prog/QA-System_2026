@@ -35,7 +35,7 @@ import {
   Language, 
   InspectionActivity 
 } from '../types';
-import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
+import { useCloudState } from '../services/firestoreSync';
 
 interface MetrologyCalibrationAppProps {
   onBackToPortal?: () => void;
@@ -196,31 +196,8 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
 }) => {
   const isTh = language === 'th';
 
-  // State
-  const [instruments, setInstruments] = useState<InstrumentRecord[]>(() => {
-    const saved = localStorage.getItem('metrology_instruments');
-    return saved ? JSON.parse(saved) : INITIAL_INSTRUMENTS;
-  });
-
-  // Real-time Cloud Subscriptions (Firebase Firestore)
-  useEffect(() => {
-    const unsubInstruments = subscribeToCloudData<InstrumentRecord[]>(
-      'metrology_instruments',
-      (data) => {
-        if (Array.isArray(data)) setInstruments(data);
-      },
-      INITIAL_INSTRUMENTS
-    );
-
-    return () => {
-      unsubInstruments();
-    };
-  }, []);
-
-  // Save Instruments to Cloud & Local Storage
-  useEffect(() => {
-    saveCloudData('metrology_instruments', instruments);
-  }, [instruments]);
+  // State with Real-time Cloud Sync
+  const [instruments, setInstruments] = useCloudState<InstrumentRecord[]>('metrology_instruments', INITIAL_INSTRUMENTS);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');

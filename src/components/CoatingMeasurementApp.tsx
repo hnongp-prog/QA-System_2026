@@ -28,7 +28,7 @@ import {
   Language, 
   InspectionActivity 
 } from '../types';
-import { subscribeToCloudData, saveCloudData } from '../services/firestoreSync';
+import { useCloudState } from '../services/firestoreSync';
 
 interface CoatingMeasurementAppProps {
   onBackToPortal?: () => void;
@@ -208,50 +208,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
   const [activeTab, setActiveTab] = useState<'new-batch' | 'settings' | 'dashboard' | 'history'>('new-batch');
   const tableRef = useRef<HTMLDivElement>(null);
 
-  // Saved Profiles & Inspections in LocalStorage
-  const [savedProfiles, setSavedProfiles] = useState<CoatingProfileSpec[]>(() => {
-    const saved = localStorage.getItem('coating_qc_profiles');
-    return saved ? JSON.parse(saved) : DEFAULT_PROFILES;
-  });
-
-  const [inspections, setInspections] = useState<CoatingInspectionRecord[]>(() => {
-    const saved = localStorage.getItem('coating_qc_inspections');
-    return saved ? JSON.parse(saved) : INITIAL_INSPECTIONS;
-  });
-
-  // Real-time Cloud Subscriptions (Firebase Firestore)
-  useEffect(() => {
-    const unsubProfiles = subscribeToCloudData<CoatingProfileSpec[]>(
-      'coating_qc_profiles',
-      (data) => {
-        if (Array.isArray(data)) setSavedProfiles(data);
-      },
-      DEFAULT_PROFILES
-    );
-
-    const unsubInspections = subscribeToCloudData<CoatingInspectionRecord[]>(
-      'coating_qc_inspections',
-      (data) => {
-        if (Array.isArray(data)) setInspections(data);
-      },
-      INITIAL_INSPECTIONS
-    );
-
-    return () => {
-      unsubProfiles();
-      unsubInspections();
-    };
-  }, []);
-
-  // Save Profiles to Cloud & Local Storage
-  useEffect(() => {
-    saveCloudData('coating_qc_profiles', savedProfiles);
-  }, [savedProfiles]);
-
-  // Save Inspections to Cloud & Local Storage
-  useEffect(() => {
-    saveCloudData('coating_qc_inspections', inspections);
-  }, [inspections]);
+  // Saved Profiles & Inspections with Real-time Cloud Sync
+  const [savedProfiles, setSavedProfiles] = useCloudState<CoatingProfileSpec[]>('coating_qc_profiles', DEFAULT_PROFILES);
+  const [inspections, setInspections] = useCloudState<CoatingInspectionRecord[]>('coating_qc_inspections', INITIAL_INSPECTIONS);
 
   // Auth State for Settings
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
