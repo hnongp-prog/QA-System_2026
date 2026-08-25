@@ -124,11 +124,19 @@ const DEFAULT_PROFILES: CuttingProfileSpec[] = [
   { 
     name: 'CUT-PROFILE-STD-100', 
     partNo: 'PART-100-A',
+    widthName: 'ความกว้าง W (Width)',
     widthTarget: '100.00', widthTolPlus: '0.50', widthTolMinus: '0.50',
+    heightName: 'ความสูง H (Height)',
+    heightLeftName: 'ความสูงซ้าย H-Left',
+    heightRightName: 'ความสูงขวา H-Right',
     heightTarget: '50.00', heightTolPlus: '0.30', heightTolMinus: '0.30',
+    lengthName: 'ความยาวตัด L (Length)',
     lengthTarget: '2000.00', lengthTolPlus: '2.00', lengthTolMinus: '2.00',
+    bendingName: 'ความโก่ง Bending',
     bendingMax: '1.50',
+    camberName: 'ความคด Camber',
     camberMax: '1.00',
+    twistName: 'ความบิด Twist',
     twistMax: '0.50',
     customControlPoints: [
       {
@@ -153,14 +161,22 @@ const DEFAULT_PROFILES: CuttingProfileSpec[] = [
       }
     ]
   },
-  {
+  { 
     name: 'HEAVY-CUT-PROFILE-200', 
     partNo: 'PART-200-B',
+    widthName: 'ความกว้างหน้าตัด (Main Width)',
     widthTarget: '200.00', widthTolPlus: '1.00', widthTolMinus: '1.00',
+    heightName: 'ความสูงชิ้นงาน (Main Height)',
+    heightLeftName: 'ความสูงซ้าย H-Left',
+    heightRightName: 'ความสูงขวา H-Right',
     heightTarget: '100.00', heightTolPlus: '0.50', heightTolMinus: '0.50',
+    lengthName: 'ความยาวตัดท่อน (Cut Length)',
     lengthTarget: '3000.00', lengthTolPlus: '3.00', lengthTolMinus: '3.00',
+    bendingName: 'ความแอ่นแนวระนาบ (Bending)',
     bendingMax: '2.00',
+    camberName: 'ความคดงอแนวแกน (Camber)',
     camberMax: '1.50',
+    twistName: 'องศาการบิดตัว (Twist)',
     twistMax: '1.00',
     customControlPoints: [
       {
@@ -259,7 +275,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminAuthError, setAdminAuthError] = useState(false);
 
-  // Header Metadata State (including customControlPoints)
+  // Header Metadata State (including customControlPoints and customizable point names)
   const [headerInfo, setHeaderInfo] = useState<{
     inspectorName: string;
     employeeName: string;
@@ -269,17 +285,25 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     date: string;
     profileName: string;
     partNo: string;
+    widthName: string;
     widthTarget: string;
     widthTolPlus: string;
     widthTolMinus: string;
+    heightName: string;
+    heightLeftName: string;
+    heightRightName: string;
     heightTarget: string;
     heightTolPlus: string;
     heightTolMinus: string;
+    lengthName: string;
     lengthTarget: string;
     lengthTolPlus: string;
     lengthTolMinus: string;
+    bendingName: string;
     bendingMax: string;
+    camberName: string;
     camberMax: string;
+    twistName: string;
     twistMax: string;
     customControlPoints: CuttingCustomPointSpec[];
   }>({
@@ -291,11 +315,19 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     date: new Date().toISOString().split('T')[0],
     profileName: '',
     partNo: '',
+    widthName: 'ความกว้าง (Width)',
     widthTarget: '', widthTolPlus: '', widthTolMinus: '',
+    heightName: 'ความสูง (Height)',
+    heightLeftName: 'ความสูงซ้าย H-Left',
+    heightRightName: 'ความสูงขวา H-Right',
     heightTarget: '', heightTolPlus: '', heightTolMinus: '',
+    lengthName: 'ความยาว (Length)',
     lengthTarget: '', lengthTolPlus: '', lengthTolMinus: '',
+    bendingName: 'ความโก่ง (Bending)',
     bendingMax: '',
+    camberName: 'ความคด (Camber)',
     camberMax: '',
+    twistName: 'ความบิด (Twist)',
     twistMax: '',
     customControlPoints: []
   });
@@ -538,17 +570,25 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       ...prev,
       profileName: profile.name,
       partNo: profile.partNo || '',
+      widthName: profile.widthName || 'ความกว้าง (Width)',
       widthTarget: formatSpecValue(profile.widthTarget),
       widthTolPlus: formatSpecValue(profile.widthTolPlus),
       widthTolMinus: formatSpecValue(profile.widthTolMinus),
+      heightName: profile.heightName || 'ความสูง (Height)',
+      heightLeftName: profile.heightLeftName || 'ความสูงซ้าย H-Left',
+      heightRightName: profile.heightRightName || 'ความสูงขวา H-Right',
       heightTarget: formatSpecValue(profile.heightTarget),
       heightTolPlus: formatSpecValue(profile.heightTolPlus),
       heightTolMinus: formatSpecValue(profile.heightTolMinus),
+      lengthName: profile.lengthName || 'ความยาว (Length)',
       lengthTarget: formatSpecValue(profile.lengthTarget),
       lengthTolPlus: formatSpecValue(profile.lengthTolPlus),
       lengthTolMinus: formatSpecValue(profile.lengthTolMinus),
+      bendingName: profile.bendingName || 'ความโก่ง (Bending)',
       bendingMax: formatSpecValue(profile.bendingMax),
+      camberName: profile.camberName || 'ความคด (Camber)',
       camberMax: formatSpecValue(profile.camberMax),
+      twistName: profile.twistName || 'ความบิด (Twist)',
       twistMax: formatSpecValue(profile.twistMax),
       customControlPoints: profile.customControlPoints ? JSON.parse(JSON.stringify(profile.customControlPoints)) : []
     }));
@@ -562,17 +602,25 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         setHeaderInfo(prev => ({
           ...prev,
           partNo: match.partNo || '',
+          widthName: match.widthName || prev.widthName || 'ความกว้าง (Width)',
           widthTarget: formatSpecValue(match.widthTarget),
           widthTolPlus: formatSpecValue(match.widthTolPlus),
           widthTolMinus: formatSpecValue(match.widthTolMinus),
+          heightName: match.heightName || prev.heightName || 'ความสูง (Height)',
+          heightLeftName: match.heightLeftName || prev.heightLeftName || 'ความสูงซ้าย H-Left',
+          heightRightName: match.heightRightName || prev.heightRightName || 'ความสูงขวา H-Right',
           heightTarget: formatSpecValue(match.heightTarget),
           heightTolPlus: formatSpecValue(match.heightTolPlus),
           heightTolMinus: formatSpecValue(match.heightTolMinus),
+          lengthName: match.lengthName || prev.lengthName || 'ความยาว (Length)',
           lengthTarget: formatSpecValue(match.lengthTarget),
           lengthTolPlus: formatSpecValue(match.lengthTolPlus),
           lengthTolMinus: formatSpecValue(match.lengthTolMinus),
+          bendingName: match.bendingName || prev.bendingName || 'ความโก่ง (Bending)',
           bendingMax: formatSpecValue(match.bendingMax),
+          camberName: match.camberName || prev.camberName || 'ความคด (Camber)',
           camberMax: formatSpecValue(match.camberMax),
+          twistName: match.twistName || prev.twistName || 'ความบิด (Twist)',
           twistMax: formatSpecValue(match.twistMax),
           customControlPoints: match.customControlPoints ? JSON.parse(JSON.stringify(match.customControlPoints)) : prev.customControlPoints
         }));
@@ -604,20 +652,34 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     showNotification(isTh ? 'เพิ่มจุดควบคุมกำหนดเองใหม่แล้ว' : 'Added new custom control point');
   };
 
-  const handleApplyCustomPointTemplate = (templateType: string) => {
+  const handleApplyCustomPointTemplate = (templateOrType: string | Partial<CuttingCustomPointSpec>) => {
     const newId = `cp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     let newPoint: CuttingCustomPointSpec;
-    if (templateType === 'w2') {
+
+    if (typeof templateOrType === 'object') {
+      newPoint = {
+        id: newId,
+        name: templateOrType.name || 'จุดควบคุมพิเศษ',
+        unit: templateOrType.unit || 'mm',
+        evalType: templateOrType.evalType || 'target_tol',
+        target: templateOrType.target || '',
+        tolPlus: templateOrType.tolPlus || '',
+        tolMinus: templateOrType.tolMinus || '',
+        maxLimit: templateOrType.maxLimit || '',
+        minLimit: templateOrType.minLimit || '',
+        description: templateOrType.description || ''
+      };
+    } else if (templateOrType === 'w2') {
       newPoint = { id: newId, name: 'ความกว้าง W2 (Side Width)', unit: 'mm', evalType: 'target_tol', target: '25.00', tolPlus: '0.20', tolMinus: '0.20', description: 'วัดความกว้างปีกข้างตำแหน่งที่ 2' };
-    } else if (templateType === 'flange') {
+    } else if (templateOrType === 'flange') {
       newPoint = { id: newId, name: 'ความหนาปีก (Flange Thickness)', unit: 'mm', evalType: 'min_max', minLimit: '3.80', maxLimit: '4.20', description: 'ความหนาปีกหน้าแปลน' };
-    } else if (templateType === 'angle') {
+    } else if (templateOrType === 'angle') {
       newPoint = { id: newId, name: 'มุมตัด (Cut Angle / Chamfer)', unit: 'deg', evalType: 'target_tol', target: '45.00', tolPlus: '1.00', tolMinus: '1.00', description: 'มุมเอียงหน้าตัดชิ้นงาน' };
-    } else if (templateType === 'radius') {
+    } else if (templateOrType === 'radius') {
       newPoint = { id: newId, name: 'รัศมีมุม R (Corner Radius)', unit: 'mm', evalType: 'max_only', maxLimit: '2.50', description: 'ความโค้งรัศมีมุมตัด' };
-    } else if (templateType === 'pitch') {
+    } else if (templateOrType === 'pitch') {
       newPoint = { id: newId, name: 'ระยะ Pitch รูเจาะ (Hole Pitch)', unit: 'mm', evalType: 'target_tol', target: '50.00', tolPlus: '0.30', tolMinus: '0.30', description: 'ระยะกึ่งกลางระหว่างรู' };
-    } else if (templateType === 'flatness') {
+    } else if (templateOrType === 'flatness') {
       newPoint = { id: newId, name: 'ความเรียบผิว (Surface Flatness)', unit: 'mm', evalType: 'max_only', maxLimit: '0.30', description: 'ความเรียบแนวระนาบ' };
     } else {
       newPoint = { id: newId, name: 'จุดควบคุมพิเศษ', unit: 'mm', evalType: 'target_tol', target: '10.00', tolPlus: '0.10', tolMinus: '0.10', description: '' };
@@ -689,11 +751,19 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       date: new Date().toISOString().split('T')[0],
       profileName: '',
       partNo: '',
+      widthName: 'ความกว้าง (Width)',
       widthTarget: '', widthTolPlus: '', widthTolMinus: '',
+      heightName: 'ความสูง (Height)',
+      heightLeftName: 'ความสูงซ้าย H-Left',
+      heightRightName: 'ความสูงขวา H-Right',
       heightTarget: '', heightTolPlus: '', heightTolMinus: '',
+      lengthName: 'ความยาว (Length)',
       lengthTarget: '', lengthTolPlus: '', lengthTolMinus: '',
+      bendingName: 'ความโก่ง (Bending)',
       bendingMax: '',
+      camberName: 'ความคด (Camber)',
       camberMax: '',
+      twistName: 'ความบิด (Twist)',
       twistMax: '',
       customControlPoints: []
     });
@@ -726,17 +796,25 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     const newProfile: CuttingProfileSpec = {
       name: headerInfo.profileName.trim(),
       partNo: headerInfo.partNo,
+      widthName: headerInfo.widthName || 'ความกว้าง (Width)',
       widthTarget: headerInfo.widthTarget,
       widthTolPlus: headerInfo.widthTolPlus,
       widthTolMinus: headerInfo.widthTolMinus,
+      heightName: headerInfo.heightName || 'ความสูง (Height)',
+      heightLeftName: headerInfo.heightLeftName || 'ความสูงซ้าย H-Left',
+      heightRightName: headerInfo.heightRightName || 'ความสูงขวา H-Right',
       heightTarget: headerInfo.heightTarget,
       heightTolPlus: headerInfo.heightTolPlus,
       heightTolMinus: headerInfo.heightTolMinus,
+      lengthName: headerInfo.lengthName || 'ความยาว (Length)',
       lengthTarget: headerInfo.lengthTarget,
       lengthTolPlus: headerInfo.lengthTolPlus,
       lengthTolMinus: headerInfo.lengthTolMinus,
+      bendingName: headerInfo.bendingName || 'ความโก่ง (Bending)',
       bendingMax: headerInfo.bendingMax,
+      camberName: headerInfo.camberName || 'ความคด (Camber)',
       camberMax: headerInfo.camberMax,
+      twistName: headerInfo.twistName || 'ความบิด (Twist)',
       twistMax: headerInfo.twistMax,
       customControlPoints: headerInfo.customControlPoints
     };
@@ -816,7 +894,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       }
     }
 
-    const hasAnyCustomVal = Object.values(item.customPointValues || {}).some(v => v && v.trim() !== '');
+    const hasAnyCustomVal = Object.values(item.customPointValues || {}).some(v => v && String(v).trim() !== '');
     if (!item.sampleName && !item.width && !item.length && !hasAnyCustomVal) return 'Pending';
 
     return pass ? 'Pass' : 'Fail';
@@ -889,7 +967,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
   const saveBatch = () => {
     const validItems = batchItems.filter(item => {
-      const hasCustom = Object.values(item.customPointValues || {}).some(v => v && v.trim() !== '');
+      const hasCustom = Object.values(item.customPointValues || {}).some(v => v && String(v).trim() !== '');
       return (item.sampleName || item.width || item.length || hasCustom) && judgeStatus(item) !== 'Pending';
     });
 
@@ -941,7 +1019,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          moduleCode: 'IPQC-05',
+          moduleCode: 'IPQA-05',
           moduleTitleTh: 'ตรวจสอบขนาดตัดชิ้นงาน (Cutting Dimension & Dynamic Profile Points)',
           moduleTitleEn: 'Cutting Dimension & Dynamic Profile Points Inspection',
           inspector: headerInfo.inspectorName || 'Cutting Inspector',
@@ -951,7 +1029,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
           remarks: resText,
           coilNo: headerInfo.coilNo || 'COIL-N/A',
           profile: `${headerInfo.profileName} (${headerInfo.partNo || 'Part'})`,
-          process: `IPQC-05 Cutting Dimension (${headerInfo.machine || 'Line'})`,
+          process: `IPQA-05 Cutting Dimension (${headerInfo.machine || 'Line'})`,
           inspectionDate: now.toLocaleString('sv-SE').slice(0, 16),
           inspectionResult: resText
         });
@@ -1172,7 +1250,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
-                  IPQC-05
+                  IPQA-05
                 </span>
                 <h1 className="text-xl font-bold text-white tracking-tight">
                   {isTh ? 'การตรวจวัดขนาดจากการตัด (Cutting Dimension Measurement)' : 'Cutting Dimension System'}
@@ -1416,12 +1494,12 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
             {/* Loaded Target Limits Quick Bar */}
             <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800/80 text-xs space-y-2.5">
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-slate-300">
-                <div><span className="text-slate-500">Width:</span> <strong className="text-indigo-300">{headerInfo.widthTarget ? `${headerInfo.widthTarget} (+${headerInfo.widthTolPlus}/-${headerInfo.widthTolMinus}) mm` : '-'}</strong></div>
-                <div><span className="text-slate-500">Height:</span> <strong className="text-indigo-300">{headerInfo.heightTarget ? `${headerInfo.heightTarget} (+${headerInfo.heightTolPlus}/-${headerInfo.heightTolMinus}) mm` : '-'}</strong></div>
-                <div><span className="text-slate-500">Length:</span> <strong className="text-indigo-300">{headerInfo.lengthTarget ? `${headerInfo.lengthTarget} (+${headerInfo.lengthTolPlus}/-${headerInfo.lengthTolMinus}) mm` : '-'}</strong></div>
-                <div><span className="text-slate-500">Bending:</span> <strong className="text-amber-300">{headerInfo.bendingMax ? `≤ ${headerInfo.bendingMax} mm/m` : '-'}</strong></div>
-                <div><span className="text-slate-500">Camber:</span> <strong className="text-amber-300">{headerInfo.camberMax ? `≤ ${headerInfo.camberMax} mm/m` : '-'}</strong></div>
-                <div><span className="text-slate-500">Twist:</span> <strong className="text-amber-300">{headerInfo.twistMax ? `≤ ${headerInfo.twistMax} deg/m` : '-'}</strong></div>
+                <div><span className="text-slate-500">{headerInfo.widthName || 'Width'}:</span> <strong className="text-indigo-300">{headerInfo.widthTarget ? `${headerInfo.widthTarget} (+${headerInfo.widthTolPlus}/-${headerInfo.widthTolMinus}) mm` : '-'}</strong></div>
+                <div><span className="text-slate-500">{headerInfo.heightName || 'Height'}:</span> <strong className="text-indigo-300">{headerInfo.heightTarget ? `${headerInfo.heightTarget} (+${headerInfo.heightTolPlus}/-${headerInfo.heightTolMinus}) mm` : '-'}</strong></div>
+                <div><span className="text-slate-500">{headerInfo.lengthName || 'Length'}:</span> <strong className="text-indigo-300">{headerInfo.lengthTarget ? `${headerInfo.lengthTarget} (+${headerInfo.lengthTolPlus}/-${headerInfo.lengthTolMinus}) mm` : '-'}</strong></div>
+                <div><span className="text-slate-500">{headerInfo.bendingName || 'Bending'}:</span> <strong className="text-amber-300">{headerInfo.bendingMax ? `≤ ${headerInfo.bendingMax} mm/m` : '-'}</strong></div>
+                <div><span className="text-slate-500">{headerInfo.camberName || 'Camber'}:</span> <strong className="text-amber-300">{headerInfo.camberMax ? `≤ ${headerInfo.camberMax} mm/m` : '-'}</strong></div>
+                <div><span className="text-slate-500">{headerInfo.twistName || 'Twist'}:</span> <strong className="text-amber-300">{headerInfo.twistMax ? `≤ ${headerInfo.twistMax} deg/m` : '-'}</strong></div>
                 <div><span className="text-slate-500">Part No:</span> <strong className="text-purple-300">{headerInfo.partNo || '-'}</strong></div>
               </div>
 
@@ -1495,13 +1573,13 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                     <tr className="bg-slate-950 text-slate-400 font-bold border-b border-slate-800 text-[11px] uppercase">
                       <th className="p-2.5 w-10 text-center">#</th>
                       <th className="p-2.5 min-w-[130px]">{isTh ? 'ชื่อตัวอย่าง / Sample' : 'Sample Name'}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{isTh ? 'Width (mm)' : 'Width'}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{isTh ? 'H-Left (mm)' : 'Height L'}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{isTh ? 'H-Right (mm)' : 'Height R'}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{isTh ? 'Length (mm)' : 'Length'}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{isTh ? 'Bending (mm/m)' : 'Bending'}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{isTh ? 'Camber (mm/m)' : 'Camber'}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{isTh ? 'Twist (deg/m)' : 'Twist'}</th>
+                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.widthName || (isTh ? 'Width (mm)' : 'Width')}</th>
+                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.heightLeftName || (isTh ? 'H-Left (mm)' : 'Height L')}</th>
+                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.heightRightName || (isTh ? 'H-Right (mm)' : 'Height R')}</th>
+                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.lengthName || (isTh ? 'Length (mm)' : 'Length')}</th>
+                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.bendingName || (isTh ? 'Bending (mm/m)' : 'Bending')}</th>
+                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.camberName || (isTh ? 'Camber (mm/m)' : 'Camber')}</th>
+                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.twistName || (isTh ? 'Twist (deg/m)' : 'Twist')}</th>
                       
                       {/* Dynamic Columns for Custom Control Points */}
                       {headerInfo.customControlPoints?.map((cp) => (
@@ -1818,26 +1896,52 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
                 {/* Specification Limits Form */}
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
-                  <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
-                    {isTh ? 'กำหนดค่า Target และ Tolerance Limits' : 'Target & Tolerance Limits Configuration'}
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                      <span>{isTh ? 'กำหนดค่า Target, ค่าความคลาดเคลื่อน (Tolerance) และชื่อจุดวัด' : 'Target, Tolerance & Point Names Configuration'}</span>
+                    </h4>
+                    <span className="text-[10px] text-slate-400">
+                      {isTh ? '* สามารถแก้ไขชื่อจุดวัดและค่ามาตรฐานได้ตามต้องการ' : '* You can customize point names & standard limits'}
+                    </span>
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {/* Width Target/Tols */}
-                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
-                      <div className="text-[11px] font-bold text-indigo-300">Width Target (mm)</div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        name="widthTarget"
-                        value={headerInfo.widthTarget}
-                        onChange={handleHeaderChange}
-                        placeholder="100.00"
-                        className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
-                      />
+                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2.5">
+                      <div>
+                        <label className="text-[10px] font-bold text-indigo-300 uppercase block mb-1 flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-indigo-400" />
+                          <span>{isTh ? '1. ชื่อจุดวัดความกว้าง (Width Name)' : '1. Width Point Name'}</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="widthName"
+                          value={headerInfo.widthName}
+                          onChange={handleHeaderChange}
+                          placeholder={isTh ? 'ความกว้าง W (Width)' : 'Width (mm)'}
+                          className="w-full bg-slate-950 border border-slate-800 text-indigo-200 font-semibold text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                          {isTh ? 'ค่ามาตรฐานความกว้าง (Target mm)' : 'Width Target (mm)'}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="widthTarget"
+                          value={headerInfo.widthTarget}
+                          onChange={handleHeaderChange}
+                          placeholder="100.00"
+                          className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 font-mono font-semibold"
+                        />
+                      </div>
+
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <span className="text-[9px] text-slate-400">+ Tol</span>
+                          <span className="text-[9px] font-bold text-emerald-400 block mb-0.5">+ Tol (mm)</span>
                           <input
                             type="number"
                             step="0.01"
@@ -1845,11 +1949,11 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                             value={headerInfo.widthTolPlus}
                             onChange={handleHeaderChange}
                             placeholder="0.50"
-                            className="w-full bg-slate-950 border border-slate-800 text-emerald-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-emerald-500"
+                            className="w-full bg-slate-950 border border-slate-800 text-emerald-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-emerald-500 font-mono font-semibold"
                           />
                         </div>
                         <div>
-                          <span className="text-[9px] text-slate-400">- Tol</span>
+                          <span className="text-[9px] font-bold text-rose-400 block mb-0.5">- Tol (mm)</span>
                           <input
                             type="number"
                             step="0.01"
@@ -1857,27 +1961,47 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                             value={headerInfo.widthTolMinus}
                             onChange={handleHeaderChange}
                             placeholder="0.50"
-                            className="w-full bg-slate-950 border border-slate-800 text-rose-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-rose-500"
+                            className="w-full bg-slate-950 border border-slate-800 text-rose-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-rose-500 font-mono font-semibold"
                           />
                         </div>
                       </div>
                     </div>
 
                     {/* Height Target/Tols */}
-                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
-                      <div className="text-[11px] font-bold text-indigo-300">Height Target (mm)</div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        name="heightTarget"
-                        value={headerInfo.heightTarget}
-                        onChange={handleHeaderChange}
-                        placeholder="50.00"
-                        className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
-                      />
+                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2.5">
+                      <div>
+                        <label className="text-[10px] font-bold text-indigo-300 uppercase block mb-1 flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-indigo-400" />
+                          <span>{isTh ? '2. ชื่อจุดวัดความสูง (Height Name)' : '2. Height Point Name'}</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="heightName"
+                          value={headerInfo.heightName}
+                          onChange={handleHeaderChange}
+                          placeholder={isTh ? 'ความสูง H (Height)' : 'Height (mm)'}
+                          className="w-full bg-slate-950 border border-slate-800 text-indigo-200 font-semibold text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                          {isTh ? 'ค่ามาตรฐานความสูง (Target mm)' : 'Height Target (mm)'}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="heightTarget"
+                          value={headerInfo.heightTarget}
+                          onChange={handleHeaderChange}
+                          placeholder="50.00"
+                          className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 font-mono font-semibold"
+                        />
+                      </div>
+
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <span className="text-[9px] text-slate-400">+ Tol</span>
+                          <span className="text-[9px] font-bold text-emerald-400 block mb-0.5">+ Tol (mm)</span>
                           <input
                             type="number"
                             step="0.01"
@@ -1885,11 +2009,11 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                             value={headerInfo.heightTolPlus}
                             onChange={handleHeaderChange}
                             placeholder="0.30"
-                            className="w-full bg-slate-950 border border-slate-800 text-emerald-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-emerald-500"
+                            className="w-full bg-slate-950 border border-slate-800 text-emerald-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-emerald-500 font-mono font-semibold"
                           />
                         </div>
                         <div>
-                          <span className="text-[9px] text-slate-400">- Tol</span>
+                          <span className="text-[9px] font-bold text-rose-400 block mb-0.5">- Tol (mm)</span>
                           <input
                             type="number"
                             step="0.01"
@@ -1897,27 +2021,47 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                             value={headerInfo.heightTolMinus}
                             onChange={handleHeaderChange}
                             placeholder="0.30"
-                            className="w-full bg-slate-950 border border-slate-800 text-rose-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-rose-500"
+                            className="w-full bg-slate-950 border border-slate-800 text-rose-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-rose-500 font-mono font-semibold"
                           />
                         </div>
                       </div>
                     </div>
 
                     {/* Length Target/Tols */}
-                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
-                      <div className="text-[11px] font-bold text-indigo-300">Length Target (mm)</div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        name="lengthTarget"
-                        value={headerInfo.lengthTarget}
-                        onChange={handleHeaderChange}
-                        placeholder="2000.00"
-                        className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
-                      />
+                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2.5">
+                      <div>
+                        <label className="text-[10px] font-bold text-indigo-300 uppercase block mb-1 flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-indigo-400" />
+                          <span>{isTh ? '3. ชื่อจุดวัดความยาว (Length Name)' : '3. Length Point Name'}</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="lengthName"
+                          value={headerInfo.lengthName}
+                          onChange={handleHeaderChange}
+                          placeholder={isTh ? 'ความยาวตัด L (Length)' : 'Length (mm)'}
+                          className="w-full bg-slate-950 border border-slate-800 text-indigo-200 font-semibold text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                          {isTh ? 'ค่ามาตรฐานความยาว (Target mm)' : 'Length Target (mm)'}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="lengthTarget"
+                          value={headerInfo.lengthTarget}
+                          onChange={handleHeaderChange}
+                          placeholder="2000.00"
+                          className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 font-mono font-semibold"
+                        />
+                      </div>
+
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <span className="text-[9px] text-slate-400">+ Tol</span>
+                          <span className="text-[9px] font-bold text-emerald-400 block mb-0.5">+ Tol (mm)</span>
                           <input
                             type="number"
                             step="0.01"
@@ -1925,11 +2069,11 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                             value={headerInfo.lengthTolPlus}
                             onChange={handleHeaderChange}
                             placeholder="2.00"
-                            className="w-full bg-slate-950 border border-slate-800 text-emerald-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-emerald-500"
+                            className="w-full bg-slate-950 border border-slate-800 text-emerald-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-emerald-500 font-mono font-semibold"
                           />
                         </div>
                         <div>
-                          <span className="text-[9px] text-slate-400">- Tol</span>
+                          <span className="text-[9px] font-bold text-rose-400 block mb-0.5">- Tol (mm)</span>
                           <input
                             type="number"
                             step="0.01"
@@ -1937,7 +2081,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                             value={headerInfo.lengthTolMinus}
                             onChange={handleHeaderChange}
                             placeholder="2.00"
-                            className="w-full bg-slate-950 border border-slate-800 text-rose-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-rose-500"
+                            className="w-full bg-slate-950 border border-slate-800 text-rose-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-rose-500 font-mono font-semibold"
                           />
                         </div>
                       </div>
@@ -1946,43 +2090,103 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
                   {/* Bending, Camber, Twist Maximum Limits */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
-                      <div className="text-[11px] font-bold text-amber-300">Bending Max Limit (mm/m)</div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        name="bendingMax"
-                        value={headerInfo.bendingMax}
-                        onChange={handleHeaderChange}
-                        placeholder="1.50"
-                        className="w-full bg-slate-950 border border-slate-800 text-amber-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 font-bold"
-                      />
+                    {/* Bending */}
+                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2.5">
+                      <div>
+                        <label className="text-[10px] font-bold text-amber-300 uppercase block mb-1 flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-amber-400" />
+                          <span>{isTh ? '4. ชื่อจุดวัดความโก่ง (Bending Name)' : '4. Bending Name'}</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="bendingName"
+                          value={headerInfo.bendingName}
+                          onChange={handleHeaderChange}
+                          placeholder={isTh ? 'ความโก่ง Bending' : 'Bending (mm/m)'}
+                          className="w-full bg-slate-950 border border-slate-800 text-amber-200 font-semibold text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                          {isTh ? 'ค่าสูงสุดที่ยอมรับได้ (≤ Max mm/m)' : 'Bending Max Limit (≤ mm/m)'}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="bendingMax"
+                          value={headerInfo.bendingMax}
+                          onChange={handleHeaderChange}
+                          placeholder="1.50"
+                          className="w-full bg-slate-950 border border-slate-800 text-amber-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 font-bold font-mono"
+                        />
+                      </div>
                     </div>
 
-                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
-                      <div className="text-[11px] font-bold text-amber-300">Camber Max Limit (mm/m)</div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        name="camberMax"
-                        value={headerInfo.camberMax}
-                        onChange={handleHeaderChange}
-                        placeholder="1.00"
-                        className="w-full bg-slate-950 border border-slate-800 text-amber-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 font-bold"
-                      />
+                    {/* Camber */}
+                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2.5">
+                      <div>
+                        <label className="text-[10px] font-bold text-amber-300 uppercase block mb-1 flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-amber-400" />
+                          <span>{isTh ? '5. ชื่อจุดวัดความคด (Camber Name)' : '5. Camber Name'}</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="camberName"
+                          value={headerInfo.camberName}
+                          onChange={handleHeaderChange}
+                          placeholder={isTh ? 'ความคด Camber' : 'Camber (mm/m)'}
+                          className="w-full bg-slate-950 border border-slate-800 text-amber-200 font-semibold text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                          {isTh ? 'ค่าสูงสุดที่ยอมรับได้ (≤ Max mm/m)' : 'Camber Max Limit (≤ mm/m)'}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="camberMax"
+                          value={headerInfo.camberMax}
+                          onChange={handleHeaderChange}
+                          placeholder="1.00"
+                          className="w-full bg-slate-950 border border-slate-800 text-amber-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 font-bold font-mono"
+                        />
+                      </div>
                     </div>
 
-                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
-                      <div className="text-[11px] font-bold text-purple-300">Twist Max Limit (deg/m)</div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        name="twistMax"
-                        value={headerInfo.twistMax}
-                        onChange={handleHeaderChange}
-                        placeholder="0.50"
-                        className="w-full bg-slate-950 border border-slate-800 text-purple-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-purple-500 font-bold"
-                      />
+                    {/* Twist */}
+                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2.5">
+                      <div>
+                        <label className="text-[10px] font-bold text-purple-300 uppercase block mb-1 flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-purple-400" />
+                          <span>{isTh ? '6. ชื่อจุดวัดความบิด (Twist Name)' : '6. Twist Name'}</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="twistName"
+                          value={headerInfo.twistName}
+                          onChange={handleHeaderChange}
+                          placeholder={isTh ? 'ความบิด Twist' : 'Twist (deg/m)'}
+                          className="w-full bg-slate-950 border border-slate-800 text-purple-200 font-semibold text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                          {isTh ? 'ค่าสูงสุดที่ยอมรับได้ (≤ Max deg/m)' : 'Twist Max Limit (≤ deg/m)'}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="twistMax"
+                          value={headerInfo.twistMax}
+                          onChange={handleHeaderChange}
+                          placeholder="0.50"
+                          className="w-full bg-slate-950 border border-slate-800 text-purple-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-purple-500 font-bold font-mono"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2554,8 +2758,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
               </h3>
               <p className="text-xs text-slate-400">
                 {isTh 
-                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQC-05 (Password: admin2026)' 
-                  : 'Enter password to edit IPQC-05 record (Password: admin2026)'}
+                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQA-05 (Password: admin2026)' 
+                  : 'Enter password to edit IPQA-05 record (Password: admin2026)'}
               </p>
             </div>
 
@@ -2609,7 +2813,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">
-                    {isTh ? 'แก้ไขข้อมูลมิติตัด (IPQC-05)' : 'Edit Cutting Dimension Record'}
+                    {isTh ? 'แก้ไขข้อมูลมิติตัด (IPQA-05)' : 'Edit Cutting Dimension Record'}
                   </h3>
                   <p className="text-xs text-slate-400 font-mono">
                     Coil: {editingHistoryItem.lotNumber} | ID: {editingHistoryItem.id}

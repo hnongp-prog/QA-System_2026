@@ -87,7 +87,7 @@ const INITIAL_HISTORY: ZnWireInspectionRecord[] = [
     heat_number: "H2026-ZN-801",
     grade: "ZN-99.99",
     supplier: "Siam Zinc Wire Metallic Co., Ltd.",
-    inspector_name: "Somchai K. (IQC)",
+    inspector_name: "Somchai K. (IQA)",
     drum: "DRUM-01",
     batch_no: "BATCH-A1",
     po_no: "PO-2026-0810",
@@ -116,7 +116,7 @@ const INITIAL_HISTORY: ZnWireInspectionRecord[] = [
     heat_number: "H2026-ZN-802",
     grade: "ZN-WIRE-STD",
     supplier: "Pacific Metal Alloys Ltd.",
-    inspector_name: "Somchai K. (IQC)",
+    inspector_name: "Somchai K. (IQA)",
     drum: "DRUM-02",
     batch_no: "BATCH-A2",
     po_no: "PO-2026-0812",
@@ -324,7 +324,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
         heat_number: "H2026-ZN-905",
         grade: "ZN-99.99",
         supplier: "Siam Zinc Wire Metallic Co., Ltd.",
-        inspector_name: "Anan S. (IQC)",
+        inspector_name: "Anan S. (IQA)",
         drum: "DRUM-05",
         batch_no: "BATCH-Z1",
         po_no: "PO-2026-0901",
@@ -348,7 +348,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
         heat_number: "H2026-ZN-906",
         grade: "ZN-WIRE-STD",
         supplier: "Siam Zinc Wire Metallic Co., Ltd.",
-        inspector_name: "Anan S. (IQC)",
+        inspector_name: "Anan S. (IQA)",
         drum: "DRUM-06",
         batch_no: "BATCH-Z2",
         po_no: "PO-2026-0901",
@@ -483,7 +483,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          moduleCode: 'IQC-03',
+          moduleCode: 'IQA-03',
           moduleTitleTh: 'ตรวจรับลวดสังกะสี (Zn Wire Incoming Inspection)',
           moduleTitleEn: 'Zn Wire Incoming Inspection & COA OCR System',
           inspector: item.inspector_name || 'Zn Wire Inspector',
@@ -493,7 +493,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
           remarks: resultDesc,
           coilNo: item.heat_number || `DRUM-${item.drum}` || 'ZN-COIL-N/A',
           profile: `Zn Wire ${item.grade} (${item.wire_size || '2.0mm'})`,
-          process: 'IQC-03 Zn Wire Incoming Inspection',
+          process: 'IQA-03 Zn Wire Incoming Inspection',
           inspectionDate: now.toLocaleString('sv-SE').slice(0, 16),
           inspectionResult: resultDesc
         });
@@ -618,7 +618,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
     const judgement = item.judgement || performJudgement(item);
     const dateStr = item.timestamp || new Date().toLocaleString('th-TH');
 
-    const qrData = `APP:IQC-03\nHEAT:${item.heat_number}\nGRADE:${item.grade}\nPO:${item.po_no || '-'}\nJUDGEMENT:${judgement}`;
+    const qrData = `APP:IQA-03\nHEAT:${item.heat_number}\nGRADE:${item.grade}\nPO:${item.po_no || '-'}\nJUDGEMENT:${judgement}`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}`;
 
     const printWindow = window.open('', '_blank', 'width=500,height=400');
@@ -675,7 +675,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
             <div class="status-stamp">${judgement}</div>
             <div class="tag-header">
               <div class="tag-title">ZN WIRE IDENTIFICATION TAG</div>
-              <div class="tag-subtitle">IQC-03 INCOMING QUALITY CERTIFIED</div>
+              <div class="tag-subtitle">IQA-03 INCOMING QUALITY CERTIFIED</div>
             </div>
             <div class="tag-body">
               <div class="qr-area">
@@ -690,7 +690,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                 <div><span class="info-label">SUPPLIER:</span> ${item.supplier || '-'}</div>
               </div>
             </div>
-            <div class="footer">Verified by IQC-03 System | ${dateStr}</div>
+            <div class="footer">Verified by IQA-03 System | ${dateStr}</div>
           </div>
         </body>
       </html>
@@ -935,7 +935,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                     ? 'bg-indigo-100 text-indigo-800 border-indigo-200' 
                     : 'bg-indigo-950 text-indigo-300 border-indigo-800'
                 }`}>
-                  IQC-03
+                  IQA-03
                 </span>
                 <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? 'ตรวจรับลวดสังกะสี (Zn Wire Incoming Inspection)' : 'Zn Wire Incoming Inspection'}
@@ -1729,7 +1729,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">
-                    {isTh ? 'แก้ไขข้อมูลการตรวจรับ IQC-03' : 'Edit IQC-03 Inspection Record'}
+                    {isTh ? 'แก้ไขข้อมูลการตรวจรับ IQA-03' : 'Edit IQA-03 Inspection Record'}
                   </h3>
                   <p className="text-xs text-slate-400 font-mono">
                     Heat No: {editingHistoryItem.heat_number} | ID: {editingHistoryItem.id}

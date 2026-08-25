@@ -655,7 +655,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          moduleCode: 'IPQC-03',
+          moduleCode: 'IPQA-03',
           moduleTitleTh: 'การตรวจวัดด้วยรังสีเอกซ์ (X-Ray Measurement)',
           moduleTitleEn: 'X-Ray Coating Weight & Coverage Measurement System',
           inspector: headerInfo.inspectorName || 'X-Ray Technician',
@@ -891,7 +891,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                 <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
                   isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-950 text-indigo-300 border-indigo-800'
                 }`}>
-                  IPQC-03
+                  IPQA-03
                 </span>
                 <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? 'ระบบตรวจวัดด้วยรังสีเอกซ์ (X-Ray Measurement)' : 'X-Ray Measurement System'}
@@ -1835,8 +1835,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
               </h3>
               <p className="text-xs text-slate-400">
                 {isTh 
-                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQC-03 (Password: admin2026)' 
-                  : 'Enter password to edit IPQC-03 record (Password: admin2026)'}
+                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQA-03 (Password: admin2026)' 
+                  : 'Enter password to edit IPQA-03 record (Password: admin2026)'}
               </p>
             </div>
 
@@ -1890,7 +1890,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">
-                    {isTh ? 'แก้ไขข้อมูลการตรวจวัดรังสีเอกซ์ (IPQC-03)' : 'Edit X-Ray Measurement Record'}
+                    {isTh ? 'แก้ไขข้อมูลการตรวจวัดรังสีเอกซ์ (IPQA-03)' : 'Edit X-Ray Measurement Record'}
                   </h3>
                   <p className="text-xs text-slate-400 font-mono">
                     Coil: {editingHistoryItem.lotNumber} | ID: {editingHistoryItem.id}

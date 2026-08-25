@@ -306,10 +306,10 @@ export async function callGeminiVisionClientSide(
 }
 
 /**
- * IQC-01: Billet Incoming Inspection Cert Analysis (Client-side)
+ * IQA-01: Billet Incoming Inspection Cert Analysis (Client-side)
  */
 export async function analyzeBilletCertClient(base64Image: string, mimeType: string = "image/png") {
-  const systemPrompt = `You are an expert Quality Control AI for Metal Mill Test Certificates / Inspection Reports (Billet Incoming Inspection IQC-01).
+  const systemPrompt = `You are an expert Quality Control AI for Metal Mill Test Certificates / Inspection Reports (Billet Incoming Inspection IQA-01).
 Analyze the uploaded document image or PDF carefully and extract ALL real information visible in the document for EVERY Heat Number / Lot found.
 
 IMPORTANT INSTRUCTIONS:
@@ -413,10 +413,10 @@ IMPORTANT INSTRUCTIONS:
 }
 
 /**
- * IQC-02: Coating Chemical Incoming Inspection Cert Analysis (Client-side)
+ * IQA-02: Coating Chemical Incoming Inspection Cert Analysis (Client-side)
  */
 export async function analyzeChemicalCertClient(base64Image: string, mimeType: string = "image/png") {
-  const systemPrompt = `You are an expert Quality Control AI for Coating Chemical Mill Certificate / COA / Certificate of Analysis (Coating Chemical Incoming Inspection IQC-02).
+  const systemPrompt = `You are an expert Quality Control AI for Coating Chemical Mill Certificate / COA / Certificate of Analysis (Coating Chemical Incoming Inspection IQA-02).
 Analyze the uploaded image or PDF page carefully and extract ALL visible header information and ALL chemical test measurement rows.
 
 Return ONLY a valid JSON object with top-level keys "header" and "table":
@@ -496,10 +496,10 @@ IMPORTANT:
 }
 
 /**
- * IQC-03: Zn Wire Incoming Inspection Cert Analysis (Client-side)
+ * IQA-03: Zn Wire Incoming Inspection Cert Analysis (Client-side)
  */
 export async function analyzeZnWireCertClient(base64Image: string, mimeType: string = "image/png") {
-  const systemPrompt = `You are an expert Quality Control AI for Zn Wire Mill Test Certificates / COA (Zn Wire Incoming Inspection IQC-03).
+  const systemPrompt = `You are an expert Quality Control AI for Zn Wire Mill Test Certificates / COA (Zn Wire Incoming Inspection IQA-03).
 Analyze the image or PDF document and extract ALL data for EVERY lot/item/drum found in the document.
 Return ONLY valid JSON format with top-level array "items" or a root array.
 Each object must have the following keys:
@@ -561,7 +561,7 @@ Each object must have the following keys:
 }
 
 /**
- * OQC-01: FG Pre-Shipment Label 2-Step Inspection (Client-side)
+ * OQA-01: FG Pre-Shipment Label 2-Step Inspection (Client-side)
  */
 export async function analyzeFgPreShipmentLabelClient(
   testBase64: string,
@@ -652,10 +652,10 @@ Return ONLY valid JSON format:
 }
 
 /**
- * IPQC-07: Thickness Wall Measurement Extraction (Client-side)
+ * IPQA-07: Thickness Wall Measurement Extraction (Client-side)
  */
 export async function extractThicknessWallClient(fileBase64: string, mimeType: string = "image/png") {
-  const prompt = `You are a high-precision QA/QC Inspection AI reading a Thickness Wall Measurement Report / IPQC-07 Inspection Drawing/Sheet.
+  const prompt = `You are a high-precision QA/QC Inspection AI reading a Thickness Wall Measurement Report / IPQA-07 Inspection Drawing/Sheet.
 
 Analyze the uploaded document image or PDF carefully and extract ALL real information visible in the document into valid JSON format:
 

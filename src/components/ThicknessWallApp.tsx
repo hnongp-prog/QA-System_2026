@@ -272,13 +272,13 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // Load Demo IPQC-07 Document
+  // Load Demo IPQA-07 Document
   const loadDemoDocument = () => {
     const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800" fill="none">
     <rect width="600" height="800" fill="#0f172a"/>
     <rect x="20" y="20" width="560" height="760" rx="12" fill="#1e293b" stroke="#334155" stroke-width="2"/>
     <rect x="40" y="40" width="520" height="60" rx="8" fill="#334155"/>
-    <text x="60" y="75" fill="#f8fafc" font-family="sans-serif" font-size="18" font-weight="bold">QUALITY CONTROL INSPECTION REPORT (IPQC-07)</text>
+    <text x="60" y="75" fill="#f8fafc" font-family="sans-serif" font-size="18" font-weight="bold">QUALITY ASSURANCE INSPECTION REPORT (IPQA-07)</text>
     <text x="60" y="92" fill="#94a3b8" font-family="sans-serif" font-size="11">THICKNESS &amp; WALL MEASUREMENT SPECIFICATION</text>
     <rect x="40" y="115" width="250" height="90" rx="6" fill="#0f172a" stroke="#475569"/>
     <text x="55" y="140" fill="#cbd5e1" font-family="sans-serif" font-size="12">Inspector: Kitti M.</text>
@@ -287,7 +287,7 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
     <rect x="310" y="115" width="250" height="90" rx="6" fill="#0f172a" stroke="#475569"/>
     <text x="325" y="140" fill="#cbd5e1" font-family="sans-serif" font-size="12">Profile: A-001</text>
     <text x="325" y="162" fill="#cbd5e1" font-family="sans-serif" font-size="12">Sample ID: SAMPLE-A1</text>
-    <text x="325" y="184" fill="#38bdf8" font-family="sans-serif" font-size="12" font-weight="bold">Status: IPQC PASS</text>
+    <text x="325" y="184" fill="#38bdf8" font-family="sans-serif" font-size="12" font-weight="bold">Status: IPQA PASS</text>
     <rect x="40" y="220" width="520" height="180" rx="8" fill="#0f172a" stroke="#334155"/>
     <circle cx="300" cy="310" r="70" stroke="#38bdf8" stroke-width="3" fill="none"/>
     <circle cx="300" cy="310" r="50" stroke="#818cf8" stroke-width="3" stroke-dasharray="4 4" fill="none"/>
@@ -313,7 +313,7 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
     </g>
   </svg>`;
     const dataUri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgContent)));
-    setFileName('IPQC-07_Sample_Report.svg');
+    setFileName('IPQA-07_Sample_Report.svg');
     setFileMimeType('image/svg+xml');
     setPreviewUrl(dataUri);
     const b64 = btoa(unescape(encodeURIComponent(svgContent)));
@@ -348,7 +348,7 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
   // AI Data Extraction (Client-side)
   const processFileWithAI = async () => {
     if (!currentFileBase64) {
-      alert(isTh ? 'กรุณาเลือกหรืออัปโหลดเอกสาร IPQC-07 ก่อนทำการสกัดข้อมูล' : 'Please upload or select an IPQC-07 document before scanning.');
+      alert(isTh ? 'กรุณาเลือกหรืออัปโหลดเอกสาร IPQA-07 ก่อนทำการสกัดข้อมูล' : 'Please upload or select an IPQA-07 document before scanning.');
       return;
     }
 
@@ -593,17 +593,17 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
       onLogNewActivity({
         id: newRecord.docId!,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        moduleCode: 'IPQC-07',
+        moduleCode: 'IPQA-07',
         moduleTitleTh: 'วัดความหนาผนังชิ้นงาน (Thickness Wall Measurement)',
         moduleTitleEn: 'Thickness Wall Measurement System',
-        inspector: inspectorInput || 'IPQC Inspector',
+        inspector: inspectorInput || 'IPQA Inspector',
         batchLot: `Coil: ${coilInput || '-'} (Profile: ${profileInput || '-'})`,
         result: allPassed ? 'PASS' : 'REJECT',
         defectCount: allPassed ? 0 : tableItems.filter(i => i.status === 'FAIL').length || 1,
         remarks: inspectionResultText,
         coilNo: coilInput || 'UNKNOWN-COIL',
         profile: profileInput || 'PROFILE-SPEC',
-        process: processInput ? `${processInput} (IPQC-07)` : 'Line A - Extrusion (IPQC-07)',
+        process: processInput ? `${processInput} (IPQA-07)` : 'Line A - Extrusion (IPQA-07)',
         inspectionDate: newRecord.timestamp,
         inspectionResult: inspectionResultText
       });
@@ -808,7 +808,7 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
-                  IPQC-07
+                  IPQA-07
                 </span>
                 <h1 className="text-xl font-bold text-white tracking-tight">
                   {isTh ? 'ระบบวัดความหนาผนังชิ้นงาน (Thickness Wall Measurement)' : 'Thickness Wall Measure System'}
@@ -1564,7 +1564,7 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
                 ยืนยันรหัสผ่านเพื่อแก้ไขข้อมูล
               </h3>
               <p className="text-xs text-slate-400">
-                กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQC-07 (Password: admin2026)
+                กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQA-07 (Password: admin2026)
               </p>
             </div>
 
@@ -1618,7 +1618,7 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">
-                    แก้ไขข้อมูล Thickness & Wall (IPQC-07)
+                    แก้ไขข้อมูล Thickness & Wall (IPQA-07)
                   </h3>
                   <p className="text-xs text-slate-400 font-mono">
                     Coil: {editingHistoryItem.coil} | ID: {editingHistoryItem.id}

@@ -139,7 +139,7 @@ const INITIAL_HISTORY: BilletInspectionItem[] = [
     billet_size: "5 inch (127 mm)",
     grade: "6063",
     supplier_name: "Siam Aluminum Industry",
-    inspector_name: "Anucha S. (IQC Inspector)",
+    inspector_name: "Anucha S. (IQA Inspector)",
     batch_no: "BATCH-A-442",
     invoice_no: "INV-2026-0801",
     diameter: "127.2 mm",
@@ -167,7 +167,7 @@ const INITIAL_HISTORY: BilletInspectionItem[] = [
     billet_size: "6 inch (152 mm)",
     grade: "6061",
     supplier_name: "Metal Tech Extrusions",
-    inspector_name: "Somchai R. (IQC Lead)",
+    inspector_name: "Somchai R. (IQA Lead)",
     batch_no: "BATCH-B-108",
     invoice_no: "INV-2026-0804",
     diameter: "152.0 mm",
@@ -341,7 +341,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
         billet_size: '5 inch (127 mm)',
         grade: '6063',
         supplier_name: 'Siam Aluminum Co., Ltd.',
-        inspector_name: 'Anucha S. (IQC)',
+        inspector_name: 'Anucha S. (IQA)',
         batch_no: `BATCH-A-${Math.floor(100 + Math.random() * 900)}`,
         invoice_no: `INV-2026-${Math.floor(500 + Math.random() * 500)}`,
         diameter: '127.0 mm',
@@ -363,7 +363,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
         billet_size: '6 inch (152 mm)',
         grade: '6061',
         supplier_name: 'Metal Tech Extrusions',
-        inspector_name: 'Somchai R. (IQC)',
+        inspector_name: 'Somchai R. (IQA)',
         batch_no: `BATCH-B-${Math.floor(100 + Math.random() * 900)}`,
         invoice_no: `INV-2026-${Math.floor(500 + Math.random() * 500)}`,
         diameter: '152.0 mm',
@@ -468,17 +468,17 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
         onLogNewActivity({
           id: entryId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          moduleCode: 'IQC-01',
+          moduleCode: 'IQA-01',
           moduleTitleTh: 'ตรวจรับวัตถุดิบและชิ้นส่วน Billet',
           moduleTitleEn: 'Billet Incoming Inspection',
-          inspector: item.inspector_name || 'IQC Inspector',
+          inspector: item.inspector_name || 'IQA Inspector',
           batchLot: `${item.heat_number} (${item.grade})`,
           result: jg === 'PASS' ? 'PASS' : 'REJECT',
           defectCount: jg === 'FAIL' ? 1 : 0,
           remarks: resultDesc,
           coilNo: item.heat_number || item.batch_no || 'HEAT-N/A',
           profile: `Billet ${item.grade} (${item.billet_size || 'Size N/A'})`,
-          process: 'IQC-01 Billet Incoming Inspection',
+          process: 'IQA-01 Billet Incoming Inspection',
           inspectionDate: item.timestamp || now.toLocaleString('sv-SE').slice(0, 16),
           inspectionResult: resultDesc
         });
@@ -590,7 +590,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   // Verify password and perform delete
   const handleVerifyDeletePassword = (e: React.FormEvent) => {
     e.preventDefault();
-    if (deleteAuthPassword === "admin2026") {
+    if (deleteAuthPassword === "admin2026" || (isAdminAuthenticated && targetDeleteGrade)) {
       if (targetDeleteHistoryItem) {
         const heatNo = targetDeleteHistoryItem.heat_number;
         setHistory(prev => prev.filter(h => h.id !== targetDeleteHistoryItem.id));
@@ -599,10 +599,11 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
           message: isTh ? `ลบประวัติการตรวจรับ Heat No. ${heatNo} เรียบร้อยแล้ว` : `Deleted inspection record for Heat No. ${heatNo}`
         });
       } else if (targetDeleteGrade) {
-        deleteGrade(targetDeleteGrade);
+        const gradeName = targetDeleteGrade;
+        deleteGrade(gradeName);
         setStatus({
-          type: 'info',
-          message: isTh ? `ลบ Grade Specification ${targetDeleteGrade} เรียบร้อยแล้ว` : `Deleted Grade Spec ${targetDeleteGrade}`
+          type: 'success',
+          message: isTh ? `ลบเกณฑ์มาตรฐานเกรด ${gradeName} เรียบร้อยแล้ว` : `Deleted Grade Spec ${gradeName} successfully`
         });
       }
       setIsDeleteAuthOpen(false);
@@ -679,7 +680,8 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
       return newState;
     });
     if (editingGrade === gradeToDelete) {
-      setEditingGrade("");
+      const remaining = Object.keys(gradeSpecs).filter(g => g !== gradeToDelete && g !== "NEW_GRADE_PENDING");
+      setEditingGrade(remaining.length > 0 ? remaining[0] : "");
     }
   };
 
@@ -809,7 +811,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                 <div><strong>STATUS:</strong> <span class="badge">${jg}</span></div>
               </div>
             </div>
-            <div class="footer">QA Inspection System • IQC-01 Billet Incoming Verification</div>
+            <div class="footer">QA Inspection System • IQA-01 Billet Incoming Verification</div>
           </div>
           <script>
             window.onload = function() { window.print(); window.close(); };
@@ -858,7 +860,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                     ? 'bg-blue-50 text-blue-700 border-blue-200'
                     : 'bg-blue-950 text-blue-300 border-blue-800'
                 }`}>
-                  IQC-01
+                  IQA-01
                 </span>
                 <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? 'ระบบตรวจรับวัตถุดิบ Billet (Billet Incoming Inspection)' : 'Billet Incoming Inspection System'}
@@ -1575,374 +1577,6 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               </table>
             </div>
           </div>
-
-          {/* PASSWORD PROMPT MODAL FOR DELETING RECORD / GRADE */}
-          {isDeleteAuthOpen && (
-            <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
-              isLight ? 'bg-slate-900/40 backdrop-blur-xs' : 'bg-slate-950/80 backdrop-blur-sm'
-            }`}>
-              <div className={`rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative border ${
-                isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
-              }`}>
-                <button 
-                  onClick={() => setIsDeleteAuthOpen(false)} 
-                  className={`absolute top-4 right-4 ${isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto border ${
-                  isLight 
-                    ? 'bg-rose-50 border-rose-200 text-rose-600' 
-                    : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                }`}>
-                  <Trash2 className="w-6 h-6" />
-                </div>
-                <div className="text-center space-y-1">
-                  <h4 className={`font-bold text-base ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                    {isTh ? 'ยืนยันรหัสผ่านเพื่อลบข้อมูล' : 'Password Required for Deletion'}
-                  </h4>
-                  <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {targetDeleteHistoryItem ? (
-                      isTh 
-                        ? `ต้องการลบประวัติ Heat No. ${targetDeleteHistoryItem.heat_number} กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน` 
-                        : `Enter admin password admin2026 to delete Heat No. ${targetDeleteHistoryItem.heat_number}`
-                    ) : (
-                      isTh 
-                        ? `ต้องการลบ Grade Spec ${targetDeleteGrade} กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน` 
-                        : `Enter admin password admin2026 to delete Grade Spec ${targetDeleteGrade}`
-                    )}
-                  </p>
-                </div>
-
-                <form onSubmit={handleVerifyDeletePassword} className="space-y-3">
-                  <input
-                    type="password"
-                    autoFocus
-                    placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
-                    value={deleteAuthPassword}
-                    onChange={(e) => setDeleteAuthPassword(e.target.value)}
-                    className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
-                      isLight
-                        ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-rose-500'
-                        : 'bg-slate-950 border-slate-800 text-white focus:border-rose-500'
-                    }`}
-                  />
-                  {deleteAuthError && (
-                    <p className="text-xs text-rose-500 font-semibold text-center">
-                      {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
-                    </p>
-                  )}
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsDeleteAuthOpen(false)}
-                      className={`flex-1 font-bold text-xs py-2.5 rounded-xl transition ${
-                        isLight
-                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                      }`}
-                    >
-                      {isTh ? 'ยกเลิก' : 'Cancel'}
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-xs"
-                    >
-                      {isTh ? 'ยืนยันลบข้อมูล' : 'Verify & Delete'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* PASSWORD PROMPT MODAL FOR EDITING HISTORY */}
-          {isHistoryAuthOpen && (
-            <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
-              isLight ? 'bg-slate-900/40 backdrop-blur-xs' : 'bg-slate-950/80 backdrop-blur-sm'
-            }`}>
-              <div className={`rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative border ${
-                isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
-              }`}>
-                <button 
-                  onClick={() => setIsHistoryAuthOpen(false)} 
-                  className={`absolute top-4 right-4 ${isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto border ${
-                  isLight 
-                    ? 'bg-amber-50 border-amber-200 text-amber-600' 
-                    : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                }`}>
-                  <Lock className="w-6 h-6" />
-                </div>
-                <div className="text-center space-y-1">
-                  <h4 className={`font-bold text-base ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                    {isTh ? 'ยืนยันรหัสผ่านเพื่อแก้ไขข้อมูล' : 'Password Required for Editing'}
-                  </h4>
-                  <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {isTh 
-                      ? `ต้องการแก้ไข Heat No. ${targetEditHistoryItem?.heat_number || ''} กรุณาใส่รหัสผ่าน` 
-                      : `Enter admin password to edit Heat No. ${targetEditHistoryItem?.heat_number || ''}`}
-                  </p>
-                </div>
-
-                <form onSubmit={handleVerifyHistoryPassword} className="space-y-3">
-                  <input
-                    type="password"
-                    autoFocus
-                    placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
-                    value={historyAuthPassword}
-                    onChange={(e) => setHistoryAuthPassword(e.target.value)}
-                    className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
-                      isLight
-                        ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
-                        : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
-                    }`}
-                  />
-                  {historyAuthError && (
-                    <p className="text-xs text-rose-500 font-semibold text-center">
-                      {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
-                    </p>
-                  )}
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsHistoryAuthOpen(false)}
-                      className={`flex-1 font-bold text-xs py-2.5 rounded-xl transition ${
-                        isLight
-                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                      }`}
-                    >
-                      {isTh ? 'ยกเลิก' : 'Cancel'}
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-2.5 rounded-xl transition shadow-xs"
-                    >
-                      {isTh ? 'ยืนยันเพื่อเข้าแก้ไข' : 'Unlock & Edit'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* EDIT RECORD MODAL */}
-          {editingHistoryItem && (
-            <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto ${
-              isLight ? 'bg-slate-900/40 backdrop-blur-xs' : 'bg-slate-950/85 backdrop-blur-md'
-            }`}>
-              <div className={`border rounded-2xl max-w-3xl w-full p-6 space-y-6 my-8 shadow-2xl relative ${
-                isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
-              }`}>
-                <div className={`flex items-center justify-between border-b pb-4 ${
-                  isLight ? 'border-slate-200' : 'border-slate-800'
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <Edit3 className="w-5 h-5 text-amber-500" />
-                    <h3 className={`text-base font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                      {isTh ? `แก้ไขข้อมูลบันทึก Heat No. ${editingHistoryItem.heat_number}` : `Edit Inspection Record - ${editingHistoryItem.heat_number}`}
-                    </h3>
-                  </div>
-                  <button 
-                    onClick={() => setEditingHistoryItem(null)} 
-                    className={isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                  <div>
-                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Heat Number</label>
-                    <input
-                      type="text"
-                      value={editingHistoryItem.heat_number || ''}
-                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, heat_number: e.target.value } : null)}
-                      className={`w-full rounded-xl px-3 py-2 font-mono font-bold focus:outline-none border ${
-                        isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
-                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Grade</label>
-                    <input
-                      type="text"
-                      value={editingHistoryItem.grade || ''}
-                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, grade: e.target.value } : null)}
-                      className={`w-full rounded-xl px-3 py-2 font-bold focus:outline-none border ${
-                        isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
-                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Billet Size</label>
-                    <input
-                      type="text"
-                      value={editingHistoryItem.billet_size || ''}
-                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, billet_size: e.target.value } : null)}
-                      className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
-                        isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
-                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Supplier Name</label>
-                    <input
-                      type="text"
-                      value={editingHistoryItem.supplier_name || ''}
-                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, supplier_name: e.target.value } : null)}
-                      className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
-                        isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
-                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Inspector</label>
-                    <input
-                      type="text"
-                      value={editingHistoryItem.inspector_name || ''}
-                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, inspector_name: e.target.value } : null)}
-                      className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
-                        isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
-                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Invoice No.</label>
-                    <input
-                      type="text"
-                      value={editingHistoryItem.invoice_no || ''}
-                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, invoice_no: e.target.value } : null)}
-                      className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
-                        isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
-                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Quantity (pcs)</label>
-                    <input
-                      type="number"
-                      value={editingHistoryItem.quantity_pcs || 0}
-                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, quantity_pcs: Number(e.target.value) } : null)}
-                      className={`w-full rounded-xl px-3 py-2 font-mono focus:outline-none border ${
-                        isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
-                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Weight (kg)</label>
-                    <input
-                      type="number"
-                      value={editingHistoryItem.weight_kg || 0}
-                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, weight_kg: Number(e.target.value) } : null)}
-                      className={`w-full rounded-xl px-3 py-2 font-mono focus:outline-none border ${
-                        isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
-                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Diameter</label>
-                    <input
-                      type="text"
-                      value={editingHistoryItem.diameter || ''}
-                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, diameter: e.target.value } : null)}
-                      className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
-                        isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
-                          : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {/* Chemical Composition Matrix */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">
-                    Chemical Composition Analysis (%)
-                  </label>
-                  <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-11 gap-1.5 text-xs">
-                    {chemElements.map(el => (
-                      <div key={el} className={`p-2 rounded-xl border text-center ${
-                        isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
-                      }`}>
-                        <span className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{el}</span>
-                        <input
-                          type="text"
-                          value={editingHistoryItem.chemical_composition?.[el] ?? ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setEditingHistoryItem(prev => {
-                              if (!prev) return null;
-                              return {
-                                ...prev,
-                                chemical_composition: {
-                                  ...prev.chemical_composition,
-                                  [el]: parseFloat(val) || val
-                                }
-                              };
-                            });
-                          }}
-                          className={`w-full rounded text-center text-xs font-mono font-bold focus:outline-none border ${
-                            isLight
-                              ? 'bg-white border-slate-300 text-blue-700 focus:border-amber-500'
-                              : 'bg-slate-900 border-slate-800 text-cyan-300 focus:border-amber-500'
-                          }`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className={`flex justify-end gap-3 pt-4 border-t ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
-                  <button
-                    onClick={() => setEditingHistoryItem(null)}
-                    className={`px-5 py-2.5 text-xs font-bold rounded-xl transition ${
-                      isLight
-                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                    }`}
-                  >
-                    {isTh ? 'ยกเลิก' : 'Cancel'}
-                  </button>
-                  <button
-                    onClick={handleSaveEditedHistory}
-                    className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-2"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>{isTh ? 'บันทึกการแก้ไข' : 'Save Changes'}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -2045,7 +1679,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                     <div
                       key={grade}
                       onClick={() => setEditingGrade(grade)}
-                      className={`p-3 rounded-xl cursor-pointer transition flex items-center justify-between border ${
+                      className={`group p-2.5 rounded-xl cursor-pointer transition flex items-center justify-between border ${
                         isSelected 
                           ? isLight 
                             ? 'bg-white text-blue-700 font-bold border-blue-400 shadow-xs' 
@@ -2055,13 +1689,24 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                             : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
                         <span 
                           className="w-3 h-3 rounded-full shrink-0" 
                           style={{ backgroundColor: gradeSpecs[grade].color }}
                         />
-                        <span className="text-xs font-mono">{grade}</span>
+                        <span className="text-xs font-mono truncate">{grade}</span>
                       </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRequestDeleteGrade(grade);
+                        }}
+                        className="p-1.5 rounded-lg opacity-60 group-hover:opacity-100 transition hover:bg-rose-500/20 text-rose-500 hover:text-rose-600"
+                        title={isTh ? `ลบเกรด ${grade}` : `Delete ${grade}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   );
                 })}
@@ -2128,10 +1773,16 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                         </div>
 
                         <button
+                          type="button"
                           onClick={() => handleRequestDeleteGrade(editingGrade)}
-                          className="text-xs text-rose-500 hover:text-rose-600 p-2 bg-rose-50 rounded-lg border border-rose-200 font-semibold"
+                          className={`text-xs px-3 py-1.5 rounded-lg border font-semibold flex items-center gap-1.5 transition ${
+                            isLight 
+                              ? 'text-rose-600 bg-rose-50 hover:bg-rose-100 border-rose-200' 
+                              : 'text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30'
+                          }`}
                         >
-                          {isTh ? 'ลบเกรดนี้' : 'Delete Grade'}
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>{isTh ? 'ลบเกรดนี้' : 'Delete Grade'}</span>
                         </button>
                       </div>
                     )}
@@ -2200,6 +1851,397 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
             </div>
           )}
+        </div>
+      )}
+
+      {/* PASSWORD / CONFIRMATION PROMPT MODAL FOR DELETING RECORD / GRADE */}
+      {isDeleteAuthOpen && (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
+          isLight ? 'bg-slate-900/40 backdrop-blur-xs' : 'bg-slate-950/80 backdrop-blur-sm'
+        }`}>
+          <div className={`rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative border ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+          }`}>
+            <button 
+              onClick={() => {
+                setIsDeleteAuthOpen(false);
+                setTargetDeleteHistoryItem(null);
+                setTargetDeleteGrade(null);
+                setDeleteAuthPassword("");
+                setDeleteAuthError(false);
+              }} 
+              className={`absolute top-4 right-4 ${isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto border ${
+              isLight 
+                ? 'bg-rose-50 border-rose-200 text-rose-600' 
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+            }`}>
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h4 className={`font-bold text-base ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                {targetDeleteGrade
+                  ? (isTh ? `ยืนยันการลบเกรด: ${targetDeleteGrade}` : `Confirm Delete Grade Spec: ${targetDeleteGrade}`)
+                  : (isTh ? 'ยืนยันรหัสผ่านเพื่อลบข้อมูล' : 'Password Required for Deletion')}
+              </h4>
+              <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                {targetDeleteHistoryItem ? (
+                  isTh 
+                    ? `ต้องการลบประวัติ Heat No. ${targetDeleteHistoryItem.heat_number} กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน` 
+                    : `Enter admin password admin2026 to delete Heat No. ${targetDeleteHistoryItem.heat_number}`
+                ) : (
+                  isTh 
+                    ? `คุณต้องการลบเกณฑ์มาตรฐานเกรด ${targetDeleteGrade} หรือไม่? ${isAdminAuthenticated ? 'สามารถกดยืนยันลบได้ทันทีหรือใส่รหัสผ่าน admin2026' : 'กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน'}` 
+                    : `Are you sure you want to delete Grade Spec ${targetDeleteGrade}? ${isAdminAuthenticated ? 'Click confirm to proceed or enter password admin2026.' : 'Enter password admin2026 to confirm.'}`
+                )}
+              </p>
+            </div>
+
+            <form onSubmit={handleVerifyDeletePassword} className="space-y-3">
+              {!isAdminAuthenticated || targetDeleteHistoryItem ? (
+                <input
+                  type="password"
+                  autoFocus
+                  placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
+                  value={deleteAuthPassword}
+                  onChange={(e) => setDeleteAuthPassword(e.target.value)}
+                  className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-rose-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-rose-500'
+                  }`}
+                />
+              ) : (
+                <div className={`p-2.5 rounded-xl text-center text-xs border ${
+                  isLight ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                }`}>
+                  <span className="font-semibold">{isTh ? 'คุณอยู่ในสถานะ Admin แล้ว สามารถกดยืนยันการลบได้ทันที' : 'Authenticated as Admin. Click confirm below.'}</span>
+                </div>
+              )}
+
+              {deleteAuthError && (
+                <p className="text-xs text-rose-500 font-semibold text-center">
+                  {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
+                </p>
+              )}
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDeleteAuthOpen(false);
+                    setTargetDeleteHistoryItem(null);
+                    setTargetDeleteGrade(null);
+                    setDeleteAuthPassword("");
+                    setDeleteAuthError(false);
+                  }}
+                  className={`flex-1 font-bold text-xs py-2.5 rounded-xl transition ${
+                    isLight
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                  }`}
+                >
+                  {isTh ? 'ยกเลิก' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-xs"
+                >
+                  {isTh ? 'ยืนยันลบข้อมูล' : 'Verify & Delete'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PASSWORD PROMPT MODAL FOR EDITING HISTORY */}
+      {isHistoryAuthOpen && (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
+          isLight ? 'bg-slate-900/40 backdrop-blur-xs' : 'bg-slate-950/80 backdrop-blur-sm'
+        }`}>
+          <div className={`rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative border ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+          }`}>
+            <button 
+              onClick={() => setIsHistoryAuthOpen(false)} 
+              className={`absolute top-4 right-4 ${isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto border ${
+              isLight 
+                ? 'bg-amber-50 border-amber-200 text-amber-600' 
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+            }`}>
+              <Lock className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h4 className={`font-bold text-base ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                {isTh ? 'ยืนยันรหัสผ่านเพื่อแก้ไขข้อมูล' : 'Password Required for Editing'}
+              </h4>
+              <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                {isTh 
+                  ? `ต้องการแก้ไข Heat No. ${targetEditHistoryItem?.heat_number || ''} กรุณาใส่รหัสผ่าน` 
+                  : `Enter admin password to edit Heat No. ${targetEditHistoryItem?.heat_number || ''}`}
+              </p>
+            </div>
+
+            <form onSubmit={handleVerifyHistoryPassword} className="space-y-3">
+              <input
+                type="password"
+                autoFocus
+                placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
+                value={historyAuthPassword}
+                onChange={(e) => setHistoryAuthPassword(e.target.value)}
+                className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
+                  isLight
+                    ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                    : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                }`}
+              />
+              {historyAuthError && (
+                <p className="text-xs text-rose-500 font-semibold text-center">
+                  {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
+                </p>
+              )}
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsHistoryAuthOpen(false)}
+                  className={`flex-1 font-bold text-xs py-2.5 rounded-xl transition ${
+                    isLight
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                  }`}
+                >
+                  {isTh ? 'ยกเลิก' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-2.5 rounded-xl transition shadow-xs"
+                >
+                  {isTh ? 'ยืนยันเพื่อเข้าแก้ไข' : 'Unlock & Edit'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT RECORD MODAL */}
+      {editingHistoryItem && (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto ${
+          isLight ? 'bg-slate-900/40 backdrop-blur-xs' : 'bg-slate-950/85 backdrop-blur-md'
+        }`}>
+          <div className={`border rounded-2xl max-w-3xl w-full p-6 space-y-6 my-8 shadow-2xl relative ${
+            isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+          }`}>
+            <div className={`flex items-center justify-between border-b pb-4 ${
+              isLight ? 'border-slate-200' : 'border-slate-800'
+            }`}>
+              <div className="flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-amber-500" />
+                <h3 className={`text-base font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  {isTh ? `แก้ไขข้อมูลบันทึก Heat No. ${editingHistoryItem.heat_number}` : `Edit Inspection Record - ${editingHistoryItem.heat_number}`}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setEditingHistoryItem(null)} 
+                className={isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Heat Number</label>
+                <input
+                  type="text"
+                  value={editingHistoryItem.heat_number || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, heat_number: e.target.value } : null)}
+                  className={`w-full rounded-xl px-3 py-2 font-mono font-bold focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Grade</label>
+                <input
+                  type="text"
+                  value={editingHistoryItem.grade || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, grade: e.target.value } : null)}
+                  className={`w-full rounded-xl px-3 py-2 font-bold focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Billet Size</label>
+                <input
+                  type="text"
+                  value={editingHistoryItem.billet_size || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, billet_size: e.target.value } : null)}
+                  className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Supplier Name</label>
+                <input
+                  type="text"
+                  value={editingHistoryItem.supplier_name || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, supplier_name: e.target.value } : null)}
+                  className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Inspector</label>
+                <input
+                  type="text"
+                  value={editingHistoryItem.inspector_name || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, inspector_name: e.target.value } : null)}
+                  className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Invoice No.</label>
+                <input
+                  type="text"
+                  value={editingHistoryItem.invoice_no || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, invoice_no: e.target.value } : null)}
+                  className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Quantity (pcs)</label>
+                <input
+                  type="number"
+                  value={editingHistoryItem.quantity_pcs || 0}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, quantity_pcs: Number(e.target.value) } : null)}
+                  className={`w-full rounded-xl px-3 py-2 font-mono focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Weight (kg)</label>
+                <input
+                  type="number"
+                  value={editingHistoryItem.weight_kg || 0}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, weight_kg: Number(e.target.value) } : null)}
+                  className={`w-full rounded-xl px-3 py-2 font-mono focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Diameter</label>
+                <input
+                  type="text"
+                  value={editingHistoryItem.diameter || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, diameter: e.target.value } : null)}
+                  className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+            </div>
+
+            {/* Chemical Composition Matrix */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">
+                Chemical Composition Analysis (%)
+              </label>
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-11 gap-1.5 text-xs">
+                {chemElements.map(el => (
+                  <div key={el} className={`p-2 rounded-xl border text-center ${
+                    isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+                  }`}>
+                    <span className={`block text-[10px] font-bold mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{el}</span>
+                    <input
+                      type="text"
+                      value={editingHistoryItem.chemical_composition?.[el] ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditingHistoryItem(prev => {
+                          if (!prev) return null;
+                          return {
+                            ...prev,
+                            chemical_composition: {
+                              ...prev.chemical_composition,
+                              [el]: parseFloat(val) || val
+                            }
+                          };
+                        });
+                      }}
+                      className={`w-full rounded text-center text-xs font-mono font-bold focus:outline-none border ${
+                        isLight
+                          ? 'bg-white border-slate-300 text-blue-700 focus:border-amber-500'
+                          : 'bg-slate-900 border-slate-800 text-cyan-300 focus:border-amber-500'
+                      }`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className={`flex justify-end gap-3 pt-4 border-t ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
+              <button
+                onClick={() => setEditingHistoryItem(null)}
+                className={`px-5 py-2.5 text-xs font-bold rounded-xl transition ${
+                  isLight
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                {isTh ? 'ยกเลิก' : 'Cancel'}
+              </button>
+              <button
+                onClick={handleSaveEditedHistory}
+                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                <span>{isTh ? 'บันทึกการแก้ไข' : 'Save Changes'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

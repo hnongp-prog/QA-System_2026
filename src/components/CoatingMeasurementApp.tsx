@@ -763,7 +763,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          moduleCode: 'IPQC-04',
+          moduleCode: 'IPQA-04',
           moduleTitleTh: 'การตรวจวัดการเคลือบผิว (Coating Measurement)',
           moduleTitleEn: 'Coating Thickness, Area & Binder Measurement System',
           inspector: headerInfo.inspectorName || 'Coating Technician',
@@ -998,7 +998,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
-                  IPQC-04
+                  IPQA-04
                 </span>
                 <h1 className="text-xl font-bold text-white tracking-tight">
                   {isTh ? 'การตรวจวัดการเคลือบผิว (Coating Measurement)' : 'Coating Measurement System'}
@@ -1832,8 +1832,8 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
               </h3>
               <p className="text-xs text-slate-400">
                 {isTh 
-                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQC-04 (Password: admin2026)' 
-                  : 'Enter password to edit IPQC-04 record (Password: admin2026)'}
+                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQA-04 (Password: admin2026)' 
+                  : 'Enter password to edit IPQA-04 record (Password: admin2026)'}
               </p>
             </div>
 
@@ -1887,7 +1887,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">
-                    {isTh ? 'แก้ไขข้อมูลการตรวจวัดสารเคลือบผิว (IPQC-04)' : 'Edit Coating Measurement Record'}
+                    {isTh ? 'แก้ไขข้อมูลการตรวจวัดสารเคลือบผิว (IPQA-04)' : 'Edit Coating Measurement Record'}
                   </h3>
                   <p className="text-xs text-slate-400 font-mono">
                     Coil: {editingHistoryItem.lotNumber} | ID: {editingHistoryItem.id}

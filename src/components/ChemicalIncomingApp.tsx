@@ -107,7 +107,7 @@ const INITIAL_HISTORY: ChemicalInspectionEntry[] = [
   {
     id: "chem-hist-002",
     timestamp: "03/08/2026, 15:40:00",
-    inspector: "Wipawee K. (IQC)",
+    inspector: "Wipawee K. (IQA)",
     batch_lot: "LOT-2026-C88",
     chemical: "COAT-901",
     date: "2026-07-20",
@@ -356,7 +356,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
   // Load Demo Chemical Cert
   const loadDemoCert = () => {
     setHeader({
-      inspector_name: 'Anucha S. (IQC Chemist)',
+      inspector_name: 'Anucha S. (IQA Chemist)',
       coating_chemical: 'A-001',
       batch_lot: `LOT-2026-CH${Math.floor(100 + Math.random() * 900)}`,
       product_date: '2026-07-28',
@@ -402,7 +402,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
         const chemCode = (h.coating_chemical || 'A-001').toUpperCase();
         
         setHeader({
-          inspector_name: h.inspector_name || 'Anucha S. (IQC Chemist)',
+          inspector_name: h.inspector_name || 'Anucha S. (IQA Chemist)',
           coating_chemical: chemCode,
           batch_lot: h.batch_lot || `LOT-2026-CH${Math.floor(100 + Math.random() * 900)}`,
           product_date: h.product_date || new Date().toISOString().split('T')[0],
@@ -512,7 +512,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
       onLogNewActivity({
         id: entryId,
         timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        moduleCode: 'IQC-02',
+        moduleCode: 'IQA-02',
         moduleTitleTh: 'ตรวจรับเคมีเคลือบผิว (Chemical Incoming)',
         moduleTitleEn: 'Chemical Incoming Inspection',
         inspector: header.inspector_name || 'QA Chemist',
@@ -522,7 +522,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
         remarks: resultDesc,
         coilNo: header.batch_lot || 'BATCH-CHEM-N/A',
         profile: `Chemical ${header.coating_chemical} (${header.supplier})`,
-        process: 'IQC-02 Chemical Incoming Inspection',
+        process: 'IQA-02 Chemical Incoming Inspection',
         inspectionDate: newEntry.timestamp,
         inspectionResult: resultDesc
       });
@@ -791,7 +791,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
                   isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-950 text-indigo-300 border-indigo-800'
                 }`}>
-                  IQC-02
+                  IQA-02
                 </span>
                 <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? 'ระบบตรวจรับเคมีเคลือบผิว (Chemical Incoming Inspection)' : 'Coating Chemical Incoming Inspection'}

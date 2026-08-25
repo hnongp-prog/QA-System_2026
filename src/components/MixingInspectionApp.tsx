@@ -589,7 +589,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          moduleCode: 'IPQC-06',
+          moduleCode: 'IPQA-06',
           moduleTitleTh: 'การตรวจวัดคุณภาพสารผสม (Mixing Inspection)',
           moduleTitleEn: 'Mixing Inspection System & Coating Spec Manager',
           inspector: headerInfo.inspectorName || 'Mixing Auditor',
@@ -908,7 +908,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
-                  IPQC-06
+                  IPQA-06
                 </span>
                 <h1 className="text-xl font-bold text-white tracking-tight">
                   {isTh ? 'การตรวจวัดคุณภาพสารผสม (Mixing Inspection)' : 'Mixing Inspection System'}
@@ -1683,8 +1683,8 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
               </h3>
               <p className="text-xs text-slate-400">
                 {isTh 
-                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQC-06 (Password: admin2026)' 
-                  : 'Enter password to edit IPQC-06 record (Password: admin2026)'}
+                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQA-06 (Password: admin2026)' 
+                  : 'Enter password to edit IPQA-06 record (Password: admin2026)'}
               </p>
             </div>
 
@@ -1738,7 +1738,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">
-                    {isTh ? 'แก้ไขข้อมูลผสมและตรวจวัดสารเคลือบ (IPQC-06)' : 'Edit Mixing & Coating Record'}
+                    {isTh ? 'แก้ไขข้อมูลผสมและตรวจวัดสารเคลือบ (IPQA-06)' : 'Edit Mixing & Coating Record'}
                   </h3>
                   <p className="text-xs text-slate-400 font-mono">
                     Cup: {editingHistoryItem.lotNumber} | ID: {editingHistoryItem.id}

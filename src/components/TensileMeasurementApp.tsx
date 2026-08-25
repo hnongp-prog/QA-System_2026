@@ -142,7 +142,7 @@ const INITIAL_RECORDS: TensileRecord[] = [
     profile: 'HR-A36',
     process: 'HOT_ROLL',
     machine: 'TENSILE-M01',
-    inspector: 'Somchai P. (IPQC)',
+    inspector: 'Somchai P. (IPQA)',
     sample_name: 'SAMPLE-1A',
     width: 12.5,
     h_left: 3.2,
@@ -161,7 +161,7 @@ const INITIAL_RECORDS: TensileRecord[] = [
     profile: 'HR-A36',
     process: 'HOT_ROLL',
     machine: 'TENSILE-M01',
-    inspector: 'Somchai P. (IPQC)',
+    inspector: 'Somchai P. (IPQA)',
     sample_name: 'SAMPLE-1B',
     width: 12.4,
     h_left: 3.1,
@@ -180,7 +180,7 @@ const INITIAL_RECORDS: TensileRecord[] = [
     profile: 'CR-SS400',
     process: 'COLD_ROLL',
     machine: 'TENSILE-M02',
-    inspector: 'Kittisak N. (IPQC)',
+    inspector: 'Kittisak N. (IPQA)',
     sample_name: 'SAMPLE-2A',
     width: 20.0,
     h_left: 2.2,
@@ -498,7 +498,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
         profile: matchedSpec.profile,
         process: matchedSpec.process,
         machine: mainMachine.trim().toUpperCase() || 'TENSILE-M01',
-        inspector: mainInspector.trim() || 'IPQC Officer',
+        inspector: mainInspector.trim() || 'IPQA Officer',
         sample_name: row.sample_name.trim().toUpperCase() || `SAMPLE-${i+1}`,
         width: w,
         h_left: hl,
@@ -522,17 +522,17 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          moduleCode: 'IPQC-01',
+          moduleCode: 'IPQA-01',
           moduleTitleTh: 'การทดสอบแรงดึง (Tensile Measurement)',
           moduleTitleEn: 'Tensile Measurement & Quality Spec System',
-          inspector: mainInspector.trim() || 'IPQC Officer',
+          inspector: mainInspector.trim() || 'IPQA Officer',
           batchLot: `${matchedSpec.profile} - ${row.coil_no}`,
           result: decision === 'PASS' ? 'PASS' : 'REJECT',
           defectCount: decision === 'FAIL' ? 1 : 0,
           remarks: inspectionResultText,
           coilNo: row.coil_no || 'COIL-N/A',
           profile: matchedSpec.profile || 'CR-SPEC',
-          process: `IPQC-01 Tensile (${mainProcess})`,
+          process: `IPQA-01 Tensile (${mainProcess})`,
           inspectionDate: rec.timestamp,
           inspectionResult: inspectionResultText
         });
@@ -879,7 +879,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
                   isLight ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-cyan-950 text-cyan-300 border-cyan-800'
                 }`}>
-                  IPQC-01
+                  IPQA-01
                 </span>
                 <h1 className={`text-xl font-bold tracking-tight ${
                   isLight ? 'text-slate-900' : 'text-white'
@@ -1816,7 +1816,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {isTh 
-                    ? 'จัดการ Profile Spec กลางสำหรับตัดสินผล Pass/Fail อัตโนมัติในโมดูล IPQC-01' 
+                    ? 'จัดการ Profile Spec กลางสำหรับตัดสินผล Pass/Fail อัตโนมัติในโมดูล IPQA-01' 
                     : 'Manage standard quality criteria for automated Pass/Fail decisions'}
                 </p>
               </div>
@@ -2476,8 +2476,8 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
               </h3>
               <p className="text-xs text-slate-400">
                 {isTh 
-                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจรับ IPQC-01 (Password: admin2026)' 
-                  : 'Enter password to edit IPQC-01 record (Password: admin2026)'}
+                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจรับ IPQA-01 (Password: admin2026)' 
+                  : 'Enter password to edit IPQA-01 record (Password: admin2026)'}
               </p>
             </div>
 
@@ -2531,7 +2531,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">
-                    {isTh ? 'แก้ไขข้อมูลการตรวจวัดแรงดึง (IPQC-01)' : 'Edit Tensile Measurement Record'}
+                    {isTh ? 'แก้ไขข้อมูลการตรวจวัดแรงดึง (IPQA-01)' : 'Edit Tensile Measurement Record'}
                   </h3>
                   <p className="text-xs text-slate-400 font-mono">
                     Coil: {editingHistoryItem.coil_no} | ID: {editingHistoryItem.id}

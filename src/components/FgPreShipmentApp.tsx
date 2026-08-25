@@ -676,7 +676,7 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
           onLogNewActivity({
             id: newRecord.docId!,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            moduleCode: 'OQC-01',
+            moduleCode: 'OQA-01',
             moduleTitleTh: 'ตรวจสินค้าก่อนจัดส่ง FG Pre-Shipment (Tag Label Checker)',
             moduleTitleEn: 'FG Pre-Shipment Tag Label Checker',
             inspector: inspectorName,
@@ -686,7 +686,7 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
             remarks: inspectionResultDetail,
             coilNo: boxNo || (coils && coils[0]?.lotNo) || 'BOX-N/A',
             profile: `${profileName || 'Part'} (${partNo || 'DWG: ' + drawingNo})`,
-            process: 'OQC-01 FG Pre-Shipment Tag Inspection',
+            process: 'OQA-01 FG Pre-Shipment Tag Inspection',
             inspectionDate: newRecord.timestamp,
             inspectionResult: inspectionResultDetail
           });
@@ -923,7 +923,7 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
-                  OQC-01
+                  OQA-01
                 </span>
                 <h1 className="text-xl font-bold text-white tracking-tight">
                   {isTh ? 'ตรวจสินค้าก่อนจัดส่ง FG Pre-Shipment (Tag Label Checker)' : 'FG Pre-Shipment Tag Label Checker & AI Comparison'}

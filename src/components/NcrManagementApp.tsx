@@ -627,17 +627,17 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                   className="bg-transparent text-xs text-rose-300 font-semibold focus:outline-none cursor-pointer"
                 >
                   <option value="ALL" className="bg-slate-900 text-white">{isTh ? 'ทั้งหมด (All Processes)' : 'All Processes'}</option>
-                  <option value="IPQC-07" className="bg-slate-900 text-white">IPQC-07 Thickness Wall</option>
-                  <option value="IPQC-01" className="bg-slate-900 text-white">IPQC-01 Tensile Test</option>
-                  <option value="IPQC-02" className="bg-slate-900 text-white">IPQC-02 Roughness</option>
-                  <option value="IPQC-03" className="bg-slate-900 text-white">IPQC-03 X-Ray</option>
-                  <option value="IPQC-04" className="bg-slate-900 text-white">IPQC-04 Coating</option>
-                  <option value="IPQC-05" className="bg-slate-900 text-white">IPQC-05 Cutting</option>
-                  <option value="IPQC-06" className="bg-slate-900 text-white">IPQC-06 Mixing</option>
-                  <option value="IQC-01" className="bg-slate-900 text-white">IQC-01 Billet Incoming</option>
-                  <option value="IQC-02" className="bg-slate-900 text-white">IQC-02 Chemical Incoming</option>
-                  <option value="IQC-03" className="bg-slate-900 text-white">IQC-03 Zn Wire Incoming</option>
-                  <option value="OQC-01" className="bg-slate-900 text-white">OQC-01 FG Shipment</option>
+                  <option value="IPQA-07" className="bg-slate-900 text-white">IPQA-07 Thickness Wall</option>
+                  <option value="IPQA-01" className="bg-slate-900 text-white">IPQA-01 Tensile Test</option>
+                  <option value="IPQA-02" className="bg-slate-900 text-white">IPQA-02 Roughness</option>
+                  <option value="IPQA-03" className="bg-slate-900 text-white">IPQA-03 X-Ray</option>
+                  <option value="IPQA-04" className="bg-slate-900 text-white">IPQA-04 Coating</option>
+                  <option value="IPQA-05" className="bg-slate-900 text-white">IPQA-05 Cutting</option>
+                  <option value="IPQA-06" className="bg-slate-900 text-white">IPQA-06 Mixing</option>
+                  <option value="IQA-01" className="bg-slate-900 text-white">IQA-01 Billet Incoming</option>
+                  <option value="IQA-02" className="bg-slate-900 text-white">IQA-02 Chemical Incoming</option>
+                  <option value="IQA-03" className="bg-slate-900 text-white">IQA-03 Zn Wire Incoming</option>
+                  <option value="OQA-01" className="bg-slate-900 text-white">OQA-01 FG Shipment</option>
                   <option value="EQP-01" className="bg-slate-900 text-white">EQP-01 Metrology</option>
                 </select>
               </div>
@@ -933,7 +933,7 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                   required
                   value={newInspector}
                   onChange={(e) => setNewInspector(e.target.value)}
-                  placeholder="e.g. Somchai P. (IPQC Lead)"
+                  placeholder="e.g. Somchai P. (IPQA Lead)"
                   className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-2xl px-4 py-3 text-xs font-semibold text-amber-200 focus:outline-none"
                 />
               </div>

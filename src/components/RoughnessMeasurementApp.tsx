@@ -163,7 +163,7 @@ const INITIAL_INSPECTIONS: RoughnessInspectionRecord[] = [
     calculatedRzCal: '2.150',
     status: 'Pass',
     profileName: 'CR-SMOOTH-01',
-    inspectorName: 'Wichai T. (IPQC)',
+    inspectorName: 'Wichai T. (IPQA)',
     machineName: 'SURFTEST-01',
     date: '2026-08-04',
     timestamp: '04/08/2026, 09:15:00'
@@ -184,7 +184,7 @@ const INITIAL_INSPECTIONS: RoughnessInspectionRecord[] = [
     calculatedRzCal: '2.410',
     status: 'Fail',
     profileName: 'CR-SMOOTH-01',
-    inspectorName: 'Wichai T. (IPQC)',
+    inspectorName: 'Wichai T. (IPQA)',
     machineName: 'SURFTEST-01',
     date: '2026-08-05',
     timestamp: '05/08/2026, 10:30:00'
@@ -203,8 +203,8 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
   const [activeTab, setActiveTab] = useState<'new-batch' | 'profile-settings' | 'dashboard' | 'history'>('new-batch');
 
   // Saved Profiles & Inspections with Real-time Cloud Sync
-  const [savedProfiles, setSavedProfiles] = useCloudState<RoughnessProfileSpec[]>('roughness_qc_profiles', DEFAULT_PROFILES);
-  const [inspections, setInspections] = useCloudState<RoughnessInspectionRecord[]>('roughness_qc_inspections', INITIAL_INSPECTIONS);
+  const [savedProfiles, setSavedProfiles, isProfilesReady] = useCloudState<RoughnessProfileSpec[]>('roughness_qc_profiles', DEFAULT_PROFILES);
+  const [inspections, setInspections, isInspectionsReady] = useCloudState<RoughnessInspectionRecord[]>('roughness_qc_inspections', INITIAL_INSPECTIONS);
 
   // Point Configuration
   const [pointConfig, setPointConfig] = useState({
@@ -699,14 +699,18 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          moduleCode: 'IPQC-02',
+          moduleCode: 'IPQA-02',
           moduleTitleTh: 'การตรวจวัดความเรียบผิว (Roughness Measurement)',
           moduleTitleEn: 'Surface Roughness Measurement System (Ra/Rz/Rt/Ry)',
-          inspector: headerInfo.inspectorName || 'IPQC Officer',
-          batchLot: `${headerInfo.profileName} - ${item.lotNumber}`,
-          result: decision === 'Pass' ? 'PASS' : 'REJECT',
+          inspector: headerInfo.inspectorName || 'IPQA Officer',
+          batchLot: `${headerInfo.profileName || 'General Profile'} - ${item.lotNumber}`,
+          coilNo: item.lotNumber,
+          profile: headerInfo.profileName,
+          process: item.process,
+          inspectionResult: `${decision === 'Pass' ? 'PASS' : 'FAIL'} / Ra: ${getMax(item.raUp, item.raLo).toFixed(3)} µm, Rz: ${getMax(item.rzUp, item.rzLo).toFixed(3)} µm`,
+          result: decision === 'Pass' ? 'PASS' : 'FAIL',
           defectCount: decision === 'Fail' ? 1 : 0,
-          remarks: `Ra Max: ${getMax(item.raUp, item.raLo).toFixed(3)}, Rz Max: ${getMax(item.rzUp, item.rzLo).toFixed(3)}`
+          remarks: `Ra Max: ${getMax(item.raUp, item.raLo).toFixed(3)} µm, Rz Max: ${getMax(item.rzUp, item.rzLo).toFixed(3)} µm, RzCal: ${stats ? stats.rzCal.toFixed(3) : '0.000'}`
         });
       }
 
@@ -730,7 +734,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
         status: decision,
         remarks: item.remarks,
         profileName: headerInfo.profileName,
-        inspectorName: headerInfo.inspectorName || 'IPQC Inspector',
+        inspectorName: headerInfo.inspectorName || 'IPQA Inspector',
         machineName: headerInfo.machineName || 'SURFTEST-01',
         date: headerInfo.date,
         calculatedRzCal: stats ? stats.rzCal.toFixed(3) : '0.000',
@@ -969,7 +973,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                 <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
                   isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-950 text-indigo-300 border-indigo-800'
                 }`}>
-                  IPQC-02
+                  IPQA-02
                 </span>
                 <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? 'ระบบตรวจวัดความเรียบผิว (Roughness System)' : 'Surface Roughness Measurement System'}
@@ -977,8 +981,8 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
               </div>
               <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh 
-                  ? 'วัดค่า Ra, Rz, Rt, Ry ขอบบน-ขอบล่าง, คำนวณ Rz Cal (3-Sigma) พร้อมกราฟแนวโน้ม' 
-                  : 'Surface metrology parameters (Ra, Rz, Rt, Ry), 3-Sigma Rz Cal, Sparklines & Spec Control'}
+                  ? 'วัดค่า Ra, Rz, Rt, Ry ขอบบน-ขอบล่าง, คำนวณ Rz Cal (3-Sigma) พร้อมบันทึกฐานข้อมูลกลาง Firestore' 
+                  : 'Surface metrology parameters (Ra, Rz, Rt, Ry), 3-Sigma Rz Cal, Sparklines & Central Firestore DB Sync'}
               </p>
             </div>
           </div>
@@ -1002,10 +1006,14 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
           )}
 
           <div className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border ${
-            isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
-          }`}>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Cloud Sync Active</span>
+            isInspectionsReady && isProfilesReady
+              ? isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
+              : isLight ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-amber-950/60 border-amber-800/80 text-amber-300'
+          }`}
+          title="Central Firestore Database (qa_master_data / roughness_qc_inspections)"
+          >
+            <span className={`w-2 h-2 rounded-full ${isInspectionsReady && isProfilesReady ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+            <span>{isInspectionsReady && isProfilesReady ? 'Firestore DB Connected' : 'Connecting DB...'}</span>
           </div>
         </div>
       </header>
@@ -2022,8 +2030,8 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
               </h3>
               <p className="text-xs text-slate-400">
                 {isTh 
-                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQC-02 (Password: admin2026)' 
-                  : 'Enter password to edit IPQC-02 record (Password: admin2026)'}
+                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQA-02 (Password: admin2026)' 
+                  : 'Enter password to edit IPQA-02 record (Password: admin2026)'}
               </p>
             </div>
 
@@ -2077,7 +2085,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">
-                    {isTh ? 'แก้ไขข้อมูลการตรวจวัดความเรียบผิว (IPQC-02)' : 'Edit Surface Roughness Record'}
+                    {isTh ? 'แก้ไขข้อมูลการตรวจวัดความเรียบผิว (IPQA-02)' : 'Edit Surface Roughness Record'}
                   </h3>
                   <p className="text-xs text-slate-400 font-mono">
                     Coil / Lot: {editingHistoryItem.lotNumber} | ID: {editingHistoryItem.id}

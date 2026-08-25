@@ -183,7 +183,7 @@ export interface BilletInspectionItem {
   _year?: string;
 }
 
-// Chemical Incoming Inspection App Types (IQC-02)
+// Chemical Incoming Inspection App Types (IQA-02)
 export interface ChemicalSpecItem {
   item: string;
   min: string | number;
@@ -233,7 +233,7 @@ export interface ChemicalInspectionEntry {
   createdAt?: number;
 }
 
-// Tensile Measurement App Types (IPQC-01)
+// Tensile Measurement App Types (IPQA-01)
 export type TensileElongMode = 'min' | 'max' | 'both';
 
 export interface TensileQualitySpec {
@@ -272,7 +272,7 @@ export interface TensileRecord {
   timestamp: string;
 }
 
-// Roughness Measurement App Types (IPQC-02)
+// Roughness Measurement App Types (IPQA-02)
 export interface RoughnessProfileSpec {
   name: string;
   raUp: string;
@@ -314,7 +314,7 @@ export interface RoughnessInspectionRecord {
   timestamp: string;
 }
 
-// X-Ray Measurement App Types (IPQC-03)
+// X-Ray Measurement App Types (IPQA-03)
 export interface XRayProfileSpec {
   id?: string;
   name: string;
@@ -351,7 +351,7 @@ export interface XRayInspectionRecord {
   timestamp_raw?: string;
 }
 
-// Coating Measurement App Types (IPQC-04)
+// Coating Measurement App Types (IPQA-04)
 export interface CoatingProfileSpec {
   id?: string;
   name: string;
@@ -405,7 +405,7 @@ export interface CoatingInspectionRecord {
   timestamp: string;
 }
 
-// Cutting Dimension Measurement App Types (IPQC-05)
+// Cutting Dimension Measurement App Types (IPQA-05)
 export type CuttingEvaluationType = 'target_tol' | 'max_only' | 'min_only' | 'min_max';
 
 export interface CuttingCustomPointSpec {
@@ -425,17 +425,25 @@ export interface CuttingProfileSpec {
   id?: string;
   name: string;
   partNo?: string;
+  widthName?: string;
   widthTarget: string;
   widthTolPlus: string;
   widthTolMinus: string;
+  heightName?: string;
+  heightLeftName?: string;
+  heightRightName?: string;
   heightTarget: string;
   heightTolPlus: string;
   heightTolMinus: string;
+  lengthName?: string;
   lengthTarget: string;
   lengthTolPlus: string;
   lengthTolMinus: string;
+  bendingName?: string;
   bendingMax: string;
+  camberName?: string;
   camberMax: string;
+  twistName?: string;
   twistMax: string;
   customControlPoints?: CuttingCustomPointSpec[];
 }
@@ -464,7 +472,7 @@ export interface CuttingInspectionRecord {
   timestamp: string;
 }
 
-// Mixing Inspection App Types (IPQC-06)
+// Mixing Inspection App Types (IPQA-06)
 export interface MixingCoatingSpec {
   id?: string;
   name: string; // Coating Type Name
@@ -497,7 +505,7 @@ export interface MixingInspectionRecord {
   timestamp: string;
 }
 
-// Zn Wire Incoming Types (IQC-03)
+// Zn Wire Incoming Types (IQA-03)
 export interface ZnWireElementLimit {
   min: number;
   max: number;
@@ -677,10 +685,10 @@ export interface ThicknessWallProfileSpec {
   updatedAt?: string;
 }
 
-// FG Shipment Inspection Tag (OQC-02) Types
+// FG Shipment Inspection Tag (OQA-01) Types
 export interface FgOqc02MasterSpec {
   id?: string;
-  specCode: string; // e.g. SPEC-OQC02-01
+  specCode: string; // e.g. SPEC-OQA01-01
   profileName: string; // e.g. PROFILE-A
   partNo: string; // e.g. P-8801-TK
   drawingNo: string; // e.g. DWG-2026-0881
