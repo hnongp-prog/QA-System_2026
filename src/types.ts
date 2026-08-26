@@ -335,12 +335,16 @@ export interface XRayInspectionRecord {
   partId: string; // Side
   lotNumber: string; // Coil No.
   process: string;
-  raUp: string; // Zn weight Up
-  raLo: string; // Zn weight Lo
+  raUp: string | string[]; // Zn weight Up (single string or array of points)
+  raLo: string | string[]; // Zn weight Lo (single string or array of points)
   rzUp: string; // Flux weight Up
   rzLo: string; // Flux weight Lo
   rtUp: string; // Coverage Up
   rtLo: string; // Coverage Lo
+  znAvgUp?: string;
+  znAvgLo?: string;
+  znAvgTotal?: string;
+  znPointsCount?: number;
   status: 'Pass' | 'Fail' | 'Pending';
   remarks?: string;
   profileName: string;
@@ -369,6 +373,12 @@ export interface CoatingProfileSpec {
   coatingWtMinLo: string;
   coatingWtMaxLo: string;
   pencilHardnessLo: string;
+  scothMagicTapeMax?: string; // Spec max weight limit (e.g. 0.50 g/m² or g)
+  scothMagicTapeMaxUp?: string;
+  scothMagicTapeMaxLo?: string;
+  scothMagicTape?: string; // Spec requirement / max
+  scothMagicTapeUp?: string;
+  scothMagicTapeLo?: string;
   stdLength: string;
   stdCoatingWidth: string;
 }
@@ -396,6 +406,9 @@ export interface CoatingInspectionRecord {
   amountOfBinder?: string; // binderWt / (coatingArea / 2)
   rtUp?: string; // Hardness Up
   rtLo?: string; // Hardness Lo
+  scothMagicTape?: string; // Scoth Magic Tape test result (Overall / single)
+  scothMagicTapeUp?: string; // Scoth Magic Tape Up
+  scothMagicTapeLo?: string; // Scoth Magic Tape Lo
   status: 'Pass' | 'Fail' | 'Pending';
   remarks?: string;
   profileName: string;

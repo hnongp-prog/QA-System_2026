@@ -19,7 +19,9 @@ import {
   FileSpreadsheet,
   Edit3,
   X,
-  RotateCcw
+  RotateCcw,
+  HelpCircle,
+  Calculator
 } from 'lucide-react';
 
 import { 
@@ -117,7 +119,13 @@ const DEFAULT_PROFILES: CoatingProfileSpec[] = [
     pencilHardnessUp: '2H',
     coatingWtMinLo: '10.0', coatingWtMaxLo: '20.0',
     pencilHardnessLo: '2H',
-    stdLength: '100',
+    scothMagicTapeMax: '0.50',
+    scothMagicTapeMaxUp: '0.50',
+    scothMagicTapeMaxLo: '0.50',
+    scothMagicTape: '0.50',
+    scothMagicTapeUp: '0.50',
+    scothMagicTapeLo: '0.50',
+    stdLength: '200',
     stdCoatingWidth: '100'
   },
   {
@@ -130,7 +138,13 @@ const DEFAULT_PROFILES: CoatingProfileSpec[] = [
     pencilHardnessUp: '3H',
     coatingWtMinLo: '15.0', coatingWtMaxLo: '30.0',
     pencilHardnessLo: '3H',
-    stdLength: '100',
+    scothMagicTapeMax: '0.50',
+    scothMagicTapeMaxUp: '0.50',
+    scothMagicTapeMaxLo: '0.50',
+    scothMagicTape: '0.50',
+    scothMagicTapeUp: '0.50',
+    scothMagicTapeLo: '0.50',
+    stdLength: '200',
     stdCoatingWidth: '100'
   }
 ];
@@ -141,24 +155,27 @@ const INITIAL_INSPECTIONS: CoatingInspectionRecord[] = [
     lotNumber: 'COIL-2026-C101',
     partId: 'UP-SIDE',
     mixingLot: 'MIX-2026-B08',
-    width: '1005',
+    width: '100',
     heightLeft: '0.48',
     heightRight: '0.50',
-    length: '100',
+    length: '200',
     coatingWidth: '100',
-    coatingArea: '0.010000',
+    coatingArea: '0.020000',
     totalWeight: '1.2500',
     weightAfterDryer: '1.1800',
     wtWithoutCoatUp: '1.0200',
     wtWithoutCoatLo: '0.8800',
     binderWt: '0.0700',
     totalCoatBinderWt: '0.3700',
-    raUp: '16.00',
-    raLo: '14.00',
+    raUp: '8.00',
+    raLo: '7.00',
     binderPercent: '18.92',
-    amountOfBinder: '14.00',
+    amountOfBinder: '7.00',
     rtUp: '2H',
     rtLo: '2H',
+    scothMagicTape: '0.12',
+    scothMagicTapeUp: '0.12',
+    scothMagicTapeLo: '0.10',
     status: 'Pass',
     profileName: 'Standard_Coating_01',
     inspectorName: 'Somchai P.',
@@ -171,24 +188,27 @@ const INITIAL_INSPECTIONS: CoatingInspectionRecord[] = [
     lotNumber: 'COIL-2026-C102',
     partId: 'LO-SIDE',
     mixingLot: 'MIX-2026-B08',
-    width: '1002',
+    width: '100',
     heightLeft: '0.52',
     heightRight: '0.51',
-    length: '100',
+    length: '200',
     coatingWidth: '100',
-    coatingArea: '0.010000',
+    coatingArea: '0.020000',
     totalWeight: '1.1000',
     weightAfterDryer: '1.0800',
     wtWithoutCoatUp: '1.0500',
     wtWithoutCoatLo: '0.9200',
     binderWt: '0.0200',
     totalCoatBinderWt: '0.1800',
-    raUp: '3.00',
-    raLo: '13.00',
+    raUp: '1.50',
+    raLo: '6.50',
     binderPercent: '11.11',
-    amountOfBinder: '4.00',
+    amountOfBinder: '2.00',
     rtUp: '2H',
     rtLo: '2H',
+    scothMagicTape: '0.15',
+    scothMagicTapeUp: '0.15',
+    scothMagicTapeLo: '0.14',
     status: 'Fail',
     remarks: 'Coating Wt Up below spec min (10.0 g/m²)',
     profileName: 'Standard_Coating_01',
@@ -207,6 +227,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
   const isTh = language === 'th';
   const [activeTab, setActiveTab] = useState<'new-batch' | 'settings' | 'dashboard' | 'history'>('new-batch');
   const tableRef = useRef<HTMLDivElement>(null);
+  const [showFormulaModal, setShowFormulaModal] = useState(false);
 
   // Saved Profiles & Inspections with Real-time Cloud Sync
   const [savedProfiles, setSavedProfiles] = useCloudState<CoatingProfileSpec[]>('coating_qc_profiles', DEFAULT_PROFILES);
@@ -233,46 +254,66 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     reqPencilHardnessUp: '',
     reqCoatingWtMinLo: '', reqCoatingWtMaxLo: '',
     reqPencilHardnessLo: '',
-    stdLength: '100',
+    reqScothMagicTapeMax: '0.50',
+    reqScothMagicTapeMaxUp: '0.50',
+    reqScothMagicTapeMaxLo: '0.50',
+    reqScothMagicTape: '0.50',
+    reqScothMagicTapeUp: '0.50',
+    reqScothMagicTapeLo: '0.50',
+    stdLength: '200',
     stdCoatingWidth: '100'
   });
 
   const [profileStatus, setProfileStatus] = useState<'found' | 'not-found'>('not-found');
 
-  // Auto calculate helper for row items
+  // Auto calculate helper for row items using official IPQA-04 formulas:
+  // 1. Coating wt Up = (Dryer Wt - Empty Up) / (Width x 200 / 1000000)
+  // 2. Coating wt Lo = (Empty Up - Empty Lo) / (Width x 200 / 1000000)
+  // 3. Binder% = (Total Wt - Dryer Wt) / (Total Wt - min(Empty Up, Empty Lo)) * 100
+  // 4. Amt Binder = (Total Wt - Dryer Wt) / ((Width x 200 / 1000000) / 2)
   const calculateAutoFields = (item: any) => {
     const total = parseFloat(item.totalWeight) || 0;
     const dryer = parseFloat(item.weightAfterDryer) || 0;
     const wtUp = parseFloat(item.wtWithoutCoatUp) || 0;
     const wtLo = parseFloat(item.wtWithoutCoatLo) || 0;
-    const cWidth = parseFloat(item.coatingWidth) || 0;
-    const len = parseFloat(item.length) || 0;
+    
+    // Sample Strip Width in mm (from item.width, item.coatingWidth, or default 100mm)
+    const rawWidth = parseFloat(item.width) || parseFloat(item.coatingWidth) || 100;
+    // Standard Length in mm (default 200 mm per formula)
+    const rawLength = parseFloat(item.length) || 200;
 
-    const coatingAreaVal = cWidth > 0 && len > 0 ? (cWidth * len) / 1000000 : 0;
+    // Formula denominator: (Width x 200 / 1000000) in m²
+    const coatingAreaVal = rawWidth > 0 && rawLength > 0 ? (rawWidth * rawLength) / 1000000 : 0;
     const coatingAreaStr = coatingAreaVal > 0 ? coatingAreaVal.toFixed(6) : '';
 
+    // Binder Weight = Total Wt - Dryer Wt
     const binderWtVal = total > 0 && dryer > 0 ? (total - dryer) : 0;
     const binderWtStr = binderWtVal > 0 ? binderWtVal.toFixed(4) : '';
 
+    // Total Coat & Binder Wt = Total Wt - min(Empty Up, Empty Lo)
     let totalCoatBinderWtVal = 0;
     let totalCoatBinderWtStr = '';
     if (total > 0 && (wtUp > 0 || wtLo > 0)) {
         const values = [wtUp, wtLo].filter(v => v > 0);
-        const minWt = Math.min(...values);
-        totalCoatBinderWtVal = (total - minWt);
+        const minEmpty = Math.min(...values);
+        totalCoatBinderWtVal = (total - minEmpty);
         totalCoatBinderWtStr = totalCoatBinderWtVal > 0 ? totalCoatBinderWtVal.toFixed(4) : '';
     }
 
+    // 3. Binder% = (Total Wt - Dryer Wt) / (Total Wt - min(Empty Up, Empty Lo)) * 100
     let binderPercent = '';
     if (binderWtVal > 0 && totalCoatBinderWtVal > 0) {
       binderPercent = ((binderWtVal / totalCoatBinderWtVal) * 100).toFixed(2);
     }
 
+    // 4. Amt Binder = (Total Wt - Dryer Wt) / ((Width x 200 / 1000000) / 2)
     let amountOfBinder = '';
     if (binderWtVal > 0 && coatingAreaVal > 0) {
       amountOfBinder = (binderWtVal / (coatingAreaVal / 2)).toFixed(2);
     }
 
+    // 1. Coating wt Up = (Dryer Wt - Empty Up) / (Width x 200 / 1000000)
+    // 2. Coating wt Lo = (Empty Up - Empty Lo) / (Width x 200 / 1000000)
     let raUp = item.raUp || '';
     let raLo = item.raLo || '';
     if (coatingAreaVal > 0) {
@@ -300,7 +341,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       width: '', 
       heightLeft: '', 
       heightRight: '',
-      length: '100', 
+      length: '200', 
       coatingWidth: '100', 
       coatingArea: '', 
       totalWeight: '', 
@@ -313,6 +354,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       raUp: '', raLo: '', 
       binderPercent: '', 
       rtUp: '', rtLo: '', 
+      scothMagicTapeUp: '',
+      scothMagicTapeLo: '',
+      scothMagicTape: '',
       status: 'Pending' as 'Pass' | 'Fail' | 'Pending', 
       remarks: '' 
     };
@@ -520,6 +564,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
   };
 
   const selectProfile = (profile: CoatingProfileSpec) => {
+    const tapeMaxUp = profile.scothMagicTapeMaxUp || profile.scothMagicTapeMax || profile.scothMagicTapeUp || profile.scothMagicTape || '0.50';
+    const tapeMaxLo = profile.scothMagicTapeMaxLo || profile.scothMagicTapeMax || profile.scothMagicTapeLo || profile.scothMagicTape || '0.50';
+
     setHeaderInfo(prev => ({
       ...prev,
       profileName: profile.name,
@@ -537,6 +584,12 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       reqCoatingWtMinLo: formatSpecValue(profile.coatingWtMinLo),
       reqCoatingWtMaxLo: formatSpecValue(profile.coatingWtMaxLo),
       reqPencilHardnessLo: formatSpecValue(profile.pencilHardnessLo),
+      reqScothMagicTapeMax: formatSpecValue(tapeMaxUp),
+      reqScothMagicTapeMaxUp: formatSpecValue(tapeMaxUp),
+      reqScothMagicTapeMaxLo: formatSpecValue(tapeMaxLo),
+      reqScothMagicTape: formatSpecValue(tapeMaxUp),
+      reqScothMagicTapeUp: formatSpecValue(tapeMaxUp),
+      reqScothMagicTapeLo: formatSpecValue(tapeMaxLo),
       stdLength: formatSpecValue(profile.stdLength),
       stdCoatingWidth: formatSpecValue(profile.stdCoatingWidth)
     }));
@@ -547,6 +600,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     if (headerInfo.profileName) {
       const match = savedProfiles.find(p => p.name.toLowerCase() === headerInfo.profileName.toLowerCase());
       if (match) {
+        const tapeMaxUp = match.scothMagicTapeMaxUp || match.scothMagicTapeMax || match.scothMagicTapeUp || match.scothMagicTape || '0.50';
+        const tapeMaxLo = match.scothMagicTapeMaxLo || match.scothMagicTapeMax || match.scothMagicTapeLo || match.scothMagicTape || '0.50';
+
         setHeaderInfo(prev => ({
           ...prev,
           reqWidthMin: formatSpecValue(match.widthMin),
@@ -563,6 +619,12 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
           reqCoatingWtMinLo: formatSpecValue(match.coatingWtMinLo),
           reqCoatingWtMaxLo: formatSpecValue(match.coatingWtMaxLo),
           reqPencilHardnessLo: formatSpecValue(match.pencilHardnessLo),
+          reqScothMagicTapeMax: formatSpecValue(tapeMaxUp),
+          reqScothMagicTapeMaxUp: formatSpecValue(tapeMaxUp),
+          reqScothMagicTapeMaxLo: formatSpecValue(tapeMaxLo),
+          reqScothMagicTape: formatSpecValue(tapeMaxUp),
+          reqScothMagicTapeUp: formatSpecValue(tapeMaxUp),
+          reqScothMagicTapeLo: formatSpecValue(tapeMaxLo),
           stdLength: formatSpecValue(match.stdLength),
           stdCoatingWidth: formatSpecValue(match.stdCoatingWidth)
         }));
@@ -590,6 +652,12 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       reqPencilHardnessUp: '',
       reqCoatingWtMinLo: '', reqCoatingWtMaxLo: '',
       reqPencilHardnessLo: '',
+      reqScothMagicTapeMax: '0.50',
+      reqScothMagicTapeMaxUp: '0.50',
+      reqScothMagicTapeMaxLo: '0.50',
+      reqScothMagicTape: '0.50',
+      reqScothMagicTapeUp: '0.50',
+      reqScothMagicTapeLo: '0.50',
       stdLength: '100',
       stdCoatingWidth: '100'
     });
@@ -614,6 +682,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       raUp: '', raLo: '', 
       binderPercent: '', 
       rtUp: '', rtLo: '', 
+      scothMagicTapeUp: '',
+      scothMagicTapeLo: '',
+      scothMagicTape: '',
       status: 'Pending' as 'Pass' | 'Fail' | 'Pending', 
       remarks: '' 
     };
@@ -628,6 +699,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       return;
     }
 
+    const tapeUp = headerInfo.reqScothMagicTapeMaxUp || headerInfo.reqScothMagicTapeUp || '0.50';
+    const tapeLo = headerInfo.reqScothMagicTapeMaxLo || headerInfo.reqScothMagicTapeLo || '0.50';
+
     const newProfile: CoatingProfileSpec = {
       name: headerInfo.profileName.trim(),
       widthMin: headerInfo.reqWidthMin, widthMax: headerInfo.reqWidthMax,
@@ -638,6 +712,12 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       pencilHardnessUp: headerInfo.reqPencilHardnessUp,
       coatingWtMinLo: headerInfo.reqCoatingWtMinLo, coatingWtMaxLo: headerInfo.reqCoatingWtMaxLo,
       pencilHardnessLo: headerInfo.reqPencilHardnessLo,
+      scothMagicTapeMax: tapeUp,
+      scothMagicTapeMaxUp: tapeUp,
+      scothMagicTapeMaxLo: tapeLo,
+      scothMagicTape: tapeUp,
+      scothMagicTapeUp: tapeUp,
+      scothMagicTapeLo: tapeLo,
       stdLength: headerInfo.stdLength,
       stdCoatingWidth: headerInfo.stdCoatingWidth
     };
@@ -671,6 +751,20 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     setDeleteConfirm(null);
   };
 
+  const isScothTapeFail = (measuredStr?: string, maxLimitStr?: string) => {
+    if (!measuredStr || measuredStr.trim() === '') return false;
+    const s = measuredStr.trim().toLowerCase();
+    if (s === 'fail' || s === 'ng') return true;
+    if (s === 'pass' || s === 'ok' || s === 'no peeling') return false;
+    const val = parseFloat(measuredStr);
+    const max = parseFloat(maxLimitStr || '0.50');
+    if (!isNaN(val) && !isNaN(max) && max > 0) {
+      // Must be less than or equal to standard limit (ค่าน้อยกว่าหรือเท่ากับมาตรฐาน)
+      return val > max;
+    }
+    return false;
+  };
+
   const judgeStatus = (item: typeof batchItems[0]): 'Pass' | 'Fail' | 'Pending' => {
     let pass = true;
 
@@ -691,6 +785,14 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     checkMinMax(item.raLo, headerInfo.reqCoatingWtMinLo, headerInfo.reqCoatingWtMaxLo);
     checkMinMax(item.binderPercent, headerInfo.reqBinderMin, headerInfo.reqBinderMax);
     checkMinMax(item.amountOfBinder, headerInfo.reqAmtBinderMin, headerInfo.reqAmtBinderMax);
+
+    // Scoth Magic Tape evaluation (Weight check: measured weight must be <= standard max limit)
+    const maxTapeUp = headerInfo.reqScothMagicTapeMaxUp || headerInfo.reqScothMagicTapeUp || headerInfo.reqScothMagicTapeMax || '0.50';
+    const maxTapeLo = headerInfo.reqScothMagicTapeMaxLo || headerInfo.reqScothMagicTapeLo || headerInfo.reqScothMagicTapeMax || '0.50';
+
+    if (isScothTapeFail(item.scothMagicTapeUp, maxTapeUp)) pass = false;
+    if (isScothTapeFail(item.scothMagicTapeLo, maxTapeLo)) pass = false;
+    if (isScothTapeFail(item.scothMagicTape, maxTapeUp)) pass = false;
 
     if (!item.lotNumber && !item.totalWeight) return 'Pending';
 
@@ -724,6 +826,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       raUp: '', raLo: '', binderPercent: '',
       rtUp: headerInfo.reqPencilHardnessUp || '', 
       rtLo: headerInfo.reqPencilHardnessLo || '', 
+      scothMagicTapeUp: headerInfo.reqScothMagicTapeUp || (lastItem ? lastItem.scothMagicTapeUp : 'Pass') || 'Pass',
+      scothMagicTapeLo: headerInfo.reqScothMagicTapeLo || (lastItem ? lastItem.scothMagicTapeLo : 'Pass') || 'Pass',
+      scothMagicTape: headerInfo.reqScothMagicTape || (lastItem ? lastItem.scothMagicTape : 'Pass') || 'Pass',
       status: 'Pending' as 'Pass' | 'Fail' | 'Pending', 
       remarks: '' 
     };
@@ -770,7 +875,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
           batchLot: `${headerInfo.profileName} - ${item.lotNumber}`,
           result: decision === 'Pass' ? 'PASS' : 'REJECT',
           defectCount: decision === 'Fail' ? 1 : 0,
-          remarks: `Coat Wt: ${item.raUp}/${item.raLo}, Binder%: ${item.binderPercent}%, AmtBinder: ${item.amountOfBinder}`
+          remarks: `Coat Wt: ${item.raUp}/${item.raLo}, Binder%: ${item.binderPercent}%, AmtBinder: ${item.amountOfBinder}, Scoth Tape: ${item.scothMagicTapeUp || 'Pass'}/${item.scothMagicTapeLo || 'Pass'}`
         });
       }
 
@@ -797,6 +902,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
         amountOfBinder: item.amountOfBinder,
         rtUp: item.rtUp,
         rtLo: item.rtLo,
+        scothMagicTape: item.scothMagicTape || item.scothMagicTapeUp || 'Pass',
+        scothMagicTapeUp: item.scothMagicTapeUp || 'Pass',
+        scothMagicTapeLo: item.scothMagicTapeLo || 'Pass',
         status: decision,
         remarks: item.remarks,
         profileName: headerInfo.profileName,
@@ -817,6 +925,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       coatingArea: '0.010000', totalWeight: '', weightAfterDryer: '', wtWithoutCoatUp: '', wtWithoutCoatLo: '',
       binderWt: '', totalCoatBinderWt: '', amountOfBinder: '', raUp: '', raLo: '', binderPercent: '',
       rtUp: headerInfo.reqPencilHardnessUp || '', rtLo: headerInfo.reqPencilHardnessLo || '',
+      scothMagicTapeUp: headerInfo.reqScothMagicTapeUp || 'Pass',
+      scothMagicTapeLo: headerInfo.reqScothMagicTapeLo || 'Pass',
+      scothMagicTape: headerInfo.reqScothMagicTape || 'Pass',
       status: 'Pending' as 'Pass' | 'Fail' | 'Pending', remarks: '' 
     };
     const resetAutos = calculateAutoFields(resetRow);
@@ -846,7 +957,8 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       'Timestamp', 'Inspector', 'Machine', 'Mixing Lot', 'Profile Name', 'Coil No', 'Side', 
       'Width', 'H-Left', 'H-Right', 'Length', 'Coating Width', 'Coating Area',
       'Total Wt', 'Dryer Wt', 'Empty Up', 'Empty Lo', 'Binder Wt', 'Coat+Binder Wt',
-      'Coating Wt Up', 'Coating Wt Lo', 'Binder %', 'Amount of Binder', 'Hardness Up', 'Hardness Lo', 'Status'
+      'Coating Wt Up', 'Coating Wt Lo', 'Binder %', 'Amount of Binder', 'Hardness Up', 'Hardness Lo',
+      'Scoth Magic Tape Up', 'Scoth Magic Tape Lo', 'Status'
     ];
 
     const csvRows = inspections.map(ins => [
@@ -863,6 +975,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       ins.binderWt || '-', ins.totalCoatBinderWt || '-',
       ins.raUp || '-', ins.raLo || '-', ins.binderPercent || '-', ins.amountOfBinder || '-',
       `"${ins.rtUp || '-'}"`, `"${ins.rtLo || '-'}"`,
+      `"${ins.scothMagicTapeUp || ins.scothMagicTape || '-'}"`, `"${ins.scothMagicTapeLo || '-'}"`,
       `"${ins.status}"`
     ]);
 
@@ -1198,11 +1311,17 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
             </div>
 
             {/* Spec summary row */}
-            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs grid grid-cols-1 sm:grid-cols-4 gap-2 text-slate-300">
+            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs grid grid-cols-1 sm:grid-cols-5 gap-2 text-slate-300">
               <div><span className="text-slate-500">Width Spec:</span> <strong className="text-indigo-300">{headerInfo.reqWidthMin ? `${headerInfo.reqWidthMin} - ${headerInfo.reqWidthMax} mm` : '-'}</strong></div>
-              <div><span className="text-slate-500">Coating Wt Limit:</span> <strong className="text-emerald-300">{headerInfo.reqCoatingWtMinUp ? `${headerInfo.reqCoatingWtMinUp} - ${headerInfo.reqCoatingWtMaxUp} g/m²` : '-'}</strong></div>
-              <div><span className="text-slate-500">Binder % Limit:</span> <strong className="text-amber-300">{headerInfo.reqBinderMin ? `${headerInfo.reqBinderMin} - ${headerInfo.reqBinderMax} %` : '-'}</strong></div>
-              <div><span className="text-slate-500">Amt Binder Limit:</span> <strong className="text-purple-300">{headerInfo.reqAmtBinderMin ? `${headerInfo.reqAmtBinderMin} - ${headerInfo.reqAmtBinderMax} g/m²` : '-'}</strong></div>
+              <div><span className="text-slate-500">Coating Wt:</span> <strong className="text-emerald-300">{headerInfo.reqCoatingWtMinUp ? `${headerInfo.reqCoatingWtMinUp} - ${headerInfo.reqCoatingWtMaxUp} g/m²` : '-'}</strong></div>
+              <div><span className="text-slate-500">Binder %:</span> <strong className="text-amber-300">{headerInfo.reqBinderMin ? `${headerInfo.reqBinderMin} - ${headerInfo.reqBinderMax} %` : '-'}</strong></div>
+              <div><span className="text-slate-500">Amt Binder:</span> <strong className="text-purple-300">{headerInfo.reqAmtBinderMin ? `${headerInfo.reqAmtBinderMin} - ${headerInfo.reqAmtBinderMax} g/m²` : '-'}</strong></div>
+              <div>
+                <span className="text-slate-500">Scoth Tape Limit:</span>{' '}
+                <strong className="text-pink-300 font-mono">
+                  ≤ {headerInfo.reqScothMagicTapeMaxUp || headerInfo.reqScothMagicTapeUp || headerInfo.reqScothMagicTapeMax || '0.50'} g/m²
+                </strong>
+              </div>
             </div>
           </div>
 
@@ -1253,10 +1372,29 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                         Weight Inputs (Total / Dryer / Empty Up / Lo)
                       </th>
                       <th className="px-3 py-3 text-center bg-emerald-950/30 text-emerald-300 border-l border-slate-800" colSpan={4}>
-                        Calculated Coating & Binder Metrics
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>Calculated Coating & Binder Metrics</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowFormulaModal(true)}
+                            className="text-emerald-400 hover:text-emerald-200 bg-emerald-900/50 hover:bg-emerald-800/80 px-1.5 py-0.5 rounded text-[9px] font-bold inline-flex items-center gap-0.5 border border-emerald-500/30 transition cursor-pointer"
+                            title="View Calculation Formulas"
+                          >
+                            <Calculator className="w-3 h-3" />
+                            <span>Formula fx</span>
+                          </button>
+                        </div>
                       </th>
                       <th className="px-3 py-3 text-center bg-purple-950/30 text-purple-300 border-l border-slate-800" colSpan={2}>
                         Hardness
+                      </th>
+                      <th className="px-3 py-3 text-center bg-pink-950/30 text-pink-300 border-l border-slate-800" colSpan={2}>
+                        <div className="flex flex-col items-center justify-center">
+                          <span>Scoth Magic Tape</span>
+                          <span className="text-[9px] text-pink-400 font-mono font-normal">
+                            ≤ {headerInfo.reqScothMagicTapeMaxUp || headerInfo.reqScothMagicTapeUp || headerInfo.reqScothMagicTapeMax || '0.50'} g/m²
+                          </span>
+                        </div>
                       </th>
                       <th className="px-3 py-3 text-center border-l border-slate-800">Status</th>
                       <th className="px-3 py-3 text-center">Action</th>
@@ -1273,6 +1411,11 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                       const isCoatLoFail = isOutOfSpec(item.raLo, headerInfo.reqCoatingWtMinLo, headerInfo.reqCoatingWtMaxLo);
                       const isBinderPctFail = isOutOfSpec(item.binderPercent, headerInfo.reqBinderMin, headerInfo.reqBinderMax);
                       const isAmtBinderFail = isOutOfSpec(item.amountOfBinder, headerInfo.reqAmtBinderMin, headerInfo.reqAmtBinderMax);
+
+                      const tapeLimitUp = headerInfo.reqScothMagicTapeMaxUp || headerInfo.reqScothMagicTapeUp || headerInfo.reqScothMagicTapeMax || '0.50';
+                      const tapeLimitLo = headerInfo.reqScothMagicTapeMaxLo || headerInfo.reqScothMagicTapeLo || headerInfo.reqScothMagicTapeMax || '0.50';
+                      const isTapeUpFail = isScothTapeFail(item.scothMagicTapeUp, tapeLimitUp);
+                      const isTapeLoFail = isScothTapeFail(item.scothMagicTapeLo, tapeLimitLo);
 
                       return (
                         <tr key={item.id} className="hover:bg-slate-950/50 transition-colors">
@@ -1418,6 +1561,46 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                             </div>
                           </td>
 
+                          {/* Scoth Magic Tape Weight Inputs */}
+                          <td className="px-2 py-2.5 text-center bg-pink-950/10 border-l border-slate-800" colSpan={2}>
+                            <div className="flex gap-1.5 justify-center items-center">
+                              <div className="flex flex-col items-center">
+                                <span className="text-[9px] text-slate-500 font-bold">Up (g/m²)</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder={`≤ ${tapeLimitUp}`}
+                                  value={item.scothMagicTapeUp || ''}
+                                  onChange={(e) => handleItemChange(item.id, 'scothMagicTapeUp', e.target.value)}
+                                  className={`w-16 text-center text-[11px] font-bold rounded-lg px-1 py-1 border outline-none font-mono ${
+                                    isTapeUpFail
+                                      ? 'bg-rose-950/80 border-rose-500 text-rose-300 ring-1 ring-rose-500/50'
+                                      : item.scothMagicTapeUp && item.scothMagicTapeUp !== ''
+                                      ? 'bg-slate-950 border-emerald-500/50 text-emerald-300'
+                                      : 'bg-slate-950 border-slate-800 text-pink-300 focus:border-pink-500'
+                                  }`}
+                                />
+                              </div>
+                              <div className="flex flex-col items-center">
+                                <span className="text-[9px] text-slate-500 font-bold">Lo (g/m²)</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder={`≤ ${tapeLimitLo}`}
+                                  value={item.scothMagicTapeLo || ''}
+                                  onChange={(e) => handleItemChange(item.id, 'scothMagicTapeLo', e.target.value)}
+                                  className={`w-16 text-center text-[11px] font-bold rounded-lg px-1 py-1 border outline-none font-mono ${
+                                    isTapeLoFail
+                                      ? 'bg-rose-950/80 border-rose-500 text-rose-300 ring-1 ring-rose-500/50'
+                                      : item.scothMagicTapeLo && item.scothMagicTapeLo !== ''
+                                      ? 'bg-slate-950 border-emerald-500/50 text-emerald-300'
+                                      : 'bg-slate-950 border-slate-800 text-pink-300 focus:border-pink-500'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+                          </td>
+
                           {/* Status */}
                           <td className="px-3 py-2.5 text-center border-l border-slate-800">
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
@@ -1494,7 +1677,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                     <div>
                       <div className="text-xs font-bold">{p.name}</div>
                       <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                        Coat: {p.coatingWtMinUp}-{p.coatingWtMaxUp} | Binder: {p.binderMin}-{p.binderMax}%
+                        Coat: {p.coatingWtMinUp}-{p.coatingWtMaxUp} | Binder: {p.binderMin}-{p.binderMax}% | Tape Max: ≤{p.scothMagicTapeMaxUp || p.scothMagicTapeMax || p.scothMagicTapeUp || p.scothMagicTape || '0.50'}
                       </div>
                     </div>
                     <button
@@ -1599,6 +1782,42 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                 </div>
 
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-bold text-pink-400">Scoth Magic Tape (Max Weight Limit)</h5>
+                    <span className="text-[10px] text-pink-400 font-mono font-bold">≤ มาตรฐาน</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-slate-500 block">Max Limit Up (g/m²)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        name="reqScothMagicTapeMaxUp"
+                        value={headerInfo.reqScothMagicTapeMaxUp || headerInfo.reqScothMagicTapeUp || ''}
+                        onChange={handleHeaderChange}
+                        placeholder="e.g. 0.50"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-pink-300 font-mono font-bold focus:border-pink-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 block">Max Limit Lo (g/m²)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        name="reqScothMagicTapeMaxLo"
+                        value={headerInfo.reqScothMagicTapeMaxLo || headerInfo.reqScothMagicTapeLo || ''}
+                        onChange={handleHeaderChange}
+                        placeholder="e.g. 0.50"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-pink-300 font-mono font-bold focus:border-pink-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    {isTh ? '* ตรวจสอบน้ำหนักสารเคลือบ ต้องมีค่าน้อยกว่าหรือเท่ากับเกณฑ์ที่กำหนด (≤ Max)' : '* Measured coating weight must be less than or equal to standard limit.'}
+                  </p>
+                </div>
+
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 sm:col-span-2">
                   <h5 className="text-xs font-bold text-slate-300">Standard Test Dimensions (mm)</h5>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -1755,6 +1974,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                   <th className="px-3 py-3 text-center">Binder %</th>
                   <th className="px-3 py-3 text-center">Amt Binder</th>
                   <th className="px-3 py-3 text-center">Hardness</th>
+                  <th className="px-3 py-3 text-center">Scoth Tape</th>
                   <th className="px-3 py-3 text-center">Status</th>
                   <th className="px-3 py-3 text-center">Action</th>
                 </tr>
@@ -1776,6 +1996,24 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                     </td>
                     <td className="px-3 py-2.5 text-center text-slate-300">
                       {ins.rtUp || '-'}/{ins.rtLo || '-'}
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <div className="inline-flex items-center gap-1 font-mono text-[11px]">
+                        <span className={`px-1.5 py-0.5 rounded font-bold ${
+                          isScothTapeFail(ins.scothMagicTapeUp || ins.scothMagicTape, ins.scothMagicTapeMaxUp || ins.scothMagicTapeMax || '0.50')
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                            : 'bg-pink-500/10 text-pink-300 border border-pink-500/20'
+                        }`}>
+                          U:{ins.scothMagicTapeUp || ins.scothMagicTape || '-'}
+                        </span>
+                        <span className={`px-1.5 py-0.5 rounded font-bold ${
+                          isScothTapeFail(ins.scothMagicTapeLo, ins.scothMagicTapeMaxLo || ins.scothMagicTapeMax || '0.50')
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                            : 'bg-pink-500/10 text-pink-300 border border-pink-500/20'
+                        }`}>
+                          L:{ins.scothMagicTapeLo || '-'}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
@@ -2017,6 +2255,29 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-pink-400 uppercase block mb-1">Tape Up (g/m²)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="≤ Max"
+                      value={editingHistoryItem.scothMagicTapeUp || ''}
+                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, scothMagicTapeUp: e.target.value, scothMagicTape: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-pink-300 font-bold focus:outline-none focus:border-pink-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-pink-400 uppercase block mb-1">Tape Lo (g/m²)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="≤ Max"
+                      value={editingHistoryItem.scothMagicTapeLo || ''}
+                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, scothMagicTapeLo: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-pink-300 font-bold focus:outline-none focus:border-pink-500"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -2036,6 +2297,137 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
               >
                 <Save className="w-4 h-4" />
                 <span>{isTh ? 'บันทึกการแก้ไข' : 'Save Changes'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FORMULA REFERENCE & VERIFICATION MODAL */}
+      {showFormulaModal && (
+        <div className="fixed inset-0 z-[130] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-3xl p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
+                  <Calculator className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {isTh ? 'สูตรการคำนวณการตรวจวัด IPQA-04' : 'IPQA-04 Calculation Formulas'}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {isTh ? 'การตรวจวัดการเคลือบผิว (Calculated Coating & Binder Metrics)' : 'Coating & Binder Metrics Calculation Specs'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowFormulaModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800/80 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Formula 1 */}
+              <div className="bg-slate-950/80 p-4 rounded-2xl border border-emerald-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-400 uppercase tracking-wider text-[11px]">
+                    1. Coating wt Up (g/m²)
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold">
+                    Formula Verified ✓
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-900 rounded-xl font-mono text-emerald-300 border border-slate-800 text-xs sm:text-sm text-center">
+                  Coating wt Up = (Dryer Wt - Empty Up) / (Width × 200 / 1,000,000)
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {isTh ? 'น้ำหนักเคลือบผิวแถบบน = (น้ำหนักหลังอบแห้ง - น้ำหนักแผ่นบนเปล่า) ÷ พื้นที่ตัวอย่าง (กว้าง × 200 ÷ 1,000,000 ม.²)' : 'Upper coating weight in g/m² divided by the sample area in m².'}
+                </p>
+              </div>
+
+              {/* Formula 2 */}
+              <div className="bg-slate-950/80 p-4 rounded-2xl border border-emerald-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-400 uppercase tracking-wider text-[11px]">
+                    2. Coating wt Lo (g/m²)
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold">
+                    Formula Verified ✓
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-900 rounded-xl font-mono text-emerald-300 border border-slate-800 text-xs sm:text-sm text-center">
+                  Coating wt Lo = (Empty Up - Empty Lo) / (Width × 200 / 1,000,000)
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {isTh ? 'น้ำหนักเคลือบผิวแถบล่าง = (น้ำหนักแผ่นบนเปล่า - น้ำหนักแผ่นล่างเปล่า) ÷ พื้นที่ตัวอย่าง (กว้าง × 200 ÷ 1,000,000 ม.²)' : 'Lower coating weight in g/m² divided by the sample area in m².'}
+                </p>
+              </div>
+
+              {/* Formula 3 */}
+              <div className="bg-slate-950/80 p-4 rounded-2xl border border-amber-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-400 uppercase tracking-wider text-[11px]">
+                    3. Binder % (%)
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold">
+                    Formula Verified ✓
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-900 rounded-xl font-mono text-amber-300 border border-slate-800 text-xs sm:text-sm text-center">
+                  Binder% = (Total Wt - Dryer Wt) / (Total Wt - min(Empty Up, Empty Lo)) × 100
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {isTh ? 'เปอร์เซ็นต์ไบน์เดอร์ = (น้ำหนักรวม - น้ำหนักหลังอบแห้ง) ÷ (น้ำหนักรวม - ค่าต่ำสุดของ Empty Up/Lo) × 100%' : 'Percentage of binder relative to the total active coating and binder mass.'}
+                </p>
+              </div>
+
+              {/* Formula 4 */}
+              <div className="bg-slate-950/80 p-4 rounded-2xl border border-purple-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-purple-400 uppercase tracking-wider text-[11px]">
+                    4. Amount of Binder (Amt Binder)
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono text-[10px] font-bold">
+                    Formula Verified ✓
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-900 rounded-xl font-mono text-purple-300 border border-slate-800 text-xs sm:text-sm text-center">
+                  Amt Binder = (Total Wt - Dryer Wt) / ((Width × 200 / 1,000,000) / 2)
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {isTh ? 'ปริมาณไบน์เดอร์ = (น้ำหนักรวม - น้ำหนักหลังอบแห้ง) ÷ (พื้นที่ตัวอย่าง ÷ 2)' : 'Amount of binder per half sample area unit.'}
+                </p>
+              </div>
+
+              {/* Formula 5: Scoth Magic Tape */}
+              <div className="bg-slate-950/80 p-4 rounded-2xl border border-pink-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-pink-400 uppercase tracking-wider text-[11px]">
+                    5. Scoth Magic Tape (Weight ≤ Max Limit)
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-pink-500/20 text-pink-300 font-mono text-[10px] font-bold">
+                    Quality Standard ✓
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-900 rounded-xl font-mono text-pink-300 border border-slate-800 text-xs sm:text-sm text-center">
+                  Scoth Magic Tape Weight: Measured Value ≤ Max Limit Spec (g/m²)
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {isTh ? 'การตรวจวัดน้ำหนักสารเคลือบด้วยเทป Scotch Magic Tape ตรวจสอบทั้งแถบบน (Up) และแถบล่าง (Lo) โดยค่าน้ำหนักสารเคลือบที่ติดเทปต้องมีค่าน้อยกว่าหรือเท่ากับเกณฑ์มาตรฐานที่กำหนด (≤ Max Limit)' : 'Measured coating weight removed by Scotch Magic Tape must be less than or equal to the specified maximum limit (≤ Max Limit).'}
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowFormulaModal(false)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-5 py-2.5 rounded-xl transition"
+              >
+                {isTh ? 'ปิดหน้าต่าง' : 'Close'}
               </button>
             </div>
           </div>

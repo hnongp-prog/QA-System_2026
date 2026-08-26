@@ -40,7 +40,9 @@ import {
   QrCode,
   X,
   Sun,
-  Moon
+  Moon,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import { useCloudState } from '../services/firestoreSync';
 
@@ -244,6 +246,10 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
   // Printing & History
   const [activePrintItem, setActivePrintItem] = useState<BilletInspectionItem | null>(null);
+  const [activeBatchPrintItems, setActiveBatchPrintItems] = useState<BilletInspectionItem[] | null>(null);
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<string[]>([]);
+  const [batchPrintLayout, setBatchPrintLayout] = useState<'roll' | 'grid'>('roll');
+  const [batchCopiedInfo, setBatchCopiedInfo] = useState(false);
   const [history, setHistory] = useCloudState<BilletInspectionItem[]>('billet_qc_history', INITIAL_HISTORY);
 
   // Search & Filter
@@ -755,73 +761,251 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
     return { total, ok, ng, okRate, gradeSummary: Object.values(gradeSummaryMap) };
   }, [filteredHistory]);
 
-  // Print Tag
-  const handlePrintTag = (item: BilletInspectionItem) => {
+  // Helper to chunk arrays for sheet printing
+  const chunkArray = <T,>(arr: T[], size: number): T[][] => {
+    const res: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) {
+      res.push(arr.slice(i, i + size));
+    }
+    return res;
+  };
+
+  // Unique key for history row selection
+  const getHistoryItemKey = (item: BilletInspectionItem, idx: number): string => {
+    return item.id || (item.heat_number ? `${item.heat_number}-${item.batch_no || ''}-${idx}` : `billet-hist-${idx}`);
+  };
+
+  // Toggle single history item selection
+  const toggleSelectHistory = (key: string) => {
+    setSelectedHistoryIds(prev => 
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  // Check if all filtered history items are selected
+  const isAllFilteredSelected = filteredHistory.length > 0 && filteredHistory.every((item, idx) => 
+    selectedHistoryIds.includes(getHistoryItemKey(item, idx))
+  );
+
+  // Toggle select all filtered history items
+  const toggleSelectAllHistory = () => {
+    if (isAllFilteredSelected) {
+      const filteredKeys = new Set(filteredHistory.map((item, idx) => getHistoryItemKey(item, idx)));
+      setSelectedHistoryIds(prev => prev.filter(k => !filteredKeys.has(k)));
+    } else {
+      const filteredKeys = filteredHistory.map((item, idx) => getHistoryItemKey(item, idx));
+      setSelectedHistoryIds(prev => Array.from(new Set([...prev, ...filteredKeys])));
+    }
+  };
+
+  // Clear all selections
+  const clearHistorySelection = () => {
+    setSelectedHistoryIds([]);
+  };
+
+  // List of currently selected history items
+  const selectedHistoryItems = useMemo(() => {
+    return filteredHistory.filter((item, idx) => 
+      selectedHistoryIds.includes(getHistoryItemKey(item, idx))
+    );
+  }, [filteredHistory, selectedHistoryIds]);
+
+  // Open Batch Print Modal for selected items
+  const handlePrintBatchTags = (itemsToPrint?: BilletInspectionItem[]) => {
+    const targetItems = itemsToPrint && itemsToPrint.length > 0 ? itemsToPrint : selectedHistoryItems;
+    if (targetItems.length === 0) return;
+    setActiveBatchPrintItems(targetItems);
+    setBatchCopiedInfo(false);
+  };
+
+  // Generate Individual Tag Card Inner HTML
+  const generateTagContentHtml = (item: BilletInspectionItem) => {
     const spec = findMatchingSpec(item.grade);
-    const tagColor = spec?.color || "#4f46e5";
+    const tagColor = spec?.color || "#2563eb";
     const jg = item.judgement || performJudgement(item);
+    const isPass = jg === 'PASS';
 
-    const printWindow = window.open('', '_blank', 'width=500,height=500');
-    if (!printWindow) return;
+    return `
+      <div class="tag-box" style="border: 2.5px solid ${tagColor};">
+        <div class="header" style="background: ${tagColor};">QUALITY APPROVED BILLET TAG</div>
+        <div class="body-grid">
+          <div class="qr-placeholder">
+            <svg width="72" height="72" viewBox="0 0 100 100">
+              <rect width="100" height="100" fill="#fff" />
+              <rect x="10" y="10" width="30" height="30" fill="#000"/>
+              <rect x="15" y="15" width="20" height="20" fill="#fff"/>
+              <rect x="20" y="20" width="10" height="10" fill="#000"/>
+              <rect x="60" y="10" width="30" height="30" fill="#000"/>
+              <rect x="65" y="15" width="20" height="20" fill="#fff"/>
+              <rect x="70" y="20" width="10" height="10" fill="#000"/>
+              <rect x="10" y="60" width="30" height="30" fill="#000"/>
+              <rect x="15" y="65" width="20" height="20" fill="#fff"/>
+              <rect x="20" y="70" width="10" height="10" fill="#000"/>
+              <rect x="45" y="45" width="12" height="12" fill="#000"/>
+              <rect x="65" y="55" width="15" height="15" fill="#000"/>
+              <rect x="45" y="65" width="10" height="20" fill="#000"/>
+              <rect x="65" y="75" width="20" height="15" fill="#000"/>
+            </svg>
+            <span style="font-size: 8px; font-weight: bold; margin-top: 2px; font-family: monospace;">HEAT:${item.heat_number || '-'}</span>
+          </div>
+          <div class="details">
+            <div><strong>HEAT NO:</strong> <span style="font-family: monospace; font-size:12px; font-weight:bold;">${item.heat_number || '-'}</span></div>
+            <div><strong>GRADE:</strong> <span style="font-size:12px; font-weight:bold; color:${tagColor}">${item.grade || '-'}</span></div>
+            <div><strong>SIZE:</strong> ${item.billet_size || '-'}</div>
+            <div><strong>SUPPLIER:</strong> ${item.supplier_name || '-'}</div>
+            <div><strong>QTY / WT:</strong> ${item.quantity_pcs || '0'} pcs / ${item.weight_kg || '0'} kg</div>
+            <div><strong>INSPECTOR:</strong> ${item.inspector_name || 'QA Team'}</div>
+            <div><strong>STATUS:</strong> <span class="badge" style="background: ${isPass ? '#10b981' : '#ef4444'};">${jg}</span></div>
+          </div>
+        </div>
+        ${item.chemical_composition && Object.keys(item.chemical_composition).length > 0 ? `
+          <div class="chem-row">
+            <strong>CHEM (%):</strong>
+            ${Object.entries(item.chemical_composition).slice(0, 7).map(([k, v]) => `${k}:${v}`).join(' ')}
+          </div>
+        ` : ''}
+        <div class="footer">IQA-01 Billet Incoming Verification • Date: ${item.timestamp || (item.createdAt ? new Date(item.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])}</div>
+      </div>
+    `;
+  };
 
-    const htmlContent = `
+  // Generate Print Tag HTML (Single or Batch with page breaks)
+  const generateMultipleTagsHtml = (items: BilletInspectionItem[], layout: 'roll' | 'grid' = 'roll') => {
+    const isGrid = layout === 'grid';
+    return `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Billet Inspection QR Tag - ${item.heat_number}</title>
+          <meta charset="utf-8">
+          <title>Billet Approved QR Tags (${items.length} Heats)</title>
           <style>
-            body { font-family: system-ui, sans-serif; padding: 20px; background: #fff; color: #000; margin: 0; }
-            .tag-box { border: 3px solid ${tagColor}; border-radius: 12px; padding: 16px; max-w: 360px; margin: 0 auto; }
-            .header { background: ${tagColor}; color: #fff; text-align: center; font-weight: bold; padding: 8px; border-radius: 6px; font-size: 16px; letter-spacing: 1px; }
-            .body-grid { display: flex; margin-top: 14px; gap: 12px; align-items: center; }
-            .qr-placeholder { width: 110px; height: 110px; border: 2px border #000; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; text-align: center; border-radius: 8px; }
-            .details { flex: 1; font-size: 11px; line-height: 1.6; }
-            .badge { display: inline-block; padding: 3px 8px; font-weight: bold; border-radius: 4px; color: white; background: ${jg === 'PASS' ? '#10b981' : '#ef4444'}; margin-top: 4px; }
-            .footer { margin-top: 12px; border-top: 1px border #e2e8f0; padding-top: 6px; font-size: 9px; color: #64748b; text-align: center; }
+            * { box-sizing: border-box; }
+            body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; }
+            ${isGrid ? `
+              @page { size: A4 portrait; margin: 10mm; }
+              .grid-page {
+                page-break-after: always;
+                break-after: page;
+                margin-bottom: 24px;
+              }
+              .sheet-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+              }
+              .tag-box { border-radius: 10px; padding: 10px; background: #fff; page-break-inside: avoid; }
+            ` : `
+              @page { size: 100mm 100mm; margin: 0; }
+              .tag-page {
+                page-break-after: always;
+                break-after: page;
+                padding: 10px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100mm;
+                height: 100mm;
+                box-sizing: border-box;
+              }
+              .tag-box { border-radius: 12px; padding: 12px; width: 100%; max-width: 360px; margin: 0 auto; background: #fff; }
+            `}
+            .header { color: #fff; text-align: center; font-weight: 800; padding: 6px 4px; border-radius: 6px; font-size: 13px; letter-spacing: 0.5px; }
+            .body-grid { display: flex; margin-top: 8px; gap: 8px; align-items: stretch; }
+            .qr-placeholder { width: 90px; min-width: 90px; height: 90px; border: 2px solid #000; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; text-align: center; border-radius: 6px; }
+            .details { flex: 1; font-size: 10.5px; line-height: 1.4; }
+            .details > div { margin-bottom: 2px; }
+            .badge { display: inline-block; padding: 1px 6px; font-weight: bold; border-radius: 4px; color: white; font-size: 9.5px; }
+            .chem-row { font-size: 8.5px; font-family: monospace; background: #f1f5f9; padding: 3px 6px; border-radius: 4px; margin-top: 6px; }
+            .footer { margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 3px; font-size: 7.5px; color: #64748b; text-align: center; }
+            @media print {
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
           </style>
         </head>
         <body>
-          <div class="tag-box">
-            <div class="header">QUALITY APPROVED BILLET TAG</div>
-            <div class="body-grid">
-              <div class="qr-placeholder">
-                <svg width="80" height="80" viewBox="0 0 100 100">
-                  <rect width="100" height="100" fill="#fff" />
-                  <rect x="10" y="10" width="30" height="30" fill="#000"/>
-                  <rect x="15" y="15" width="20" height="20" fill="#fff"/>
-                  <rect x="20" y="20" width="10" height="10" fill="#000"/>
-                  <rect x="60" y="10" width="30" height="30" fill="#000"/>
-                  <rect x="65" y="15" width="20" height="20" fill="#fff"/>
-                  <rect x="70" y="20" width="10" height="10" fill="#000"/>
-                  <rect x="10" y="60" width="30" height="30" fill="#000"/>
-                  <rect x="15" y="65" width="20" height="20" fill="#fff"/>
-                  <rect x="20" y="70" width="10" height="10" fill="#000"/>
-                  <rect x="50" y="50" width="15" height="15" fill="#000"/>
-                  <rect x="70" y="70" width="20" height="20" fill="#000"/>
-                </svg>
-                <span style="font-size: 8px; font-weight: bold; margin-top: 2px;">SCAN QR</span>
+          ${isGrid ? (
+            chunkArray(items, 4).map(chunk => `
+              <div class="grid-page">
+                <div class="sheet-grid">
+                  ${chunk.map(item => generateTagContentHtml(item)).join('')}
+                </div>
               </div>
-              <div class="details">
-                <div><strong>HEAT NO:</strong> ${item.heat_number}</div>
-                <div><strong>GRADE:</strong> <span style="font-size:14px; font-weight:bold; color:${tagColor}">${item.grade}</span></div>
-                <div><strong>SIZE:</strong> ${item.billet_size}</div>
-                <div><strong>SUPPLIER:</strong> ${item.supplier_name || '-'}</div>
-                <div><strong>QTY / WT:</strong> ${item.quantity_pcs || '0'} pcs / ${item.weight_kg || '0'} kg</div>
-                <div><strong>INSPECTOR:</strong> ${item.inspector_name || 'QA Team'}</div>
-                <div><strong>STATUS:</strong> <span class="badge">${jg}</span></div>
+            `).join('')
+          ) : (
+            items.map(item => `
+              <div class="tag-page">
+                ${generateTagContentHtml(item)}
               </div>
-            </div>
-            <div class="footer">QA Inspection System • IQA-01 Billet Incoming Verification</div>
-          </div>
-          <script>
-            window.onload = function() { window.print(); window.close(); };
-          </script>
+            `).join('')
+          )}
         </body>
       </html>
     `;
+  };
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+  const generateTagHtml = (item: BilletInspectionItem) => {
+    return generateMultipleTagsHtml([item], 'roll');
+  };
+
+  // Direct Print for Single or Multiple Tags via hidden iframe
+  const triggerDirectMultiplePrint = (items: BilletInspectionItem[], layout: 'roll' | 'grid' = 'roll') => {
+    if (items.length === 0) return;
+    const htmlContent = generateMultipleTagsHtml(items, layout);
+
+    try {
+      let iframe = document.getElementById('billet-print-iframe') as HTMLIFrameElement;
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'billet-print-iframe';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.visibility = 'hidden';
+        document.body.appendChild(iframe);
+      }
+
+      const doc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (doc) {
+        doc.open();
+        doc.write(htmlContent);
+        doc.close();
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        }, 400);
+        return;
+      }
+    } catch (err) {
+      console.warn('Iframe print failed, falling back to window.open', err);
+    }
+
+    try {
+      const printWindow = window.open('', '_blank', 'width=700,height=700');
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 300);
+      }
+    } catch (e) {
+      console.error('Window print error:', e);
+    }
+  };
+
+  const triggerDirectPrint = (item: BilletInspectionItem) => {
+    triggerDirectMultiplePrint([item], 'roll');
+  };
+
+  // Print Tag action: Open Preview Modal and ready print
+  const [copiedTagInfo, setCopiedTagInfo] = useState(false);
+  const handlePrintTag = (item: BilletInspectionItem) => {
+    setActivePrintItem(item);
+    setCopiedTagInfo(false);
   };
 
   return (
@@ -1416,6 +1600,90 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
             </div>
           </div>
 
+          {/* Batch Print Action Toolbar */}
+          <div className={`p-3.5 rounded-2xl border flex flex-wrap items-center justify-between gap-3 shadow-xs transition-all ${
+            selectedHistoryItems.length > 0
+              ? isLight ? 'bg-blue-50/90 border-blue-200' : 'bg-blue-950/40 border-blue-800/70'
+              : isLight ? 'bg-slate-50/80 border-slate-200' : 'bg-slate-900/50 border-slate-800/60'
+          }`}>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <button
+                type="button"
+                onClick={toggleSelectAllHistory}
+                disabled={filteredHistory.length === 0}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+                  isAllFilteredSelected
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : isLight
+                      ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}
+              >
+                {isAllFilteredSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                <span>{isAllFilteredSelected ? (isTh ? 'ยกเลิกเลือกทั้งหมด' : 'Deselect All') : (isTh ? 'เลือกทั้งหมดในรายการ' : 'Select All Filtered')}</span>
+              </button>
+
+              <span className={`text-xs font-semibold ${
+                selectedHistoryItems.length > 0
+                  ? isLight ? 'text-blue-900' : 'text-blue-200'
+                  : isLight ? 'text-slate-500' : 'text-slate-400'
+              }`}>
+                {isTh 
+                  ? `เลือกแล้ว ${selectedHistoryItems.length} / ${filteredHistory.length} Heat Numbers`
+                  : `Selected ${selectedHistoryItems.length} / ${filteredHistory.length} Heat Numbers`}
+              </span>
+
+              {selectedHistoryItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearHistorySelection}
+                  className={`text-xs font-semibold underline hover:no-underline transition ${
+                    isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {isTh ? 'ล้างที่เลือก' : 'Clear'}
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handlePrintBatchTags(selectedHistoryItems)}
+                disabled={selectedHistoryItems.length === 0}
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-sm ${
+                  selectedHistoryItems.length > 0
+                    ? 'bg-blue-600 hover:bg-blue-500 active:scale-95 text-white shadow-blue-500/20'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60'
+                }`}
+                title={isTh ? "พิมพ์แท็ก QR Label ทุก Heat No. ที่เลือกพร้อมกัน" : "Print QR Tags for all selected heats"}
+              >
+                <Printer className="w-4 h-4" />
+                <span>
+                  {isTh 
+                    ? `พิมพ์แท็กที่เลือกพร้อมกัน (${selectedHistoryItems.length} ใบ)` 
+                    : `Print Selected Tags (${selectedHistoryItems.length})`}
+                </span>
+              </button>
+
+              {filteredHistory.length > 0 && selectedHistoryItems.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => handlePrintBatchTags(filteredHistory)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border ${
+                    isLight 
+                      ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300' 
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                  }`}
+                  title={isTh ? "พิมพ์แท็กทั้งหมดที่ค้นหาได้ในรายการ" : "Print all filtered tags"}
+                >
+                  <Printer className="w-3.5 h-3.5 text-blue-500" />
+                  <span>{isTh ? `พิมพ์ทั้งหมด (${filteredHistory.length})` : `Print All (${filteredHistory.length})`}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Summary Table by Grade */}
           <div className={`border rounded-2xl p-5 space-y-3 shadow-xs ${
             isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
@@ -1489,6 +1757,16 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                   isLight ? 'bg-slate-50 text-slate-500 border-b border-slate-200' : 'bg-slate-950 text-slate-400'
                 }`}>
                   <tr>
+                    <th className="p-3 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isAllFilteredSelected}
+                        onChange={toggleSelectAllHistory}
+                        disabled={filteredHistory.length === 0}
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                        title={isTh ? "เลือกทั้งหมด" : "Select All"}
+                      />
+                    </th>
                     <th className="p-3">Heat No / Grade</th>
                     <th className="p-3">Supplier / Inspector</th>
                     <th className="p-3 text-center">Qty / Weight</th>
@@ -1498,10 +1776,27 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-slate-800/80'}`}>
-                  {filteredHistory.map((entry) => {
+                  {filteredHistory.map((entry, idx) => {
+                    const itemKey = getHistoryItemKey(entry, idx);
+                    const isSelected = selectedHistoryIds.includes(itemKey);
                     const spec = findMatchingSpec(entry.grade);
                     return (
-                      <tr key={entry.id} className={`transition ${isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-950/50'}`}>
+                      <tr 
+                        key={itemKey} 
+                        className={`transition ${
+                          isSelected 
+                            ? isLight ? 'bg-blue-50/70' : 'bg-blue-950/30'
+                            : isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-950/50'
+                        }`}
+                      >
+                        <td className="p-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectHistory(itemKey)}
+                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                          />
+                        </td>
                         <td className="p-3">
                           <span className={`font-bold font-mono block ${isLight ? 'text-slate-900' : 'text-white'}`}>{entry.heat_number}</span>
                           <span className="text-[11px] font-semibold" style={{ color: spec?.color || (isLight ? '#2563eb' : '#38bdf8') }}>
@@ -2239,6 +2534,428 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               >
                 <Save className="w-4 h-4" />
                 <span>{isTh ? 'บันทึกการแก้ไข' : 'Save Changes'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PRINT TAG PREVIEW & PRINT MODAL */}
+      {activePrintItem && (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto ${
+          isLight ? 'bg-slate-900/40 backdrop-blur-xs' : 'bg-slate-950/85 backdrop-blur-md'
+        }`}>
+          <div className={`border rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative ${
+            isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+          }`}>
+            {/* Modal Header */}
+            <div className={`flex items-center justify-between border-b pb-3.5 ${
+              isLight ? 'border-slate-200' : 'border-slate-800'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                  <Printer className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className={`text-base font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                    {isTh ? 'พิมพ์แท็กรับรองคุณภาพ Billet (QR Tag)' : 'Print Quality Approved Billet Tag'}
+                  </h3>
+                  <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Heat No. <span className="font-mono font-bold">{activePrintItem.heat_number || 'N/A'}</span>
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActivePrintItem(null)} 
+                className={isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-400 hover:text-slate-200'}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Visual Tag Preview Card */}
+            {(() => {
+              const spec = findMatchingSpec(activePrintItem.grade);
+              const tagColor = spec?.color || "#2563eb";
+              const jg = activePrintItem.judgement || performJudgement(activePrintItem);
+              const isPass = jg === 'PASS';
+
+              return (
+                <div 
+                  className="rounded-2xl p-4 bg-white text-slate-900 border-3 shadow-md mx-auto max-w-sm relative"
+                  style={{ borderColor: tagColor }}
+                >
+                  {/* Tag Header */}
+                  <div 
+                    className="text-white text-center font-black py-1.5 px-3 rounded-lg text-xs tracking-wider uppercase shadow-xs mb-3"
+                    style={{ backgroundColor: tagColor }}
+                  >
+                    QUALITY APPROVED BILLET TAG
+                  </div>
+
+                  <div className="flex gap-3 items-stretch">
+                    {/* Simulated QR Code Graphic */}
+                    <div className="w-24 h-24 min-w-[96px] bg-slate-50 border-2 border-slate-900 rounded-xl flex flex-col items-center justify-center p-1 text-center">
+                      <svg width="68" height="68" viewBox="0 0 100 100">
+                        <rect width="100" height="100" fill="#fff" />
+                        <rect x="10" y="10" width="28" height="28" fill="#000"/>
+                        <rect x="15" y="15" width="18" height="18" fill="#fff"/>
+                        <rect x="19" y="19" width="10" height="10" fill="#000"/>
+                        <rect x="62" y="10" width="28" height="28" fill="#000"/>
+                        <rect x="67" y="15" width="18" height="18" fill="#fff"/>
+                        <rect x="71" y="19" width="10" height="10" fill="#000"/>
+                        <rect x="10" y="62" width="28" height="28" fill="#000"/>
+                        <rect x="15" y="67" width="18" height="18" fill="#fff"/>
+                        <rect x="19" y="71" width="10" height="10" fill="#000"/>
+                        <rect x="45" y="45" width="12" height="12" fill="#000"/>
+                        <rect x="62" y="52" width="14" height="14" fill="#000"/>
+                        <rect x="45" y="65" width="10" height="18" fill="#000"/>
+                        <rect x="62" y="72" width="20" height="15" fill="#000"/>
+                      </svg>
+                      <span className="text-[7px] font-mono font-bold text-slate-800 truncate max-w-full">
+                        {activePrintItem.heat_number || 'BILLET-QR'}
+                      </span>
+                    </div>
+
+                    {/* Tag Meta Details */}
+                    <div className="flex-1 text-[11px] leading-tight space-y-1">
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase block">Heat Number</span>
+                        <span className="font-mono font-bold text-sm text-slate-950">{activePrintItem.heat_number || '-'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase">Grade:</span>
+                        <span className="font-black text-xs px-1.5 py-0.5 rounded text-white" style={{ backgroundColor: tagColor }}>
+                          {activePrintItem.grade || '-'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 text-[10px]">
+                        <div>
+                          <span className="text-slate-500">Size: </span>
+                          <span className="font-bold">{activePrintItem.billet_size || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Qty: </span>
+                          <span className="font-bold">{activePrintItem.quantity_pcs || '0'} pcs</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 text-[10px]">
+                        <div>
+                          <span className="text-slate-500">Wt: </span>
+                          <span className="font-bold">{activePrintItem.weight_kg || '0'} kg</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">QC: </span>
+                          <span className="font-bold truncate">{activePrintItem.inspector_name || 'QA Team'}</span>
+                        </div>
+                      </div>
+                      <div className="pt-0.5 flex items-center justify-between">
+                        <span className="text-[9px] text-slate-500">{activePrintItem.timestamp || (activePrintItem.createdAt ? new Date(activePrintItem.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])}</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold text-white ${
+                          isPass ? 'bg-emerald-600' : 'bg-rose-600'
+                        }`}>
+                          {jg}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Chemistry Preview Footer */}
+                  {activePrintItem.chemical_composition && Object.keys(activePrintItem.chemical_composition).length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-dashed border-slate-300 text-[9px] font-mono text-slate-700 grid grid-cols-5 gap-1 text-center bg-slate-50 p-1.5 rounded-lg">
+                      {Object.entries(activePrintItem.chemical_composition).slice(0, 5).map(([el, val]) => (
+                        <div key={el}>
+                          <span className="font-bold text-slate-500 block text-[8px]">{el}</span>
+                          <span className="font-semibold text-slate-900">{val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const tagDate = activePrintItem.timestamp || (activePrintItem.createdAt ? new Date(activePrintItem.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+                  const tagText = `[BILLET QUALITY TAG]\nHeat No: ${activePrintItem.heat_number}\nGrade: ${activePrintItem.grade}\nSize: ${activePrintItem.billet_size}\nSupplier: ${activePrintItem.supplier_name || '-'}\nQty: ${activePrintItem.quantity_pcs} pcs (${activePrintItem.weight_kg} kg)\nStatus: ${activePrintItem.judgement || 'PASS'}\nInspector: ${activePrintItem.inspector_name || 'QA Team'}\nDate: ${tagDate}`;
+                  navigator.clipboard.writeText(tagText);
+                  setCopiedTagInfo(true);
+                  setTimeout(() => setCopiedTagInfo(false), 2000);
+                }}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${
+                  isLight 
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' 
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+              >
+                {copiedTagInfo ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedTagInfo ? (isTh ? 'คัดลอกแล้ว!' : 'Copied!') : (isTh ? 'คัดลอกข้อมูลแท็ก' : 'Copy Tag Info')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerDirectPrint(activePrintItem)}
+                className="flex-1 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition shadow-sm flex items-center justify-center gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                <span>{isTh ? 'สั่งพิมพ์แท็กทันที' : 'Print Tag Now'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActivePrintItem(null)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition border ${
+                  isLight 
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' 
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border-slate-700'
+                }`}
+              >
+                {isTh ? 'ปิด' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BATCH PRINT TAG MODAL */}
+      {activeBatchPrintItems && activeBatchPrintItems.length > 0 && (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto ${
+          isLight ? 'bg-slate-900/50 backdrop-blur-xs' : 'bg-slate-950/85 backdrop-blur-md'
+        }`}>
+          <div className={`border rounded-3xl max-w-4xl w-full p-6 space-y-5 shadow-2xl relative max-h-[92vh] flex flex-col ${
+            isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+          }`}>
+            {/* Modal Header */}
+            <div className={`flex items-center justify-between border-b pb-4 shrink-0 ${
+              isLight ? 'border-slate-200' : 'border-slate-800'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                  <Printer className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className={`text-base font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                      {isTh ? 'พิมพ์แท็กรับรองคุณภาพ Billet แบบกลุ่ม (Batch QR Tag Printing)' : 'Batch Billet QR Tag Printing'}
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white">
+                      {activeBatchPrintItems.length} {isTh ? 'แท็ก' : 'Tags'}
+                    </span>
+                  </div>
+                  <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {isTh 
+                      ? `พิมพ์แท็กระบุ Heat Number ทั้งหมด ${activeBatchPrintItems.length} รายการพร้อมกันในคำสั่งเดียว`
+                      : `Simultaneously print ${activeBatchPrintItems.length} Heat identification tags in one single print job`}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActiveBatchPrintItems(null)} 
+                className={`p-1.5 rounded-xl transition ${isLight ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Options Bar: Layout Selector & Summary */}
+            <div className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 ${
+              isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
+            }`}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                  {isTh ? 'รูปแบบการพิมพ์:' : 'Print Layout:'}
+                </span>
+                <div className="inline-flex rounded-xl p-1 bg-slate-200/70 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setBatchPrintLayout('roll')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                      batchPrintLayout === 'roll'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : isLight ? 'text-slate-700 hover:text-slate-900' : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    🏷️ {isTh ? 'ม้วนสติกเกอร์ (100x100mm)' : 'Label Roll (100x100mm)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBatchPrintLayout('grid')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                      batchPrintLayout === 'grid'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : isLight ? 'text-slate-700 hover:text-slate-900' : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    📄 {isTh ? 'กระดาษ A4 (4 แท็ก/หน้า)' : 'A4 Sheet Grid (4/page)'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-xs font-mono flex items-center gap-3">
+                <span className={isLight ? 'text-slate-600' : 'text-slate-400'}>
+                  Heats: <strong className={isLight ? 'text-slate-900' : 'text-white'}>{activeBatchPrintItems.length}</strong>
+                </span>
+                <span className={isLight ? 'text-slate-600' : 'text-slate-400'}>
+                  Qty: <strong className={isLight ? 'text-slate-900' : 'text-white'}>
+                    {activeBatchPrintItems.reduce((sum, it) => sum + (parseFloat(String(it.quantity_pcs)) || 0), 0)} pcs
+                  </strong>
+                </span>
+                <span className={isLight ? 'text-blue-700' : 'text-cyan-400'}>
+                  Weight: <strong>
+                    {activeBatchPrintItems.reduce((sum, it) => sum + (parseFloat(String(it.weight_kg)) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} kg
+                  </strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Visual Scrollable Tag Previews */}
+            <div className="overflow-y-auto flex-1 pr-1 space-y-4 max-h-[50vh]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeBatchPrintItems.map((item, index) => {
+                  const spec = findMatchingSpec(item.grade);
+                  const tagColor = spec?.color || "#2563eb";
+                  const jg = item.judgement || performJudgement(item);
+                  const isPass = jg === 'PASS';
+
+                  return (
+                    <div
+                      key={item.id || (item.heat_number + index)}
+                      className="rounded-2xl p-4 bg-white text-slate-900 border-2 shadow-sm relative flex flex-col justify-between"
+                      style={{ borderColor: tagColor }}
+                    >
+                      <div>
+                        {/* Tag Header */}
+                        <div 
+                          className="text-white text-center font-black py-1.5 px-3 rounded-lg text-xs tracking-wider uppercase shadow-xs mb-2.5 flex items-center justify-between"
+                          style={{ backgroundColor: tagColor }}
+                        >
+                          <span>QUALITY APPROVED BILLET TAG</span>
+                          <span className="text-[10px] bg-black/20 px-2 py-0.5 rounded font-mono">#{index + 1}</span>
+                        </div>
+
+                        <div className="flex gap-3 items-stretch">
+                          {/* Simulated QR Code Graphic */}
+                          <div className="w-20 h-20 min-w-[80px] bg-slate-50 border-2 border-slate-900 rounded-xl flex flex-col items-center justify-center p-1 text-center">
+                            <svg width="56" height="56" viewBox="0 0 100 100">
+                              <rect width="100" height="100" fill="#fff" />
+                              <rect x="10" y="10" width="28" height="28" fill="#000"/>
+                              <rect x="15" y="15" width="18" height="18" fill="#fff"/>
+                              <rect x="19" y="19" width="10" height="10" fill="#000"/>
+                              <rect x="62" y="10" width="28" height="28" fill="#000"/>
+                              <rect x="67" y="15" width="18" height="18" fill="#fff"/>
+                              <rect x="71" y="19" width="10" height="10" fill="#000"/>
+                              <rect x="10" y="62" width="28" height="28" fill="#000"/>
+                              <rect x="15" y="67" width="18" height="18" fill="#fff"/>
+                              <rect x="19" y="71" width="10" height="10" fill="#000"/>
+                              <rect x="45" y="45" width="12" height="12" fill="#000"/>
+                              <rect x="62" y="52" width="14" height="14" fill="#000"/>
+                              <rect x="45" y="65" width="10" height="18" fill="#000"/>
+                              <rect x="62" y="72" width="20" height="15" fill="#000"/>
+                            </svg>
+                            <span className="text-[6.5px] font-mono font-bold text-slate-800 truncate max-w-full">
+                              {item.heat_number || 'BILLET-QR'}
+                            </span>
+                          </div>
+
+                          {/* Tag Meta Details */}
+                          <div className="flex-1 text-[11px] leading-tight space-y-1">
+                            <div>
+                              <span className="text-[9px] font-bold text-slate-500 uppercase block">Heat Number</span>
+                              <span className="font-mono font-bold text-sm text-slate-950">{item.heat_number || '-'}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-bold text-slate-500 uppercase">Grade:</span>
+                              <span className="font-black text-xs px-1.5 py-0.5 rounded text-white" style={{ backgroundColor: tagColor }}>
+                                {item.grade || '-'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1 text-[10px]">
+                              <div>
+                                <span className="text-slate-500">Size: </span>
+                                <span className="font-bold">{item.billet_size || '-'}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500">Qty: </span>
+                                <span className="font-bold">{item.quantity_pcs || '0'} pcs</span>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1 text-[10px]">
+                              <div>
+                                <span className="text-slate-500">Wt: </span>
+                                <span className="font-bold">{item.weight_kg || '0'} kg</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500">Status: </span>
+                                <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold text-white ${isPass ? 'bg-emerald-600' : 'bg-rose-600'}`}>
+                                  {jg}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 pt-1.5 border-t border-dashed border-slate-200 text-[8px] text-slate-400 flex items-center justify-between">
+                        <span>Supplier: {item.supplier_name || '-'}</span>
+                        <span>{item.timestamp || (item.createdAt ? new Date(item.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className={`flex flex-col sm:flex-row gap-3 pt-3 border-t shrink-0 ${
+              isLight ? 'border-slate-200' : 'border-slate-800'
+            }`}>
+              <button
+                type="button"
+                onClick={() => {
+                  const allText = activeBatchPrintItems.map((it, i) => 
+                    `[TAG #${i + 1}] Heat: ${it.heat_number} | Grade: ${it.grade} | Size: ${it.billet_size} | Supplier: ${it.supplier_name || '-'} | Qty: ${it.quantity_pcs} pcs | Wt: ${it.weight_kg} kg | Status: ${it.judgement || 'PASS'}`
+                  ).join('\n');
+                  navigator.clipboard.writeText(allText);
+                  setBatchCopiedInfo(true);
+                  setTimeout(() => setBatchCopiedInfo(false), 2000);
+                }}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${
+                  isLight 
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' 
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+              >
+                {batchCopiedInfo ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                <span>{batchCopiedInfo ? (isTh ? 'คัดลอกครบทุกใบแล้ว!' : 'All Copied!') : (isTh ? 'คัดลอกข้อมูลทั้งหมด' : 'Copy All Data')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerDirectMultiplePrint(activeBatchPrintItems, batchPrintLayout)}
+                className="flex-1 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-md shadow-blue-600/20 flex items-center justify-center gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                <span>
+                  {isTh 
+                    ? `สั่งพิมพ์ทั้งหมด ${activeBatchPrintItems.length} แท็กทันที (${batchPrintLayout === 'roll' ? 'ม้วนสติกเกอร์' : 'กระดาษ A4'})` 
+                    : `Print All ${activeBatchPrintItems.length} Tags Now (${batchPrintLayout === 'roll' ? 'Roll' : 'A4 Sheet'})`}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveBatchPrintItems(null)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition border ${
+                  isLight 
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' 
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border-slate-700'
+                }`}
+              >
+                {isTh ? 'ปิด' : 'Close'}
               </button>
             </div>
           </div>

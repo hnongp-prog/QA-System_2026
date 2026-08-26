@@ -37,7 +37,9 @@ import {
   Edit3,
   AlertTriangle,
   Sun,
-  Moon
+  Moon,
+  Check,
+  Copy
 } from 'lucide-react';
 
 import { 
@@ -191,6 +193,11 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
 
   // Print Tag Modal State
   const [activePrintItem, setActivePrintItem] = useState<ZnWireInspectionRecord | null>(null);
+  const [activeBatchPrintItems, setActiveBatchPrintItems] = useState<ZnWireInspectionRecord[] | null>(null);
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<string[]>([]);
+  const [batchPrintLayout, setBatchPrintLayout] = useState<'roll' | 'grid'>('roll');
+  const [batchCopiedInfo, setBatchCopiedInfo] = useState(false);
+  const [copiedTagInfo, setCopiedTagInfo] = useState(false);
 
   // Config tab state
   const [editingGrade, setEditingGrade] = useState<string>('');
@@ -613,100 +620,18 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
     }));
   };
 
-  // Print Identification Tag via browser window
-  const handlePrintTag = (item: ZnWireInspectionRecord) => {
-    const judgement = item.judgement || performJudgement(item);
-    const dateStr = item.timestamp || new Date().toLocaleString('th-TH');
-
-    const qrData = `APP:IQA-03\nHEAT:${item.heat_number}\nGRADE:${item.grade}\nPO:${item.po_no || '-'}\nJUDGEMENT:${judgement}`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}`;
-
-    const printWindow = window.open('', '_blank', 'width=500,height=400');
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Zinc Wire Identification Tag - ${item.heat_number}</title>
-          <style>
-            body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; background: #f8fafc; }
-            .tag-card {
-              border: 3px solid #0f172a;
-              border-radius: 12px;
-              padding: 16px;
-              width: 320px;
-              margin: auto;
-              position: relative;
-              background: #ffffff;
-              box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-            }
-            .tag-header {
-              text-align: center;
-              border-bottom: 2px solid #0f172a;
-              padding-bottom: 8px;
-              margin-bottom: 12px;
-            }
-            .tag-title { font-weight: 900; font-size: 16px; text-transform: uppercase; color: #0f172a; tracking-wider; }
-            .tag-subtitle { font-size: 10px; font-weight: 700; color: #64748b; }
-            .tag-body { display: flex; align-items: center; gap: 12px; }
-            .qr-area { width: 100px; height: 100px; flex-shrink: 0; }
-            .qr-area img { width: 100%; height: 100%; border-radius: 6px; border: 1px solid #cbd5e1; }
-            .info-area { flex: 1; font-size: 11px; line-height: 1.5; font-weight: 700; color: #1e293b; }
-            .info-label { color: #64748b; font-size: 9px; text-transform: uppercase; }
-            .status-stamp {
-              position: absolute;
-              top: 12px;
-              right: 12px;
-              border: 3px solid ${judgement === 'PASS' ? '#059669' : '#e11d48'};
-              color: ${judgement === 'PASS' ? '#059669' : '#e11d48'};
-              padding: 2px 8px;
-              font-size: 12px;
-              font-weight: 900;
-              transform: rotate(12deg);
-              text-transform: uppercase;
-              border-radius: 6px;
-              background: #ffffff;
-            }
-            .footer { margin-top: 12px; border-top: 1px dashed #cbd5e1; padding-top: 6px; font-size: 8px; text-align: center; color: #94a3b8; font-weight: 600; }
-          </style>
-        </head>
-        <body>
-          <div class="tag-card">
-            <div class="status-stamp">${judgement}</div>
-            <div class="tag-header">
-              <div class="tag-title">ZN WIRE IDENTIFICATION TAG</div>
-              <div class="tag-subtitle">IQA-03 INCOMING QUALITY CERTIFIED</div>
-            </div>
-            <div class="tag-body">
-              <div class="qr-area">
-                <img src="${qrUrl}" alt="QR" />
-              </div>
-              <div class="info-area">
-                <div><span class="info-label">HEAT NO:</span> ${item.heat_number}</div>
-                <div><span class="info-label">GRADE:</span> ${item.grade}</div>
-                <div><span class="info-label">PO NO:</span> ${item.po_no || '-'}</div>
-                <div><span class="info-label">DRUM:</span> ${item.drum || '-'}</div>
-                <div><span class="info-label">WEIGHT:</span> ${item.weight_kg || '0'} KG</div>
-                <div><span class="info-label">SUPPLIER:</span> ${item.supplier || '-'}</div>
-              </div>
-            </div>
-            <div class="footer">Verified by IQA-03 System | ${dateStr}</div>
-          </div>
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 250);
+  // Helper to chunk arrays for sheet printing
+  const chunkArray = <T,>(arr: T[], size: number): T[][] => {
+    const res: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) {
+      res.push(arr.slice(i, i + size));
+    }
+    return res;
   };
 
-  const handlePrintMultipleTags = (items: ZnWireInspectionRecord[]) => {
-    if (items.length === 0) return;
-    items.forEach(item => handlePrintTag(item));
+  // Unique key for history row selection
+  const getHistoryItemKey = (item: ZnWireInspectionRecord, idx: number): string => {
+    return item.id || (item.heat_number ? `${item.heat_number}-${item.drum || ''}-${item.batch_no || ''}-${idx}` : `znwire-hist-${idx}`);
   };
 
   // Filtered History
@@ -724,6 +649,234 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
       return matchSearch && matchMonth && matchYear;
     });
   }, [history, searchQuery, filterMonth, filterYear]);
+
+  // Toggle single history item selection
+  const toggleSelectHistory = (key: string) => {
+    setSelectedHistoryIds(prev => 
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  // Check if all filtered history items are selected
+  const isAllFilteredSelected = filteredHistory.length > 0 && filteredHistory.every((item, idx) => 
+    selectedHistoryIds.includes(getHistoryItemKey(item, idx))
+  );
+
+  // Toggle select all filtered history items
+  const toggleSelectAllHistory = () => {
+    if (isAllFilteredSelected) {
+      const filteredKeys = new Set(filteredHistory.map((item, idx) => getHistoryItemKey(item, idx)));
+      setSelectedHistoryIds(prev => prev.filter(k => !filteredKeys.has(k)));
+    } else {
+      const filteredKeys = filteredHistory.map((item, idx) => getHistoryItemKey(item, idx));
+      setSelectedHistoryIds(prev => Array.from(new Set([...prev, ...filteredKeys])));
+    }
+  };
+
+  // Clear all selections
+  const clearHistorySelection = () => {
+    setSelectedHistoryIds([]);
+  };
+
+  // List of currently selected history items
+  const selectedHistoryItems = useMemo(() => {
+    return filteredHistory.filter((item, idx) => 
+      selectedHistoryIds.includes(getHistoryItemKey(item, idx))
+    );
+  }, [filteredHistory, selectedHistoryIds]);
+
+  // Open Batch Print Modal for selected items
+  const handlePrintBatchTags = (itemsToPrint?: ZnWireInspectionRecord[]) => {
+    const targetItems = itemsToPrint && itemsToPrint.length > 0 ? itemsToPrint : selectedHistoryItems;
+    if (targetItems.length === 0) return;
+    setActiveBatchPrintItems(targetItems);
+    setBatchCopiedInfo(false);
+  };
+
+  // Generate Individual Tag Card Inner HTML
+  const generateTagContentHtml = (item: ZnWireInspectionRecord) => {
+    const tagColor = "#4f46e5";
+    const jg = item.judgement || performJudgement(item);
+    const isPass = jg === 'PASS';
+    const dateStr = item.timestamp || (item.date ? item.date : new Date().toISOString().split('T')[0]);
+
+    return `
+      <div class="tag-box" style="border: 2.5px solid ${tagColor};">
+        <div class="header" style="background: ${tagColor};">QUALITY APPROVED ZINC WIRE TAG</div>
+        <div class="body-grid">
+          <div class="qr-placeholder">
+            <svg width="72" height="72" viewBox="0 0 100 100">
+              <rect width="100" height="100" fill="#fff" />
+              <rect x="10" y="10" width="30" height="30" fill="#000"/>
+              <rect x="15" y="15" width="20" height="20" fill="#fff"/>
+              <rect x="20" y="20" width="10" height="10" fill="#000"/>
+              <rect x="60" y="10" width="30" height="30" fill="#000"/>
+              <rect x="65" y="15" width="20" height="20" fill="#fff"/>
+              <rect x="70" y="20" width="10" height="10" fill="#000"/>
+              <rect x="10" y="60" width="30" height="30" fill="#000"/>
+              <rect x="15" y="65" width="20" height="20" fill="#fff"/>
+              <rect x="20" y="70" width="10" height="10" fill="#000"/>
+              <rect x="45" y="45" width="12" height="12" fill="#000"/>
+              <rect x="65" y="55" width="15" height="15" fill="#000"/>
+              <rect x="45" y="65" width="10" height="20" fill="#000"/>
+              <rect x="65" y="75" width="20" height="15" fill="#000"/>
+            </svg>
+            <span style="font-size: 8px; font-weight: bold; margin-top: 2px; font-family: monospace;">HEAT:${item.heat_number || '-'}</span>
+          </div>
+          <div class="details">
+            <div><strong>HEAT NO:</strong> <span style="font-family: monospace; font-size:12px; font-weight:bold;">${item.heat_number || '-'}</span></div>
+            <div><strong>GRADE:</strong> <span style="font-size:12px; font-weight:bold; color:${tagColor}">${item.grade || '-'}</span></div>
+            <div><strong>SUPPLIER:</strong> ${item.supplier || '-'}</div>
+            <div><strong>PO / DRUM:</strong> ${item.po_no || '-'} / ${item.drum || '-'}</div>
+            <div><strong>QTY / WT:</strong> ${item.quantity_pcs || '-'} pcs / ${item.weight_kg || '0'} kg</div>
+            <div><strong>SIZE / TS:</strong> ${item.diameter || '-'} / ${item.tensile_strength ? item.tensile_strength + ' MPa' : '-'}</div>
+            <div><strong>INSPECTOR:</strong> ${item.inspector_name || 'QA Team'}</div>
+            <div><strong>STATUS:</strong> <span class="badge" style="background: ${isPass ? '#10b981' : '#ef4444'};">${jg}</span></div>
+          </div>
+        </div>
+        ${item.chemical_composition && Object.keys(item.chemical_composition).length > 0 ? `
+          <div class="chem-row">
+            <strong>CHEM (%):</strong>
+            ${Object.entries(item.chemical_composition).slice(0, 6).map(([k, v]) => `${k}:${v}`).join(' ')}
+          </div>
+        ` : ''}
+        <div class="footer">IQA-03 Zinc Wire Incoming Verification • Date: ${dateStr}</div>
+      </div>
+    `;
+  };
+
+  // Generate Print Tag HTML (Single or Batch with page breaks)
+  const generateMultipleTagsHtml = (items: ZnWireInspectionRecord[], layout: 'roll' | 'grid' = 'roll') => {
+    const isGrid = layout === 'grid';
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Zinc Wire Approved QR Tags (${items.length} Heats)</title>
+          <style>
+            * { box-sizing: border-box; }
+            body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; }
+            ${isGrid ? `
+              @page { size: A4 portrait; margin: 10mm; }
+              .grid-page {
+                page-break-after: always;
+                break-after: page;
+                margin-bottom: 24px;
+              }
+              .sheet-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+              }
+              .tag-box { border-radius: 10px; padding: 10px; background: #fff; page-break-inside: avoid; }
+            ` : `
+              @page { size: 100mm 100mm; margin: 0; }
+              .tag-page {
+                page-break-after: always;
+                break-after: page;
+                padding: 10px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100mm;
+                height: 100mm;
+                box-sizing: border-box;
+              }
+              .tag-box { border-radius: 12px; padding: 12px; width: 100%; max-width: 360px; margin: 0 auto; background: #fff; }
+            `}
+            .header { color: #fff; text-align: center; font-weight: 800; padding: 6px 4px; border-radius: 6px; font-size: 13px; letter-spacing: 0.5px; }
+            .body-grid { display: flex; margin-top: 8px; gap: 8px; align-items: stretch; }
+            .qr-placeholder { width: 90px; min-width: 90px; height: 90px; border: 2px solid #000; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; text-align: center; border-radius: 6px; }
+            .details { flex: 1; font-size: 10.5px; line-height: 1.4; }
+            .details > div { margin-bottom: 2px; }
+            .badge { display: inline-block; padding: 1px 6px; font-weight: bold; border-radius: 4px; color: white; font-size: 9.5px; }
+            .chem-row { font-size: 8.5px; font-family: monospace; background: #f1f5f9; padding: 3px 6px; border-radius: 4px; margin-top: 6px; }
+            .footer { margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 3px; font-size: 7.5px; color: #64748b; text-align: center; }
+            @media print {
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          ${isGrid ? (
+            chunkArray(items, 4).map(chunk => `
+              <div class="grid-page">
+                <div class="sheet-grid">
+                  ${chunk.map(item => generateTagContentHtml(item)).join('')}
+                </div>
+              </div>
+            `).join('')
+          ) : (
+            items.map(item => `
+              <div class="tag-page">
+                ${generateTagContentHtml(item)}
+              </div>
+            `).join('')
+          )}
+        </body>
+      </html>
+    `;
+  };
+
+  // Direct Print via hidden iframe
+  const triggerDirectMultiplePrint = (items: ZnWireInspectionRecord[], layout: 'roll' | 'grid' = 'roll') => {
+    if (items.length === 0) return;
+    const htmlContent = generateMultipleTagsHtml(items, layout);
+
+    try {
+      let iframe = document.getElementById('znwire-print-iframe') as HTMLIFrameElement;
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'znwire-print-iframe';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.visibility = 'hidden';
+        document.body.appendChild(iframe);
+      }
+
+      const doc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (doc) {
+        doc.open();
+        doc.write(htmlContent);
+        doc.close();
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        }, 400);
+        return;
+      }
+    } catch (err) {
+      console.warn('Iframe print failed, falling back to window.open', err);
+    }
+
+    try {
+      const printWindow = window.open('', '_blank', 'width=700,height=700');
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 300);
+      }
+    } catch (e) {
+      console.error('Window print error:', e);
+    }
+  };
+
+  const triggerDirectPrint = (item: ZnWireInspectionRecord) => {
+    triggerDirectMultiplePrint([item], 'roll');
+  };
+
+  const handlePrintTag = (item: ZnWireInspectionRecord) => {
+    setActivePrintItem(item);
+    setCopiedTagInfo(false);
+  };
 
   // Dashboard Stats
   const dashboardStats = useMemo(() => {
@@ -1117,7 +1270,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                 {extractedItems.length > 0 && (
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handlePrintMultipleTags(extractedItems.filter((_, idx) => selectedIndices.includes(idx)))}
+                      onClick={() => handlePrintBatchTags(extractedItems.filter((_, idx) => selectedIndices.includes(idx)))}
                       disabled={selectedIndices.length === 0}
                       className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-3 py-1.5 rounded-xl border border-slate-700 flex items-center gap-1.5 transition disabled:opacity-40"
                     >
@@ -1350,51 +1503,109 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
             </div>
           </div>
 
-          {/* Search & Export Toolbar */}
-          <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex flex-1 items-center gap-2 w-full sm:w-auto">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search Heat No, Grade, Supplier, PO..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-                />
+          {/* Search, Filter & Batch Print Action Bar */}
+          <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex flex-1 items-center gap-2 w-full sm:w-auto">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search Heat No, Grade, Supplier, PO..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <select
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 text-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">{isTh ? 'ทุกเดือน' : 'All Months'}</option>
+                  {['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={filterYear}
+                  onChange={(e) => setFilterYear(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 text-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">{isTh ? 'ทุกปี' : 'All Years'}</option>
+                  {['2025','2026','2027'].map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
               </div>
 
-              <select
-                value={filterMonth}
-                onChange={(e) => setFilterMonth(e.target.value)}
-                className="bg-slate-950 border border-slate-800 text-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
-              >
-                <option value="">{isTh ? 'ทุกเดือน' : 'All Months'}</option>
-                {['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-
-              <select
-                value={filterYear}
-                onChange={(e) => setFilterYear(e.target.value)}
-                className="bg-slate-950 border border-slate-800 text-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
-              >
-                <option value="">{isTh ? 'ทุกปี' : 'All Years'}</option>
-                {['2025','2026','2027'].map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  onClick={exportToCSV}
+                  disabled={filteredHistory.length === 0}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20 disabled:opacity-40"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>{isTh ? 'ส่งออก CSV' : 'Export CSV'}</span>
+                </button>
+              </div>
             </div>
 
-            <button
-              onClick={exportToCSV}
-              disabled={filteredHistory.length === 0}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20 disabled:opacity-40"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>{isTh ? 'ส่งออกไฟล์ CSV' : 'Export CSV'}</span>
-            </button>
+            {/* Batch Selection Status & Print Trigger Bar */}
+            <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-semibold text-slate-300">
+                  {isTh 
+                    ? `เลือกแล้ว ${selectedHistoryItems.length} / ${filteredHistory.length} Heat Numbers`
+                    : `Selected ${selectedHistoryItems.length} / ${filteredHistory.length} Heat Numbers`}
+                </span>
+
+                {selectedHistoryItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearHistorySelection}
+                    className="text-xs font-semibold text-slate-400 hover:text-slate-200 underline transition ml-1"
+                  >
+                    {isTh ? 'ล้างที่เลือก' : 'Clear'}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePrintBatchTags(selectedHistoryItems)}
+                  disabled={selectedHistoryItems.length === 0}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-sm ${
+                    selectedHistoryItems.length > 0
+                      ? 'bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white shadow-indigo-500/20'
+                      : 'bg-slate-800 text-slate-600 cursor-not-allowed opacity-60'
+                  }`}
+                  title={isTh ? "พิมพ์แท็ก QR Label ทุก Heat No. ที่เลือกพร้อมกัน" : "Print QR Tags for all selected heats"}
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>
+                    {isTh 
+                      ? `พิมพ์แท็กที่เลือกพร้อมกัน (${selectedHistoryItems.length} ใบ)` 
+                      : `Print Selected Tags (${selectedHistoryItems.length})`}
+                  </span>
+                </button>
+
+                {filteredHistory.length > 0 && selectedHistoryItems.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handlePrintBatchTags(filteredHistory)}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+                    title={isTh ? "พิมพ์แท็กทั้งหมดที่ค้นหาได้ในรายการ" : "Print all filtered tags"}
+                  >
+                    <Printer className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>{isTh ? `พิมพ์ทั้งหมด (${filteredHistory.length})` : `Print All (${filteredHistory.length})`}</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* History Records Table */}
@@ -1403,6 +1614,16 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-950 text-slate-400 font-bold border-b border-slate-800 text-[10px] uppercase">
+                    <th className="p-3 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isAllFilteredSelected}
+                        onChange={toggleSelectAllHistory}
+                        disabled={filteredHistory.length === 0}
+                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600"
+                        title={isTh ? "เลือกทั้งหมด" : "Select All"}
+                      />
+                    </th>
                     <th className="p-3">Timestamp</th>
                     <th className="p-3">Heat No.</th>
                     <th className="p-3">Grade</th>
@@ -1416,65 +1637,80 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredHistory.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-slate-500">
+                      <td colSpan={9} className="p-8 text-center text-slate-500">
                         {isTh ? 'ไม่พบข้อมูลประวัติการตรวจรับ' : 'No inspection records found'}
                       </td>
                     </tr>
                   ) : (
-                    filteredHistory.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-850/50 transition">
-                        <td className="p-3 font-mono text-slate-400 text-[11px]">{item.timestamp}</td>
-                        <td className="p-3 font-mono font-bold text-indigo-300">{item.heat_number}</td>
-                        <td className="p-3 font-bold text-slate-200">{item.grade}</td>
-                        <td className="p-3 text-slate-400 text-[11px]">
-                          <div>{item.supplier || '-'}</div>
-                          <div className="text-[10px] text-slate-500">PO: {item.po_no || '-'} | Drum: {item.drum || '-'}</div>
-                        </td>
-                        <td className="p-3 text-center font-mono font-bold text-slate-200">{item.weight_kg || '-'}</td>
-                        <td className="p-3 text-center font-mono text-amber-300 font-bold">
-                          {item.tensile_strength || '-'}/{item.elongation || '-'}
-                        </td>
-                        <td className="p-3 text-center">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                            item.judgement === 'PASS' ? 'bg-emerald-950 text-emerald-300 border-emerald-800' :
-                            item.judgement === 'FAIL' ? 'bg-rose-950 text-rose-300 border-rose-800' :
-                            'bg-amber-950 text-amber-300 border-amber-800'
-                          }`}>
-                            {item.judgement}
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => handleRequestEditHistory(item)}
-                              className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition border border-amber-500/30 flex items-center gap-1 text-[11px] font-bold"
-                              title={isTh ? "แก้ไขข้อมูล (ต้องใส่ Password)" : "Edit Record (Password required)"}
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">{isTh ? 'แก้ไข' : 'Edit'}</span>
-                            </button>
-                            <button
-                              onClick={() => handlePrintTag(item)}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-400 transition"
-                              title="Print Tag"
-                            >
-                              <Tag className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setDeleteConfirmPassword('');
-                                setDeleteConfirmError(false);
-                                setDeleteConfirm({ show: true, id: item.id || null, type: 'history' });
-                              }}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400 transition"
-                              title={isTh ? "ลบรายการ (ต้องใส่รหัส admin2026)" : "Delete Record (Password required)"}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                    filteredHistory.map((item, idx) => {
+                      const itemKey = getHistoryItemKey(item, idx);
+                      const isSelected = selectedHistoryIds.includes(itemKey);
+                      return (
+                        <tr 
+                          key={itemKey} 
+                          className={`transition ${isSelected ? 'bg-indigo-950/30' : 'hover:bg-slate-850/50'}`}
+                        >
+                          <td className="p-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelectHistory(itemKey)}
+                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600"
+                            />
+                          </td>
+                          <td className="p-3 font-mono text-slate-400 text-[11px]">{item.timestamp}</td>
+                          <td className="p-3 font-mono font-bold text-indigo-300">{item.heat_number}</td>
+                          <td className="p-3 font-bold text-slate-200">{item.grade}</td>
+                          <td className="p-3 text-slate-400 text-[11px]">
+                            <div>{item.supplier || '-'}</div>
+                            <div className="text-[10px] text-slate-500">PO: {item.po_no || '-'} | Drum: {item.drum || '-'}</div>
+                          </td>
+                          <td className="p-3 text-center font-mono font-bold text-slate-200">{item.weight_kg || '-'}</td>
+                          <td className="p-3 text-center font-mono text-amber-300 font-bold">
+                            {item.tensile_strength || '-'}/{item.elongation || '-'}
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              item.judgement === 'PASS' ? 'bg-emerald-950 text-emerald-300 border-emerald-800' :
+                              item.judgement === 'FAIL' ? 'bg-rose-950 text-rose-300 border-rose-800' :
+                              'bg-amber-950 text-amber-300 border-amber-800'
+                            }`}>
+                              {item.judgement}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => handleRequestEditHistory(item)}
+                                className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition border border-amber-500/30 flex items-center gap-1 text-[11px] font-bold"
+                                title={isTh ? "แก้ไขข้อมูล (ต้องใส่ Password)" : "Edit Record (Password required)"}
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">{isTh ? 'แก้ไข' : 'Edit'}</span>
+                              </button>
+                              <button
+                                onClick={() => handlePrintTag(item)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-400 transition"
+                                title="Print Tag"
+                              >
+                                <Tag className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setDeleteConfirmPassword('');
+                                  setDeleteConfirmError(false);
+                                  setDeleteConfirm({ show: true, id: item.id || null, type: 'history' });
+                                }}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400 transition"
+                                title={isTh ? "ลบรายการ (ต้องใส่รหัส admin2026)" : "Delete Record (Password required)"}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1936,6 +2172,365 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
               >
                 <Save className="w-4 h-4" />
                 <span>{isTh ? 'บันทึกการแก้ไข' : 'Save Changes'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SINGLE PRINT TAG MODAL */}
+      {activePrintItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-slate-950/85 backdrop-blur-md">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative text-slate-100">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  <Printer className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {isTh ? 'พิมพ์แท็กรับรองคุณภาพลวดสังกะสี (QR Tag)' : 'Zinc Wire QR Quality Tag'}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Heat No: {activePrintItem.heat_number}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActivePrintItem(null)} 
+                className="p-1.5 rounded-xl transition text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Tag Visual Preview */}
+            <div className="rounded-2xl p-4 bg-white text-slate-900 border-2 border-indigo-600 shadow-sm relative">
+              <div className="bg-indigo-600 text-white text-center font-black py-1.5 px-3 rounded-lg text-xs tracking-wider uppercase shadow-xs mb-3">
+                QUALITY APPROVED ZINC WIRE TAG
+              </div>
+
+              <div className="flex gap-3 items-stretch">
+                {/* Simulated QR Code Graphic */}
+                <div className="w-24 h-24 min-w-[96px] bg-slate-50 border-2 border-slate-900 rounded-xl flex flex-col items-center justify-center p-1 text-center">
+                  <svg width="68" height="68" viewBox="0 0 100 100">
+                    <rect width="100" height="100" fill="#fff" />
+                    <rect x="10" y="10" width="30" height="30" fill="#000"/>
+                    <rect x="15" y="15" width="20" height="20" fill="#fff"/>
+                    <rect x="20" y="20" width="10" height="10" fill="#000"/>
+                    <rect x="60" y="10" width="30" height="30" fill="#000"/>
+                    <rect x="65" y="15" width="20" height="20" fill="#fff"/>
+                    <rect x="70" y="20" width="10" height="10" fill="#000"/>
+                    <rect x="10" y="60" width="30" height="30" fill="#000"/>
+                    <rect x="15" y="65" width="20" height="20" fill="#fff"/>
+                    <rect x="20" y="70" width="10" height="10" fill="#000"/>
+                    <rect x="45" y="45" width="12" height="12" fill="#000"/>
+                    <rect x="65" y="55" width="15" height="15" fill="#000"/>
+                    <rect x="45" y="65" width="10" height="20" fill="#000"/>
+                    <rect x="65" y="75" width="20" height="15" fill="#000"/>
+                  </svg>
+                  <span className="text-[7px] font-mono font-bold text-slate-800 truncate max-w-full">
+                    {activePrintItem.heat_number || 'ZN-WIRE'}
+                  </span>
+                </div>
+
+                {/* Tag Meta Details */}
+                <div className="flex-1 text-[11px] leading-tight space-y-1.5">
+                  <div>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase block">Heat Number</span>
+                    <span className="font-mono font-bold text-sm text-slate-950">{activePrintItem.heat_number || '-'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-bold text-slate-500 uppercase">Grade:</span>
+                    <span className="font-black text-xs px-2 py-0.5 rounded bg-indigo-600 text-white">
+                      {activePrintItem.grade || '-'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[10px]">
+                    <div>
+                      <span className="text-slate-500">Supplier: </span>
+                      <span className="font-bold truncate">{activePrintItem.supplier || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">PO: </span>
+                      <span className="font-bold">{activePrintItem.po_no || '-'}</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[10px]">
+                    <div>
+                      <span className="text-slate-500">Weight: </span>
+                      <span className="font-bold">{activePrintItem.weight_kg || '0'} kg</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Drum: </span>
+                      <span className="font-bold">{activePrintItem.drum || '-'}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px]">
+                    <span className="text-slate-500">Status: </span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold text-white ${
+                      (activePrintItem.judgement || performJudgement(activePrintItem)) === 'PASS' ? 'bg-emerald-600' : 'bg-rose-600'
+                    }`}>
+                      {activePrintItem.judgement || performJudgement(activePrintItem)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {activePrintItem.chemical_composition && Object.keys(activePrintItem.chemical_composition).length > 0 && (
+                <div className="mt-2.5 pt-2 border-t border-slate-200 text-[9px] font-mono bg-slate-50 p-2 rounded-lg text-slate-700">
+                  <strong>Chem: </strong>
+                  {Object.entries(activePrintItem.chemical_composition).map(([k, v]) => `${k}:${v}`).join(' | ')}
+                </div>
+              )}
+
+              <div className="mt-2 pt-1.5 border-t border-dashed border-slate-200 text-[8px] text-slate-400 flex items-center justify-between">
+                <span>Inspector: {activePrintItem.inspector_name || 'QA Team'}</span>
+                <span>{activePrintItem.timestamp || new Date().toLocaleDateString('th-TH')}</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const text = `[ZN WIRE TAG] Heat: ${activePrintItem.heat_number} | Grade: ${activePrintItem.grade} | Supplier: ${activePrintItem.supplier || '-'} | PO: ${activePrintItem.po_no || '-'} | Drum: ${activePrintItem.drum || '-'} | Weight: ${activePrintItem.weight_kg}kg | Status: ${activePrintItem.judgement || performJudgement(activePrintItem)}`;
+                  navigator.clipboard.writeText(text);
+                  setCopiedTagInfo(true);
+                  setTimeout(() => setCopiedTagInfo(false), 2000);
+                }}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+              >
+                {copiedTagInfo ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedTagInfo ? (isTh ? 'คัดลอกแล้ว!' : 'Copied!') : (isTh ? 'คัดลอก' : 'Copy')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerDirectPrint(activePrintItem)}
+                className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                <span>{isTh ? 'สั่งพิมพ์ทันที (Direct Print)' : 'Print Tag Now'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BATCH PRINT TAG MODAL */}
+      {activeBatchPrintItems && activeBatchPrintItems.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-slate-950/85 backdrop-blur-md">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full p-6 space-y-5 shadow-2xl relative max-h-[92vh] flex flex-col text-slate-100">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  <Printer className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-white">
+                      {isTh ? 'พิมพ์แท็กรับรองคุณภาพลวดสังกะสีแบบกลุ่ม (Batch QR Tag Printing)' : 'Batch Zinc Wire QR Tag Printing'}
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-600 text-white">
+                      {activeBatchPrintItems.length} {isTh ? 'แท็ก' : 'Tags'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    {isTh 
+                      ? `พิมพ์แท็กระบุ Heat Number ทั้งหมด ${activeBatchPrintItems.length} รายการพร้อมกันในคำสั่งเดียว`
+                      : `Simultaneously print ${activeBatchPrintItems.length} Heat identification tags in one single print job`}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActiveBatchPrintItems(null)} 
+                className="p-1.5 rounded-xl transition text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Options Bar: Layout Selector & Summary */}
+            <div className="p-3 rounded-2xl border border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-slate-300">
+                  {isTh ? 'รูปแบบการพิมพ์:' : 'Print Layout:'}
+                </span>
+                <div className="inline-flex rounded-xl p-1 bg-slate-800 border border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setBatchPrintLayout('roll')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                      batchPrintLayout === 'roll'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    🏷️ {isTh ? 'ม้วนสติกเกอร์ (100x100mm)' : 'Label Roll (100x100mm)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBatchPrintLayout('grid')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                      batchPrintLayout === 'grid'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    📄 {isTh ? 'กระดาษ A4 (4 แท็ก/หน้า)' : 'A4 Sheet Grid (4/page)'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-xs font-mono flex items-center gap-3">
+                <span className="text-slate-400">
+                  Heats: <strong className="text-white">{activeBatchPrintItems.length}</strong>
+                </span>
+                <span className="text-slate-400">
+                  Qty: <strong className="text-white">
+                    {activeBatchPrintItems.reduce((sum, it) => sum + (parseFloat(String(it.quantity_pcs)) || 0), 0)} pcs
+                  </strong>
+                </span>
+                <span className="text-indigo-400">
+                  Weight: <strong>
+                    {activeBatchPrintItems.reduce((sum, it) => sum + (parseFloat(String(it.weight_kg)) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} kg
+                  </strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Visual Scrollable Tag Previews */}
+            <div className="overflow-y-auto flex-1 pr-1 space-y-4 max-h-[50vh]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeBatchPrintItems.map((item, index) => {
+                  const jg = item.judgement || performJudgement(item);
+                  const isPass = jg === 'PASS';
+
+                  return (
+                    <div
+                      key={item.id || (item.heat_number + index)}
+                      className="rounded-2xl p-4 bg-white text-slate-900 border-2 border-indigo-600 shadow-sm relative flex flex-col justify-between"
+                    >
+                      <div>
+                        {/* Tag Header */}
+                        <div className="bg-indigo-600 text-white text-center font-black py-1.5 px-3 rounded-lg text-xs tracking-wider uppercase shadow-xs mb-2.5 flex items-center justify-between">
+                          <span>QUALITY APPROVED ZINC WIRE TAG</span>
+                          <span className="text-[10px] bg-black/20 px-2 py-0.5 rounded font-mono">#{index + 1}</span>
+                        </div>
+
+                        <div className="flex gap-3 items-stretch">
+                          {/* Simulated QR Code Graphic */}
+                          <div className="w-20 h-20 min-w-[80px] bg-slate-50 border-2 border-slate-900 rounded-xl flex flex-col items-center justify-center p-1 text-center">
+                            <svg width="56" height="56" viewBox="0 0 100 100">
+                              <rect width="100" height="100" fill="#fff" />
+                              <rect x="10" y="10" width="28" height="28" fill="#000"/>
+                              <rect x="15" y="15" width="18" height="18" fill="#fff"/>
+                              <rect x="19" y="19" width="10" height="10" fill="#000"/>
+                              <rect x="62" y="10" width="28" height="28" fill="#000"/>
+                              <rect x="67" y="15" width="18" height="18" fill="#fff"/>
+                              <rect x="71" y="19" width="10" height="10" fill="#000"/>
+                              <rect x="10" y="62" width="28" height="28" fill="#000"/>
+                              <rect x="15" y="67" width="18" height="18" fill="#fff"/>
+                              <rect x="19" y="71" width="10" height="10" fill="#000"/>
+                              <rect x="45" y="45" width="12" height="12" fill="#000"/>
+                              <rect x="62" y="52" width="14" height="14" fill="#000"/>
+                              <rect x="45" y="65" width="10" height="18" fill="#000"/>
+                              <rect x="62" y="72" width="20" height="15" fill="#000"/>
+                            </svg>
+                            <span className="text-[6.5px] font-mono font-bold text-slate-800 truncate max-w-full">
+                              {item.heat_number || 'ZN-WIRE'}
+                            </span>
+                          </div>
+
+                          {/* Tag Meta Details */}
+                          <div className="flex-1 text-[11px] leading-tight space-y-1">
+                            <div>
+                              <span className="text-[9px] font-bold text-slate-500 uppercase block">Heat Number</span>
+                              <span className="font-mono font-bold text-sm text-slate-950">{item.heat_number || '-'}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-bold text-slate-500 uppercase">Grade:</span>
+                              <span className="font-black text-xs px-1.5 py-0.5 rounded bg-indigo-600 text-white">
+                                {item.grade || '-'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1 text-[10px]">
+                              <div>
+                                <span className="text-slate-500">Drum: </span>
+                                <span className="font-bold">{item.drum || '-'}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500">Qty: </span>
+                                <span className="font-bold">{item.quantity_pcs || '0'} pcs</span>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1 text-[10px]">
+                              <div>
+                                <span className="text-slate-500">Wt: </span>
+                                <span className="font-bold">{item.weight_kg || '0'} kg</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500">Status: </span>
+                                <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold text-white ${isPass ? 'bg-emerald-600' : 'bg-rose-600'}`}>
+                                  {jg}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 pt-1.5 border-t border-dashed border-slate-200 text-[8px] text-slate-400 flex items-center justify-between">
+                        <span>Supplier: {item.supplier || '-'}</span>
+                        <span>{item.timestamp || (item.date ? item.date : new Date().toISOString().split('T')[0])}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-slate-800 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const allText = activeBatchPrintItems.map((it, i) => 
+                    `[TAG #${i + 1}] Heat: ${it.heat_number} | Grade: ${it.grade} | Supplier: ${it.supplier || '-'} | PO: ${it.po_no || '-'} | Drum: ${it.drum || '-'} | Qty: ${it.quantity_pcs || 0} pcs | Wt: ${it.weight_kg} kg | Status: ${it.judgement || 'PASS'}`
+                  ).join('\n');
+                  navigator.clipboard.writeText(allText);
+                  setBatchCopiedInfo(true);
+                  setTimeout(() => setBatchCopiedInfo(false), 2000);
+                }}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+              >
+                {batchCopiedInfo ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                <span>{batchCopiedInfo ? (isTh ? 'คัดลอกครบทุกใบแล้ว!' : 'All Copied!') : (isTh ? 'คัดลอกข้อมูลทั้งหมด' : 'Copy All Data')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerDirectMultiplePrint(activeBatchPrintItems, batchPrintLayout)}
+                className="flex-1 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                <span>
+                  {isTh 
+                    ? `สั่งพิมพ์ทั้งหมด ${activeBatchPrintItems.length} แท็กทันที (${batchPrintLayout === 'roll' ? 'ม้วนสติกเกอร์' : 'กระดาษ A4'})` 
+                    : `Print All ${activeBatchPrintItems.length} Tags Now (${batchPrintLayout === 'roll' ? 'Roll' : 'A4 Sheet'})`}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveBatchPrintItems(null)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold transition border bg-slate-800 hover:bg-slate-700 text-slate-400 border-slate-700"
+              >
+                {isTh ? 'ปิด' : 'Close'}
               </button>
             </div>
           </div>

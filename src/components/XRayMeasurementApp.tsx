@@ -21,6 +21,8 @@ import {
   ArrowLeft,
   Download,
   Plus,
+  Minus,
+  Layers,
   Search,
   Sliders,
   FileSpreadsheet,
@@ -38,6 +40,40 @@ import {
   ThemeMode
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
+
+// Helper to normalize string or string[] into string[]
+const toArray = (val: string | string[] | undefined | null): string[] => {
+  if (val === undefined || val === null) return [''];
+  if (Array.isArray(val)) return val.length > 0 ? val : [''];
+  return [String(val)];
+};
+
+// Helper for empty point array
+const createEmptyPointArray = (count: number) => Array(Math.max(1, count)).fill('');
+
+// Helper to calculate average of point values
+const calcZnAvg = (points: string | string[] | undefined): string => {
+  const arr = toArray(points);
+  const nums = arr.map(p => parseFloat(p)).filter(n => !isNaN(n) && n > 0);
+  if (nums.length === 0) return '';
+  return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2);
+};
+
+// Helper to format multiple points for display
+const formatZnDisplay = (val: string | string[] | undefined): string => {
+  const arr = toArray(val).filter(v => v.trim() !== '');
+  if (arr.length === 0) return '-';
+  return arr.join(', ');
+};
+
+// Helper to calculate overall Zn average (combining Up and Lo)
+const getZnOverallAvg = (raUp: string | string[] | undefined, raLo: string | string[] | undefined): string => {
+  const upNums = toArray(raUp).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+  const loNums = toArray(raLo).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+  const all = [...upNums, ...loNums];
+  if (all.length === 0) return '-';
+  return (all.reduce((a, b) => a + b, 0) / all.length).toFixed(2);
+};
 
 interface XRayMeasurementAppProps {
   onBackToPortal?: () => void;
@@ -215,6 +251,9 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
 
   const [profileStatus, setProfileStatus] = useState<'found' | 'not-found'>('not-found');
 
+  // Multi-point Zn weight measurement configuration state
+  const [znPointCount, setZnPointCount] = useState<number>(1);
+
   // Batch Data Entry Items State (Clean initial state)
   const [batchItems, setBatchItems] = useState([
     { 
@@ -222,7 +261,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       partId: '', 
       lotNumber: '', 
       process: '', 
-      raUp: '', raLo: '', 
+      raUp: createEmptyPointArray(1), 
+      raLo: createEmptyPointArray(1), 
       rzUp: '', rzLo: '', 
       rtUp: '', rtLo: '', 
       status: 'Pending' as 'Pass' | 'Fail' | 'Pending', 
@@ -263,7 +303,16 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
 
   const handleSaveEditedHistory = () => {
     if (!editingHistoryItem) return;
-    setInspections(prev => prev.map(ins => ins.id === editingHistoryItem.id ? editingHistoryItem : ins));
+    const upArr = toArray(editingHistoryItem.raUp);
+    const loArr = toArray(editingHistoryItem.raLo);
+    const updated: XRayInspectionRecord = {
+      ...editingHistoryItem,
+      znAvgUp: calcZnAvg(upArr),
+      znAvgLo: calcZnAvg(loArr),
+      znAvgTotal: getZnOverallAvg(upArr, loArr),
+      znPointsCount: Math.max(upArr.length, loArr.length)
+    };
+    setInspections(prev => prev.map(ins => ins.id === updated.id ? updated : ins));
     setEditingHistoryItem(null);
     setTargetEditHistoryItem(null);
     showNotification(isTh ? 'บันทึกการแก้ไขข้อมูลเรียบร้อยแล้ว' : 'Record updated successfully');
@@ -360,10 +409,10 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       if (item.status === 'Pass') profileGroups[pName].pass++;
       else profileGroups[pName].fail++;
 
-      const znUp = parseFloat(item.raUp);
-      const znLo = parseFloat(item.raLo);
-      if (!isNaN(znUp)) { profileGroups[pName].avgZn += znUp; profileGroups[pName].countZn++; }
-      if (!isNaN(znLo)) { profileGroups[pName].avgZn += znLo; profileGroups[pName].countZn++; }
+      const upVals = toArray(item.raUp).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+      const loVals = toArray(item.raLo).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+      upVals.forEach(v => { profileGroups[pName].avgZn += v; profileGroups[pName].countZn++; });
+      loVals.forEach(v => { profileGroups[pName].avgZn += v; profileGroups[pName].countZn++; });
 
       const fluxUp = parseFloat(item.rzUp);
       const fluxLo = parseFloat(item.rzLo);
@@ -414,8 +463,9 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       const trends = {
         zn: sortedHistory.map(item => {
           let sum = 0, count = 0;
-          if (!isNaN(parseFloat(item.raUp))) { sum += parseFloat(item.raUp); count++; }
-          if (!isNaN(parseFloat(item.raLo))) { sum += parseFloat(item.raLo); count++; }
+          const upVals = toArray(item.raUp).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+          const loVals = toArray(item.raLo).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+          [...upVals, ...loVals].forEach(v => { sum += v; count++; });
           return count > 0 ? sum / count : 0;
         }),
         flux: sortedHistory.map(item => {
@@ -548,23 +598,34 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       coverageLo: parseFloat(headerInfo.requirementCoverageLimitLo) || 0
     };
 
-    if (reqZnUp && item.raUp === '') return 'Pending';
-    if (reqZnLo && item.raLo === '') return 'Pending';
+    const hasAnyZnUp = item.raUp.some(v => v.trim() !== '');
+    const hasAnyZnLo = item.raLo.some(v => v.trim() !== '');
+
+    if (reqZnUp && !hasAnyZnUp) return 'Pending';
+    if (reqZnLo && !hasAnyZnLo) return 'Pending';
     if (reqFluxUp && item.rzUp === '') return 'Pending';
     if (reqFluxLo && item.rzLo === '') return 'Pending';
 
     let pass = true;
 
     if (reqZnUp) {
-      const znUp = parseFloat(item.raUp);
-      if (specs.znMinUp > 0 && znUp < specs.znMinUp) pass = false;
-      if (specs.znMaxUp > 0 && znUp > specs.znMaxUp) pass = false;
+      for (const val of item.raUp) {
+        if (val.trim() !== '') {
+          const znUp = parseFloat(val);
+          if (specs.znMinUp > 0 && znUp < specs.znMinUp) pass = false;
+          if (specs.znMaxUp > 0 && znUp > specs.znMaxUp) pass = false;
+        }
+      }
     }
 
     if (reqZnLo) {
-      const znLo = parseFloat(item.raLo);
-      if (specs.znMinLo > 0 && znLo < specs.znMinLo) pass = false;
-      if (specs.znMaxLo > 0 && znLo > specs.znMaxLo) pass = false;
+      for (const val of item.raLo) {
+        if (val.trim() !== '') {
+          const znLo = parseFloat(val);
+          if (specs.znMinLo > 0 && znLo < specs.znMinLo) pass = false;
+          if (specs.znMaxLo > 0 && znLo > specs.znMaxLo) pass = false;
+        }
+      }
     }
 
     if (reqFluxUp) {
@@ -590,6 +651,34 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
     setTimeout(() => setNotification(null), 3000);
   };
 
+  // Add / Remove Zn Point
+  const addZnPoint = () => {
+    setZnPointCount(prev => {
+      const newCount = prev + 1;
+      setBatchItems(items => items.map(it => ({
+        ...it,
+        raUp: [...it.raUp, ''],
+        raLo: [...it.raLo, '']
+      })));
+      return newCount;
+    });
+    showNotification(isTh ? `เพิ่มจุดวัด Zn weight เป็น ${znPointCount + 1} จุด` : `Added Zn weight point (${znPointCount + 1} points total)`);
+  };
+
+  const removeZnPoint = () => {
+    if (znPointCount <= 1) return;
+    setZnPointCount(prev => {
+      const newCount = Math.max(1, prev - 1);
+      setBatchItems(items => items.map(it => ({
+        ...it,
+        raUp: it.raUp.slice(0, newCount),
+        raLo: it.raLo.slice(0, newCount)
+      })));
+      return newCount;
+    });
+    showNotification(isTh ? `ลดจุดวัด Zn weight เหลือ ${znPointCount - 1} จุด` : `Reduced Zn weight point`);
+  };
+
   const handleResetForm = () => {
     setHeaderInfo({
       inspectorName: '',
@@ -608,7 +697,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       partId: '', 
       lotNumber: '', 
       process: '', 
-      raUp: '', raLo: '', 
+      raUp: createEmptyPointArray(znPointCount), 
+      raLo: createEmptyPointArray(znPointCount), 
       rzUp: '', rzLo: '', 
       rtUp: '', rtLo: '', 
       status: 'Pending', 
@@ -623,10 +713,12 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       partId: lastItem ? lastItem.partId : '', 
       lotNumber: lastItem ? lastItem.lotNumber : '', 
       process: lastItem ? lastItem.process : '', 
-      raUp: '', raLo: '', 
+      raUp: createEmptyPointArray(znPointCount), 
+      raLo: createEmptyPointArray(znPointCount), 
       rzUp: '', rzLo: '', 
       rtUp: '', rtLo: '', 
-      status: 'Pending', remarks: '' 
+      status: 'Pending', 
+      remarks: '' 
     }]);
   };
 
@@ -637,6 +729,18 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
 
   const handleItemChange = (id: number, field: string, value: string) => {
     setBatchItems(prevItems => prevItems.map(item => item.id === id ? { ...item, [field]: value } : item));
+  };
+
+  const handleDynamicZnChange = (id: number, side: 'raUp' | 'raLo', pointIndex: number, value: string) => {
+    setBatchItems(prev => prev.map(item => {
+      if (item.id === id) {
+        const newArr = [...item[side]];
+        while (newArr.length <= pointIndex) newArr.push('');
+        newArr[pointIndex] = value;
+        return { ...item, [side]: newArr };
+      }
+      return item;
+    }));
   };
 
   const saveBatch = () => {
@@ -651,6 +755,12 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       const decision = judgeStatus(item);
       const recId = `rec-xray-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
 
+      const znAvgUpVal = calcZnAvg(item.raUp);
+      const znAvgLoVal = calcZnAvg(item.raLo);
+      const znAvgTotalVal = getZnOverallAvg(item.raUp, item.raLo);
+      const znUpStr = item.raUp.filter(v => v.trim() !== '').join(', ');
+      const znLoStr = item.raLo.filter(v => v.trim() !== '').join(', ');
+
       if (onLogNewActivity) {
         onLogNewActivity({
           id: recId,
@@ -662,7 +772,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
           batchLot: `${headerInfo.profileName} - ${item.lotNumber}`,
           result: decision === 'Pass' ? 'PASS' : 'REJECT',
           defectCount: decision === 'Fail' ? 1 : 0,
-          remarks: `Zn: ${item.raUp}/${item.raLo}, Flux: ${item.rzUp}/${item.rzLo}, Coverage: ${item.rtUp}/${item.rtLo}%`
+          remarks: `Zn Up: [${znUpStr}] (Avg: ${znAvgUpVal || '-'}), Zn Lo: [${znLoStr}] (Avg: ${znAvgLoVal || '-'}), Flux: ${item.rzUp}/${item.rzLo}, Coverage: ${item.rtUp}/${item.rtLo}%`
         });
       }
 
@@ -673,6 +783,10 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
         process: item.process.trim().toUpperCase() || 'GALVANIZING',
         raUp: item.raUp,
         raLo: item.raLo,
+        znAvgUp: znAvgUpVal,
+        znAvgLo: znAvgLoVal,
+        znAvgTotal: znAvgTotalVal,
+        znPointsCount: item.raUp.length,
         rzUp: item.rzUp,
         rzLo: item.rzLo,
         rtUp: item.rtUp,
@@ -694,7 +808,9 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
     setBatchItems([{ 
       id: Date.now(), 
       partId: '', lotNumber: '', process: '', 
-      raUp: '', raLo: '', rzUp: '', rzLo: '', rtUp: '', rtLo: '', 
+      raUp: createEmptyPointArray(znPointCount), 
+      raLo: createEmptyPointArray(znPointCount), 
+      rzUp: '', rzLo: '', rtUp: '', rtLo: '', 
       status: 'Pending', remarks: '' 
     }]);
 
@@ -719,7 +835,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
 
     const headers = [
       'Timestamp', 'Inspector', 'Machine', 'Profile Name', 'Coil No', 'Side', 'Process', 
-      'Zn Up', 'Zn Lo', 'Flux Up', 'Flux Lo', 'Coverage Up', 'Coverage Lo', 'Status'
+      'Zn Up Points', 'Zn Lo Points', 'Zn Avg Up', 'Zn Avg Lo', 'Zn Avg Overall', 
+      'Flux Up', 'Flux Lo', 'Coverage Up', 'Coverage Lo', 'Status'
     ];
 
     const csvRows = inspections.map(ins => [
@@ -730,7 +847,12 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       `"${ins.lotNumber}"`,
       `"${ins.partId}"`,
       `"${ins.process}"`,
-      ins.raUp, ins.raLo, ins.rzUp, ins.rzLo, ins.rtUp, ins.rtLo,
+      `"${formatZnDisplay(ins.raUp)}"`,
+      `"${formatZnDisplay(ins.raLo)}"`,
+      `"${ins.znAvgUp || calcZnAvg(ins.raUp) || '-'}"`,
+      `"${ins.znAvgLo || calcZnAvg(ins.raLo) || '-'}"`,
+      `"${ins.znAvgTotal || getZnOverallAvg(ins.raUp, ins.raLo)}"`,
+      ins.rzUp, ins.rzLo, ins.rtUp, ins.rtLo,
       `"${ins.status}"`
     ]);
 
@@ -1132,12 +1254,51 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
           {/* Measurement Table */}
           <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 shadow-md overflow-hidden" ref={tableRef}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
-              <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                <Activity className="w-4 h-4 text-emerald-400" />
-                {isTh ? '2. ตารางบันทึกค่ารังสีเอกซ์ (X-Ray Measurements Entry)' : '2. X-Ray Entry Table'}
-              </h3>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-emerald-400" />
+                  {isTh ? '2. ตารางบันทึกค่ารังสีเอกซ์ (X-Ray Measurements Entry)' : '2. X-Ray Entry Table'}
+                </h3>
+
+                {/* Point Count Indicator & Control */}
+                <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800 text-xs">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase">
+                    {isTh ? 'จุดวัด Zn:' : 'Zn Points:'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={removeZnPoint}
+                    disabled={znPointCount <= 1}
+                    className="p-1 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 transition rounded hover:bg-slate-800"
+                    title={isTh ? "ลดจุดวัด Zn weight" : "Decrease Zn Points"}
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="px-2 py-0.5 bg-indigo-950 text-indigo-300 font-mono font-bold text-xs rounded border border-indigo-800">
+                    {znPointCount} {isTh ? 'จุด' : 'pts'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={addZnPoint}
+                    className="p-1 text-indigo-400 hover:text-indigo-200 transition rounded hover:bg-indigo-950/60"
+                    title={isTh ? "+ เพิ่มจุดวัด Zn weight (Up/Lo)" : "Add Zn weight point (Up/Lo)"}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={addZnPoint}
+                  className="bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 font-bold text-xs px-3 py-2 rounded-xl border border-indigo-800/80 flex items-center gap-1.5 transition"
+                  title={isTh ? '+ เพิ่มจุดวัด Zn weight (Up/Lo)' : '+ Add Zn Point (Up/Lo)'}
+                >
+                  <Plus className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>{isTh ? '+ เพิ่มจุด Zn' : '+ Zn Point'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={handleResetForm}
@@ -1173,9 +1334,36 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase font-bold text-[10px]">
                     <tr>
-                      <th className="px-3 py-3 w-64">Coil Info (Side / Process)</th>
-                      <th className="px-3 py-3 text-center bg-indigo-950/30 text-indigo-300 border-l border-slate-800" colSpan={2}>
-                        Zn weight (Up / Lo)
+                      <th className="px-3 py-3 w-64" rowSpan={znPointCount > 1 ? 1 : 1}>Coil Info (Side / Process)</th>
+                      <th 
+                        className="px-3 py-2 text-center bg-indigo-950/40 text-indigo-300 border-l border-slate-800" 
+                        colSpan={znPointCount * 2 + (znPointCount > 1 ? 1 : 0)}
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <span>Zn weight (Up / Lo)</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-200 border border-indigo-700/50">
+                            {znPointCount} {isTh ? 'จุดวัด' : 'Pts'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={addZnPoint}
+                            className="p-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition shadow flex items-center gap-0.5 text-[9px] font-bold px-1.5"
+                            title={isTh ? "+ เพิ่มจุดวัด Zn weight (Up/Lo)" : "+ Add Zn point"}
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>{isTh ? '+ เพิ่มจุด Zn' : '+ Zn'}</span>
+                          </button>
+                          {znPointCount > 1 && (
+                            <button
+                              type="button"
+                              onClick={removeZnPoint}
+                              className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md transition border border-slate-700 flex items-center text-[9px]"
+                              title={isTh ? "ลดจุดวัด Zn weight" : "Remove Zn point"}
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       </th>
                       <th className="px-3 py-3 text-center bg-emerald-950/30 text-emerald-300 border-l border-slate-800" colSpan={2}>
                         Flux weight (Up / Lo)
@@ -1186,17 +1374,44 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       <th className="px-3 py-3 text-center border-l border-slate-800">Status</th>
                       <th className="px-3 py-3 text-center">Action</th>
                     </tr>
+                    {/* Sub-header row for multi-points */}
+                    <tr className="bg-slate-950/80 text-[9px] text-slate-400 border-b border-slate-800/80">
+                      <th className="px-3 py-1"></th>
+                      {Array.from({ length: znPointCount }).map((_, pIdx) => (
+                        <React.Fragment key={pIdx}>
+                          <th className="px-1 py-1 text-center bg-indigo-950/20 text-indigo-300 border-l border-slate-800/60 font-mono">
+                            {znPointCount > 1 ? `Pt.${pIdx + 1} Up` : 'Up'}
+                          </th>
+                          <th className="px-1 py-1 text-center bg-indigo-950/20 text-indigo-300 font-mono">
+                            {znPointCount > 1 ? `Pt.${pIdx + 1} Lo` : 'Lo'}
+                          </th>
+                        </React.Fragment>
+                      ))}
+                      {znPointCount > 1 && (
+                        <th className="px-2 py-1 text-center bg-indigo-950/30 text-indigo-200 border-l border-slate-800/60 font-mono">
+                          Zn Avg
+                        </th>
+                      )}
+                      <th className="px-1 py-1 text-center bg-emerald-950/20 text-emerald-300 border-l border-slate-800">Up</th>
+                      <th className="px-1 py-1 text-center bg-emerald-950/20 text-emerald-300">Lo</th>
+                      <th className="px-1 py-1 text-center bg-amber-950/20 text-amber-300 border-l border-slate-800">Up</th>
+                      <th className="px-1 py-1 text-center bg-amber-950/20 text-amber-300">Lo</th>
+                      <th className="px-3 py-1 border-l border-slate-800"></th>
+                      <th className="px-3 py-1"></th>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 font-mono">
                     {batchItems.map((item) => {
                       const currentStatus = judgeStatus(item);
 
-                      const isZnUpFail = isOutOfSpec(item.raUp, headerInfo.requirementRaUp, headerInfo.requirementRzUp);
-                      const isZnLoFail = isOutOfSpec(item.raLo, headerInfo.requirementRaLo, headerInfo.requirementRzLo);
                       const isFluxUpFail = isOutOfSpec(item.rzUp, headerInfo.requirementFluxMinUp, headerInfo.requirementFluxMaxUp);
                       const isFluxLoFail = isOutOfSpec(item.rzLo, headerInfo.requirementFluxMinLo, headerInfo.requirementFluxMaxLo);
                       const isCovUpFail = parseFloat(headerInfo.requirementCoverageLimitUp) > 0 && item.rtUp !== '' && parseFloat(item.rtUp) < parseFloat(headerInfo.requirementCoverageLimitUp);
                       const isCovLoFail = parseFloat(headerInfo.requirementCoverageLimitLo) > 0 && item.rtLo !== '' && parseFloat(item.rtLo) < parseFloat(headerInfo.requirementCoverageLimitLo);
+
+                      const rowZnAvgUp = calcZnAvg(item.raUp);
+                      const rowZnAvgLo = calcZnAvg(item.raLo);
+                      const rowZnOverall = getZnOverallAvg(item.raUp, item.raLo);
 
                       return (
                         <tr key={item.id} className="hover:bg-slate-950/50 transition-colors">
@@ -1226,34 +1441,58 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                             </div>
                           </td>
 
-                          {/* Zn weight (Up / Lo) */}
-                          <td className="px-2 py-2.5 text-center bg-indigo-950/10 border-l border-slate-800" colSpan={2}>
-                            <div className="flex gap-2 justify-center">
-                              {reqZnUp ? (
-                                <input 
-                                  type="number" step="0.01" 
-                                  placeholder="Up" 
-                                  value={item.raUp} 
-                                  onChange={(e) => handleItemChange(item.id, 'raUp', e.target.value)} 
-                                  className={`w-16 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
-                                    isZnUpFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-indigo-300 focus:border-indigo-500'
-                                  }`} 
-                                />
-                              ) : <div className="w-16 py-1.5 text-slate-600 bg-slate-950 border border-slate-800 rounded-lg text-center">-</div>}
+                          {/* Dynamic Multi-point Zn weight (Up / Lo) */}
+                          {Array.from({ length: znPointCount }).map((_, pIdx) => {
+                            const valUp = item.raUp[pIdx] || '';
+                            const valLo = item.raLo[pIdx] || '';
+                            const isPtUpFail = isOutOfSpec(valUp, headerInfo.requirementRaUp, headerInfo.requirementRzUp);
+                            const isPtLoFail = isOutOfSpec(valLo, headerInfo.requirementRaLo, headerInfo.requirementRzLo);
 
-                              {reqZnLo ? (
-                                <input 
-                                  type="number" step="0.01" 
-                                  placeholder="Lo" 
-                                  value={item.raLo} 
-                                  onChange={(e) => handleItemChange(item.id, 'raLo', e.target.value)} 
-                                  className={`w-16 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
-                                    isZnLoFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-indigo-300 focus:border-indigo-500'
-                                  }`} 
-                                />
-                              ) : <div className="w-16 py-1.5 text-slate-600 bg-slate-950 border border-slate-800 rounded-lg text-center">-</div>}
-                            </div>
-                          </td>
+                            return (
+                              <React.Fragment key={pIdx}>
+                                <td className="px-1 py-2.5 text-center bg-indigo-950/10 border-l border-slate-800/60">
+                                  {reqZnUp ? (
+                                    <input 
+                                      type="number" step="0.01" 
+                                      placeholder={`Up ${pIdx + 1}`} 
+                                      value={valUp} 
+                                      onChange={(e) => handleDynamicZnChange(item.id, 'raUp', pIdx, e.target.value)} 
+                                      className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
+                                        isPtUpFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-indigo-300 focus:border-indigo-500'
+                                      }`} 
+                                    />
+                                  ) : <div className="w-14 py-1.5 text-slate-600 bg-slate-950 border border-slate-800 rounded-lg text-center">-</div>}
+                                </td>
+                                <td className="px-1 py-2.5 text-center bg-indigo-950/10">
+                                  {reqZnLo ? (
+                                    <input 
+                                      type="number" step="0.01" 
+                                      placeholder={`Lo ${pIdx + 1}`} 
+                                      value={valLo} 
+                                      onChange={(e) => handleDynamicZnChange(item.id, 'raLo', pIdx, e.target.value)} 
+                                      className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
+                                        isPtLoFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-indigo-300 focus:border-indigo-500'
+                                      }`} 
+                                    />
+                                  ) : <div className="w-14 py-1.5 text-slate-600 bg-slate-950 border border-slate-800 rounded-lg text-center">-</div>}
+                                </td>
+                              </React.Fragment>
+                            );
+                          })}
+
+                          {/* Calculated Zn Summary Column when points > 1 */}
+                          {znPointCount > 1 && (
+                            <td className="px-2 py-2.5 text-center bg-indigo-950/20 border-l border-slate-800/60">
+                              <div className="text-[10px] leading-tight space-y-0.5">
+                                <div className="text-indigo-300 font-bold">
+                                  U:{rowZnAvgUp || '-'} L:{rowZnAvgLo || '-'}
+                                </div>
+                                <div className="text-[9px] text-slate-400">
+                                  Avg: <span className="font-bold text-indigo-200">{rowZnOverall}</span>
+                                </div>
+                              </div>
+                            </td>
+                          )}
 
                           {/* Flux weight (Up / Lo) */}
                           <td className="px-2 py-2.5 text-center bg-emerald-950/10 border-l border-slate-800" colSpan={2}>
@@ -1771,7 +2010,14 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                     </td>
                     <td className="px-3 py-3 font-sans text-slate-300">{ins.profileName}</td>
                     <td className="px-3 py-3 text-center text-indigo-300">
-                      {ins.raUp || '-'} / {ins.raLo || '-'}
+                      <div>
+                        {formatZnDisplay(ins.raUp)} / {formatZnDisplay(ins.raLo)}
+                      </div>
+                      {(ins.znAvgUp || ins.znAvgLo || (Array.isArray(ins.raUp) && ins.raUp.length > 1) || (Array.isArray(ins.raLo) && ins.raLo.length > 1)) && (
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                          Avg: <span className="text-indigo-200 font-bold">{ins.znAvgTotal || getZnOverallAvg(ins.raUp, ins.raLo)}</span> (U:{ins.znAvgUp || calcZnAvg(ins.raUp) || '-'} L:{ins.znAvgLo || calcZnAvg(ins.raLo) || '-'})
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-center text-emerald-300">
                       {ins.rzUp || '-'} / {ins.rzLo || '-'}
@@ -1977,8 +2223,16 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Zn Wt Up (g/m²)</label>
                     <input
                       type="text"
-                      value={editingHistoryItem.raUp || ''}
-                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, raUp: e.target.value })}
+                      placeholder="e.g. 45.2, 46.1"
+                      value={Array.isArray(editingHistoryItem.raUp) ? editingHistoryItem.raUp.join(', ') : (editingHistoryItem.raUp || '')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val.includes(',')) {
+                          setEditingHistoryItem({ ...editingHistoryItem, raUp: val.split(',').map(s => s.trim()) });
+                        } else {
+                          setEditingHistoryItem({ ...editingHistoryItem, raUp: val });
+                        }
+                      }}
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-indigo-300 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
@@ -1986,8 +2240,16 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Zn Wt Lo (g/m²)</label>
                     <input
                       type="text"
-                      value={editingHistoryItem.raLo || ''}
-                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, raLo: e.target.value })}
+                      placeholder="e.g. 44.8, 45.5"
+                      value={Array.isArray(editingHistoryItem.raLo) ? editingHistoryItem.raLo.join(', ') : (editingHistoryItem.raLo || '')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val.includes(',')) {
+                          setEditingHistoryItem({ ...editingHistoryItem, raLo: val.split(',').map(s => s.trim()) });
+                        } else {
+                          setEditingHistoryItem({ ...editingHistoryItem, raLo: val });
+                        }
+                      }}
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-indigo-300 focus:outline-none focus:border-indigo-500"
                     />
                   </div>

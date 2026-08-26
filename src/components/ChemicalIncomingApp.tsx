@@ -37,7 +37,9 @@ import {
   Edit3,
   AlertTriangle,
   Sun,
-  Moon
+  Moon,
+  Printer,
+  Tag
 } from 'lucide-react';
 
 import { 
@@ -189,8 +191,18 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
   const [targetEditHistoryItem, setTargetEditHistoryItem] = useState<ChemicalInspectionEntry | null>(null);
   const [editingHistoryItem, setEditingHistoryItem] = useState<ChemicalInspectionEntry | null>(null);
 
-  // Search Filter
+  // Search Filter & Month/Year Filters
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterMonth, setFilterMonth] = useState<string>('');
+  const [filterYear, setFilterYear] = useState<string>('');
+
+  // Single & Batch Tag Print Modal State
+  const [activePrintItem, setActivePrintItem] = useState<ChemicalInspectionEntry | null>(null);
+  const [activeBatchPrintItems, setActiveBatchPrintItems] = useState<ChemicalInspectionEntry[] | null>(null);
+  const [batchPrintLayout, setBatchPrintLayout] = useState<'roll' | 'grid'>('roll');
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<string[]>([]);
+  const [copiedTagInfo, setCopiedTagInfo] = useState<boolean>(false);
+  const [batchCopiedInfo, setBatchCopiedInfo] = useState<boolean>(false);
 
   // Delete Confirmation Modal State with Password Protection (admin2026)
   const [confirmModal, setConfirmModal] = useState<{
@@ -662,19 +674,613 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     setSettingRows(list.map(i => ({ item: i.item, min: String(i.min), max: String(i.max) })));
   };
 
-  // Filtered History
+  // Filtered History with Search, Month, and Year
   const filteredHistory = useMemo(() => {
     return history.filter(item => {
       const q = searchQuery.toLowerCase();
-      return (
+      const matchQuery = (
         !searchQuery ||
         item.chemical?.toLowerCase().includes(q) ||
         item.batch_lot?.toLowerCase().includes(q) ||
         item.supplier?.toLowerCase().includes(q) ||
-        item.inspector?.toLowerCase().includes(q)
+        item.inspector?.toLowerCase().includes(q) ||
+        item.packaging?.toLowerCase().includes(q)
       );
+
+      let matchMonth = true;
+      let matchYear = true;
+
+      if (filterMonth || filterYear) {
+        const itemDateStr = item.date || item.timestamp || '';
+        if (filterMonth) {
+          matchMonth = itemDateStr.includes(`-${filterMonth}-`) || itemDateStr.includes(`/${filterMonth}/`);
+        }
+        if (filterYear) {
+          matchYear = itemDateStr.includes(filterYear);
+        }
+      }
+
+      return matchQuery && matchMonth && matchYear;
     });
-  }, [history, searchQuery]);
+  }, [history, searchQuery, filterMonth, filterYear]);
+
+  // Unique key helper for multi-selection
+  const getHistoryItemKey = (item: ChemicalInspectionEntry, idx: number): string => {
+    return item.id || `${item.batch_lot}-${item.chemical}-${idx}`;
+  };
+
+  const toggleSelectHistory = (key: string) => {
+    setSelectedHistoryIds(prev => 
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  const isAllFilteredSelected = filteredHistory.length > 0 && filteredHistory.every((item, idx) => 
+    selectedHistoryIds.includes(getHistoryItemKey(item, idx))
+  );
+
+  const toggleSelectAllHistory = () => {
+    if (isAllFilteredSelected) {
+      setSelectedHistoryIds([]);
+    } else {
+      const allFilteredKeys = filteredHistory.map((item, idx) => getHistoryItemKey(item, idx));
+      setSelectedHistoryIds(allFilteredKeys);
+    }
+  };
+
+  const clearHistorySelection = () => {
+    setSelectedHistoryIds([]);
+  };
+
+  const selectedHistoryItems = useMemo(() => {
+    return filteredHistory.filter((item, idx) => 
+      selectedHistoryIds.includes(getHistoryItemKey(item, idx))
+    );
+  }, [filteredHistory, selectedHistoryIds]);
+
+  const handlePrintTag = (item: ChemicalInspectionEntry) => {
+    setActivePrintItem(item);
+  };
+
+  const handlePrintBatchTags = (itemsToPrint?: ChemicalInspectionEntry[]) => {
+    const list = itemsToPrint && itemsToPrint.length > 0 ? itemsToPrint : selectedHistoryItems;
+    if (list.length > 0) {
+      setActiveBatchPrintItems(list);
+    } else if (filteredHistory.length > 0) {
+      setActiveBatchPrintItems(filteredHistory);
+    }
+  };
+
+  function chunkArray<T>(arr: T[], size: number): T[][] {
+    const result: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) {
+      result.push(arr.slice(i, i + size));
+    }
+    return result;
+  }
+
+  // Tag HTML Generator for Chemical Inspection
+  const generateTagContentHtml = (item: ChemicalInspectionEntry, tagIndex?: number) => {
+    const jg = item.result || 'PASS';
+    const isPass = jg === 'PASS';
+    const bgBadge = isPass ? '#10b981' : '#ef4444';
+    const tagNo = tagIndex !== undefined ? `<div class="tag-number">#${tagIndex + 1}</div>` : '';
+
+    const itemsSummary = item.items && item.items.length > 0
+      ? item.items.map(it => `${it.description}: ${it.value} (${it.status})`).join(' | ')
+      : '';
+
+    return `
+      <div class="tag-card">
+        ${tagNo}
+        <div class="tag-header">
+          QUALITY APPROVED CHEMICAL TAG
+        </div>
+
+        <div class="tag-body">
+          <div class="qr-box">
+            <svg width="70" height="70" viewBox="0 0 100 100">
+              <rect width="100" height="100" fill="#fff" />
+              <rect x="8" y="8" width="30" height="30" fill="#000"/>
+              <rect x="13" y="13" width="20" height="20" fill="#fff"/>
+              <rect x="18" y="18" width="10" height="10" fill="#000"/>
+              <rect x="62" y="8" width="30" height="30" fill="#000"/>
+              <rect x="67" y="13" width="20" height="20" fill="#fff"/>
+              <rect x="72" y="18" width="10" height="10" fill="#000"/>
+              <rect x="8" y="62" width="30" height="30" fill="#000"/>
+              <rect x="13" y="67" width="20" height="20" fill="#fff"/>
+              <rect x="18" y="72" width="10" height="10" fill="#000"/>
+              <rect x="45" y="45" width="12" height="12" fill="#000"/>
+              <rect x="62" y="52" width="14" height="14" fill="#000"/>
+              <rect x="45" y="65" width="10" height="18" fill="#000"/>
+              <rect x="62" y="72" width="20" height="15" fill="#000"/>
+            </svg>
+            <div class="qr-text">${item.batch_lot || 'CHEM-LOT'}</div>
+          </div>
+
+          <div class="info-box">
+            <div class="info-row">
+              <span class="label">BATCH / LOT NO:</span>
+              <span class="val bold mono" style="font-size: 12px; color: #000;">${item.batch_lot || '-'}</span>
+            </div>
+
+            <div class="info-row">
+              <span class="label">CHEMICAL CODE:</span>
+              <span class="val bold" style="font-size: 12px; color: #4338ca;">${item.chemical || '-'}</span>
+            </div>
+
+            <div class="info-row-2col">
+              <div>
+                <span class="label">SUPPLIER:</span>
+                <span class="val">${item.supplier || '-'}</span>
+              </div>
+              <div>
+                <span class="label">INSPECTOR:</span>
+                <span class="val">${item.inspector || 'QA Chemist'}</span>
+              </div>
+            </div>
+
+            <div class="info-row-2col">
+              <div>
+                <span class="label">MFG / EXP:</span>
+                <span class="val mono">${item.date || '-'} / ${item.expiration || '-'}</span>
+              </div>
+              <div>
+                <span class="label">QTY / WT:</span>
+                <span class="val mono bold">${item.qty || '-'} pcs / ${item.weight || '0'} kg</span>
+              </div>
+            </div>
+
+            <div class="info-row-2col">
+              <div>
+                <span class="label">PACKAGING:</span>
+                <span class="val">${item.packaging || 'Normal'}</span>
+              </div>
+              <div>
+                <span class="label">RESULT:</span>
+                <span class="badge" style="background: ${bgBadge};">${jg}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        ${itemsSummary ? `
+          <div class="chem-row">
+            <strong>PARAM: </strong>${itemsSummary}
+          </div>
+        ` : ''}
+
+        <div class="tag-footer">
+          <span>IQA-02 Coating Chemical Incoming Verification</span>
+          <span>${item.timestamp || (item.date ? item.date : new Date().toLocaleDateString('th-TH'))}</span>
+        </div>
+      </div>
+    `;
+  };
+
+  const generateMultipleTagsHtml = (items: ChemicalInspectionEntry[], layout: 'roll' | 'grid') => {
+    if (layout === 'roll') {
+      const tagsHtml = items.map((item, idx) => `
+        <div class="page-container">
+          ${generateTagContentHtml(item, idx)}
+        </div>
+      `).join('');
+
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Chemical Incoming QR Quality Tags (Roll)</title>
+          <meta charset="utf-8" />
+          <style>
+            @page {
+              size: 100mm 100mm;
+              margin: 0;
+            }
+            * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            html, body {
+              margin: 0;
+              padding: 0;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              background: #fff;
+              color: #0f172a;
+            }
+            .page-container {
+              width: 100mm;
+              height: 100mm;
+              padding: 4mm;
+              page-break-after: always;
+              break-after: page;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .page-container:last-child {
+              page-break-after: auto;
+              break-after: auto;
+            }
+            .tag-card {
+              width: 92mm;
+              height: 92mm;
+              border: 2px solid #4338ca;
+              border-radius: 8px;
+              padding: 8px;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              background: #fff;
+              box-sizing: border-box;
+              position: relative;
+            }
+            .tag-number {
+              position: absolute;
+              top: 6px;
+              right: 6px;
+              font-size: 8px;
+              font-family: monospace;
+              background: rgba(255,255,255,0.3);
+              color: #fff;
+              padding: 1px 4px;
+              border-radius: 4px;
+              z-index: 2;
+            }
+            .tag-header {
+              background: #4338ca;
+              color: #fff;
+              font-size: 9.5px;
+              font-weight: 900;
+              text-align: center;
+              padding: 4px 6px;
+              border-radius: 4px;
+              letter-spacing: 0.5px;
+              text-transform: uppercase;
+            }
+            .tag-body {
+              display: flex;
+              gap: 8px;
+              margin-top: 4px;
+              align-items: stretch;
+            }
+            .qr-box {
+              width: 78px;
+              min-width: 78px;
+              border: 1.5px solid #0f172a;
+              border-radius: 6px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              padding: 2px;
+              background: #fafafa;
+            }
+            .qr-text {
+              font-family: monospace;
+              font-size: 7.5px;
+              font-weight: bold;
+              color: #0f172a;
+              margin-top: 2px;
+              max-width: 74px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+            .info-box {
+              flex: 1;
+              font-size: 9.5px;
+              line-height: 1.25;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+            }
+            .info-row {
+              display: flex;
+              flex-direction: column;
+              margin-bottom: 2px;
+            }
+            .info-row-2col {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 4px;
+              font-size: 8.5px;
+              margin-bottom: 2px;
+            }
+            .label {
+              font-size: 7.5px;
+              font-weight: 700;
+              color: #64748b;
+              text-transform: uppercase;
+              display: block;
+            }
+            .val {
+              color: #0f172a;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .bold { font-weight: bold; }
+            .mono { font-family: monospace; }
+            .badge {
+              display: inline-block;
+              padding: 1px 5px;
+              border-radius: 3px;
+              color: #fff;
+              font-weight: 900;
+              font-size: 8px;
+              text-align: center;
+            }
+            .chem-row {
+              margin-top: 3px;
+              padding: 2px 4px;
+              background: #f8fafc;
+              border-radius: 4px;
+              border: 1px solid #e2e8f0;
+              font-family: monospace;
+              font-size: 7px;
+              color: #334155;
+              line-height: 1.2;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .tag-footer {
+              border-top: 1px dashed #cbd5e1;
+              padding-top: 3px;
+              font-size: 7px;
+              color: #94a3b8;
+              display: flex;
+              justify-content: space-between;
+            }
+          </style>
+        </head>
+        <body>
+          ${tagsHtml}
+        </body>
+        </html>
+      `;
+    } else {
+      // Grid Layout A4 (4 tags per page)
+      const pages = chunkArray(items, 4);
+      const pagesHtml = pages.map((pageItems, pageIdx) => `
+        <div class="a4-page">
+          <div class="grid-container">
+            ${pageItems.map((item, itemIdx) => generateTagContentHtml(item, (pageIdx * 4) + itemIdx)).join('')}
+          </div>
+        </div>
+      `).join('');
+
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Chemical Incoming QR Quality Tags (A4 Sheet)</title>
+          <meta charset="utf-8" />
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 10mm;
+            }
+            * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            html, body {
+              margin: 0;
+              padding: 0;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              background: #fff;
+              color: #0f172a;
+            }
+            .a4-page {
+              width: 190mm;
+              min-height: 277mm;
+              page-break-after: always;
+              break-after: page;
+              box-sizing: border-box;
+              display: flex;
+              align-items: flex-start;
+            }
+            .a4-page:last-child {
+              page-break-after: auto;
+              break-after: auto;
+            }
+            .grid-container {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 8mm;
+              width: 100%;
+            }
+            .tag-card {
+              border: 2px solid #4338ca;
+              border-radius: 8px;
+              padding: 10px;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              background: #fff;
+              min-height: 125mm;
+              box-sizing: border-box;
+              position: relative;
+            }
+            .tag-number {
+              position: absolute;
+              top: 8px;
+              right: 8px;
+              font-size: 9px;
+              font-family: monospace;
+              background: rgba(255,255,255,0.3);
+              color: #fff;
+              padding: 1px 5px;
+              border-radius: 4px;
+              z-index: 2;
+            }
+            .tag-header {
+              background: #4338ca;
+              color: #fff;
+              font-size: 11px;
+              font-weight: 900;
+              text-align: center;
+              padding: 6px;
+              border-radius: 4px;
+              letter-spacing: 0.5px;
+              text-transform: uppercase;
+            }
+            .tag-body {
+              display: flex;
+              gap: 12px;
+              margin-top: 8px;
+              align-items: stretch;
+            }
+            .qr-box {
+              width: 90px;
+              min-width: 90px;
+              border: 1.5px solid #0f172a;
+              border-radius: 6px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              padding: 4px;
+              background: #fafafa;
+            }
+            .qr-text {
+              font-family: monospace;
+              font-size: 8.5px;
+              font-weight: bold;
+              color: #0f172a;
+              margin-top: 4px;
+              max-width: 86px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+            .info-box {
+              flex: 1;
+              font-size: 11px;
+              line-height: 1.35;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+            }
+            .info-row {
+              display: flex;
+              flex-direction: column;
+              margin-bottom: 3px;
+            }
+            .info-row-2col {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 6px;
+              font-size: 10px;
+              margin-bottom: 3px;
+            }
+            .label {
+              font-size: 8px;
+              font-weight: 700;
+              color: #64748b;
+              text-transform: uppercase;
+              display: block;
+            }
+            .val {
+              color: #0f172a;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .bold { font-weight: bold; }
+            .mono { font-family: monospace; }
+            .badge {
+              display: inline-block;
+              padding: 2px 6px;
+              border-radius: 3px;
+              color: #fff;
+              font-weight: 900;
+              font-size: 9px;
+              text-align: center;
+            }
+            .chem-row {
+              margin-top: 6px;
+              padding: 4px 6px;
+              background: #f8fafc;
+              border-radius: 4px;
+              border: 1px solid #e2e8f0;
+              font-family: monospace;
+              font-size: 8px;
+              color: #334155;
+              line-height: 1.2;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .tag-footer {
+              border-top: 1px dashed #cbd5e1;
+              padding-top: 6px;
+              font-size: 8px;
+              color: #94a3b8;
+              display: flex;
+              justify-content: space-between;
+            }
+          </style>
+        </head>
+        <body>
+          ${pagesHtml}
+        </body>
+        </html>
+      `;
+    }
+  };
+
+  const triggerDirectMultiplePrint = (items: ChemicalInspectionEntry[], layout: 'roll' | 'grid') => {
+    if (!items || items.length === 0) return;
+    const printHtml = generateMultipleTagsHtml(items, layout);
+
+    let iframe = document.getElementById('chem-print-iframe') as HTMLIFrameElement | null;
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'chem-print-iframe';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+    }
+
+    try {
+      const doc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (doc) {
+        doc.open();
+        doc.write(printHtml);
+        doc.close();
+
+        setTimeout(() => {
+          try {
+            iframe?.contentWindow?.focus();
+            iframe?.contentWindow?.print();
+          } catch (e) {
+            console.error("Iframe print error:", e);
+            const win = window.open('', '_blank');
+            if (win) {
+              win.document.write(printHtml);
+              win.document.close();
+              win.focus();
+              win.print();
+            }
+          }
+        }, 300);
+      }
+    } catch (err) {
+      console.error("Direct printing failed, using popup fallback:", err);
+      const win = window.open('', '_blank');
+      if (win) {
+        win.document.write(printHtml);
+        win.document.close();
+        win.focus();
+        win.print();
+      }
+    }
+  };
+
+  const triggerDirectPrint = (item: ChemicalInspectionEntry) => {
+    triggerDirectMultiplePrint([item], 'roll');
+  };
 
   // Export CSV
   const exportHistoryCSV = () => {
@@ -1011,6 +1617,42 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                   </button>
 
                   <button
+                    onClick={() => {
+                      if (tableItems.length === 0) return;
+                      const tempEntry: ChemicalInspectionEntry = {
+                        id: 'temp_' + Date.now(),
+                        timestamp: new Date().toLocaleString('th-TH'),
+                        chemical: header.coating_chemical || 'CHEMICAL',
+                        batch_lot: header.batch_lot || 'BATCH-001',
+                        supplier: header.supplier_code || '-',
+                        date: header.product_date || '',
+                        expiration: header.expiration_date || '',
+                        weight: header.weight_kg || '0',
+                        qty: header.qty_pcs || '0',
+                        packaging: header.packaging || 'Normal',
+                        inspector: header.inspector_name || 'QA Chemist',
+                        result: overallResult,
+                        items: tableItems.map(it => ({
+                          description: it.description,
+                          value: it.total,
+                          status: validateItemRow(header.coating_chemical, it.description, it.total)
+                        }))
+                      };
+                      handlePrintTag(tempEntry);
+                    }}
+                    disabled={tableItems.length === 0}
+                    className={`font-bold text-xs px-3.5 py-2 rounded-xl border flex items-center gap-1.5 transition disabled:opacity-40 ${
+                      isLight
+                        ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+                        : 'bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 border-indigo-800'
+                    }`}
+                    title={isTh ? "พิมพ์ Quality Tag ทันที" : "Print Quality Tag"}
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>{isTh ? 'พิมพ์ Tag' : 'Print Tag'}</span>
+                  </button>
+
+                  <button
                     onClick={copyJSON}
                     disabled={tableItems.length === 0}
                     className={`font-bold text-xs px-3 py-2 rounded-xl border flex items-center gap-1.5 transition disabled:opacity-40 ${
@@ -1303,27 +1945,89 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
       {/* TAB 2: INSPECTION HISTORY */}
       {activeTab === 'history' && (
         <div className="space-y-6">
-          {/* Top Control Ribbon */}
-          <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 ${
+          {/* Top Control Ribbon with Search, Filters & Batch Tag Printing */}
+          <div className={`p-4 rounded-2xl border flex flex-col md:flex-row items-center justify-between gap-4 ${
             isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-900 border-slate-800'
           }`}>
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder={isTh ? "ค้นหา Chemical, Batch, Supplier..." : "Search Chemical, Batch..."}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full border rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-indigo-500 ${
-                  isLight ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-950 border-slate-800 text-slate-200'
-                }`}
-              />
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <div className="relative flex-1 sm:w-64 min-w-[200px]">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder={isTh ? "ค้นหา Chemical, Batch, Supplier..." : "Search Chemical, Batch..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`w-full border rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                    isLight ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-950 border-slate-800 text-slate-200'
+                  }`}
+                />
+              </div>
+
+              {/* Month Filter */}
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className={`border rounded-xl px-2.5 py-2 text-xs font-semibold focus:outline-none ${
+                    isLight ? 'bg-slate-50 border-slate-300 text-slate-700' : 'bg-slate-950 border-slate-800 text-slate-300'
+                  }`}
+                >
+                  <option value="">{isTh ? 'ทุกเดือน' : 'All Months'}</option>
+                  <option value="01">01 - Jan</option>
+                  <option value="02">02 - Feb</option>
+                  <option value="03">03 - Mar</option>
+                  <option value="04">04 - Apr</option>
+                  <option value="05">05 - May</option>
+                  <option value="06">06 - Jun</option>
+                  <option value="07">07 - Jul</option>
+                  <option value="08">08 - Aug</option>
+                  <option value="09">09 - Sep</option>
+                  <option value="10">10 - Oct</option>
+                  <option value="11">11 - Nov</option>
+                  <option value="12">12 - Dec</option>
+                </select>
+
+                <select
+                  value={filterYear}
+                  onChange={(e) => setFilterYear(e.target.value)}
+                  className={`border rounded-xl px-2.5 py-2 text-xs font-semibold focus:outline-none ${
+                    isLight ? 'bg-slate-50 border-slate-300 text-slate-700' : 'bg-slate-950 border-slate-800 text-slate-300'
+                  }`}
+                >
+                  <option value="">{isTh ? 'ทุกปี' : 'All Years'}</option>
+                  <option value="2026">2026</option>
+                  <option value="2025">2025</option>
+                  <option value="2024">2024</option>
+                </select>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+              {/* Batch Print Button */}
+              <button
+                onClick={() => handlePrintBatchTags()}
+                disabled={filteredHistory.length === 0}
+                className={`font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition shadow-xs ${
+                  selectedHistoryItems.length > 0
+                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white animate-pulse'
+                    : isLight 
+                      ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200' 
+                      : 'bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-800'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                title={isTh ? "พิมพ์ Quality Tag เป็นชุด" : "Print batch quality tags"}
+              >
+                <Printer className="w-4 h-4" />
+                <span>
+                  {selectedHistoryItems.length > 0
+                    ? (isTh ? `พิมพ์ Tag ที่เลือก (${selectedHistoryItems.length})` : `Print Selected Tags (${selectedHistoryItems.length})`)
+                    : (isTh ? `พิมพ์ Tag ทั้งหมด (${filteredHistory.length})` : `Print All Tags (${filteredHistory.length})`)
+                  }
+                </span>
+              </button>
+
               <button
                 onClick={exportHistoryCSV}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition shadow-xs"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition shadow-xs"
               >
                 <FileSpreadsheet className="w-4 h-4" />
                 <span>{isTh ? 'ส่งออก CSV' : 'Export CSV'}</span>
@@ -1343,6 +2047,40 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
             </div>
           </div>
 
+          {/* Selection Banner */}
+          {selectedHistoryItems.length > 0 && (
+            <div className={`p-3.5 rounded-2xl border flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 ${
+              isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-950' : 'bg-indigo-950/40 border-indigo-800 text-indigo-200'
+            }`}>
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <Check className="w-4 h-4 text-indigo-500" />
+                <span>
+                  {isTh 
+                    ? `เลือกแล้ว ${selectedHistoryItems.length} รายการ (จากทั้งหมด ${filteredHistory.length} รายการ)` 
+                    : `Selected ${selectedHistoryItems.length} records (of ${filteredHistory.length} total)`
+                  }
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={clearHistorySelection}
+                  className={`text-xs px-3 py-1.5 rounded-xl border font-bold transition ${
+                    isLight ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300' : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700'
+                  }`}
+                >
+                  {isTh ? 'ยกเลิกการเลือก' : 'Clear Selection'}
+                </button>
+                <button
+                  onClick={() => handlePrintBatchTags()}
+                  className="text-xs px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition flex items-center gap-1.5 shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>{isTh ? 'พิมพ์ Tag ที่เลือก' : 'Print Selected Tags'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* History Data Table */}
           <div className={`rounded-2xl border overflow-hidden ${
             isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-900 border-slate-800'
@@ -1353,6 +2091,15 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                   isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-slate-950 text-slate-400 border-slate-800'
                 }`}>
                   <tr>
+                    <th className="px-3 py-3 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isAllFilteredSelected}
+                        onChange={toggleSelectAllHistory}
+                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        title={isTh ? "เลือกทั้งหมด" : "Select All"}
+                      />
+                    </th>
                     <th className="px-4 py-3">Date/Time</th>
                     <th className="px-4 py-3">Chemical</th>
                     <th className="px-4 py-3">Batch/Lot</th>
@@ -1364,59 +2111,94 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-slate-800/80'}`}>
-                  {filteredHistory.map((entry) => (
-                    <tr key={entry.id} className={isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-950/40'}>
-                      <td className={`px-4 py-3 font-mono text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{entry.timestamp}</td>
-                      <td className={`px-4 py-3 font-bold ${isLight ? 'text-indigo-700' : 'text-indigo-400'}`}>{entry.chemical}</td>
-                      <td className={`px-4 py-3 font-mono font-semibold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{entry.batch_lot}</td>
-                      <td className={`px-4 py-3 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{entry.supplier || '-'}</td>
-                      <td className="px-4 py-3 font-mono">
-                        <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>{entry.weight} kg</span> / <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>{entry.qty} pcs</span>
-                      </td>
-                      <td className={`px-4 py-3 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{entry.packaging || '-'}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                          entry.result === 'PASS'
-                            ? isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                            : isLight ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                        }`}>
-                          {entry.result}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleRequestEditHistory(entry)}
-                            className={`p-1.5 rounded-lg transition border flex items-center gap-1 text-[11px] font-bold ${
-                              isLight 
-                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200' 
-                                : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30'
-                            }`}
-                            title={isTh ? "แก้ไขข้อมูล (ใส่รหัส admin2026)" : "Edit Record (Password required)"}
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                            <span>{isTh ? 'แก้ไข' : 'Edit'}</span>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteHistoryItem(entry)}
-                            className={`p-1.5 rounded-lg transition border flex items-center gap-1 text-[11px] font-bold ${
-                              isLight 
-                                ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200' 
-                                : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30'
-                            }`}
-                            title={isTh ? "ลบรายการประวัติ" : "Delete Record"}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">{isTh ? 'ลบ' : 'Delete'}</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredHistory.map((entry, idx) => {
+                    const rowKey = getHistoryItemKey(entry, idx);
+                    const isSelected = selectedHistoryIds.includes(rowKey);
+
+                    return (
+                      <tr 
+                        key={rowKey} 
+                        className={`transition-colors ${
+                          isSelected
+                            ? isLight ? 'bg-indigo-50/70' : 'bg-indigo-950/30'
+                            : isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-950/40'
+                        }`}
+                      >
+                        <td className="px-3 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectHistory(rowKey)}
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          />
+                        </td>
+                        <td className={`px-4 py-3 font-mono text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{entry.timestamp}</td>
+                        <td className={`px-4 py-3 font-bold ${isLight ? 'text-indigo-700' : 'text-indigo-400'}`}>{entry.chemical}</td>
+                        <td className={`px-4 py-3 font-mono font-semibold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{entry.batch_lot}</td>
+                        <td className={`px-4 py-3 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{entry.supplier || '-'}</td>
+                        <td className="px-4 py-3 font-mono">
+                          <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>{entry.weight} kg</span> / <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>{entry.qty} pcs</span>
+                        </td>
+                        <td className={`px-4 py-3 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{entry.packaging || '-'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                            entry.result === 'PASS'
+                              ? isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : isLight ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                          }`}>
+                            {entry.result}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Print Single Tag Button */}
+                            <button
+                              onClick={() => handlePrintTag(entry)}
+                              className={`p-1.5 rounded-lg transition border flex items-center gap-1 text-[11px] font-bold ${
+                                isLight 
+                                  ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200' 
+                                  : 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
+                              }`}
+                              title={isTh ? "พิมพ์ Quality Tag รายการนี้" : "Print Quality Tag"}
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span className="hidden lg:inline">{isTh ? 'Tag' : 'Tag'}</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleRequestEditHistory(entry)}
+                              className={`p-1.5 rounded-lg transition border flex items-center gap-1 text-[11px] font-bold ${
+                                isLight 
+                                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200' 
+                                  : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30'
+                              }`}
+                              title={isTh ? "แก้ไขข้อมูล (ใส่รหัส admin2026)" : "Edit Record (Password required)"}
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">{isTh ? 'แก้ไข' : 'Edit'}</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteHistoryItem(entry)}
+                              className={`p-1.5 rounded-lg transition border flex items-center gap-1 text-[11px] font-bold ${
+                                isLight 
+                                  ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200' 
+                                  : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30'
+                              }`}
+                              title={isTh ? "ลบรายการประวัติ" : "Delete Record"}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">{isTh ? 'ลบ' : 'Delete'}</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
 
                   {filteredHistory.length === 0 && (
                     <tr>
-                      <td colSpan={8} className={`p-12 text-center ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <td colSpan={9} className={`p-12 text-center ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                         {isTh ? 'ไม่มีข้อมูลประวัติการตรวจรับ' : 'No inspection history found'}
                       </td>
                     </tr>
@@ -1936,6 +2718,439 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* SINGLE TAG PRINT MODAL */}
+      {activePrintItem && (
+        <div className={`fixed inset-0 z-50 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto ${
+          isLight ? 'bg-slate-900/50' : 'bg-slate-950/85'
+        }`}>
+          <div className={`border rounded-2xl max-w-md w-full p-6 space-y-5 my-8 shadow-2xl relative animate-in fade-in zoom-in-95 ${
+            isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+          }`}>
+            {/* Modal Header */}
+            <div className={`flex items-center justify-between border-b pb-4 ${
+              isLight ? 'border-slate-200' : 'border-slate-800'
+            }`}>
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-xl border ${
+                  isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400'
+                }`}>
+                  <Printer className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className={`text-base font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                    {isTh ? 'พิมพ์ Quality Tag ตรวจรับเคมี' : 'Print Chemical Quality Tag'}
+                  </h3>
+                  <p className={`text-[11px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Batch: {activePrintItem.batch_lot} | {activePrintItem.chemical}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActivePrintItem(null)} 
+                className={`p-1.5 rounded-lg transition ${
+                  isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Visual Tag Preview Card */}
+            <div className="flex justify-center">
+              <div className="w-[320px] border-2 border-indigo-700 rounded-xl p-3.5 bg-white text-slate-900 shadow-md space-y-3 font-sans relative">
+                {/* Header */}
+                <div className="bg-indigo-700 text-white font-black text-[11px] text-center py-1.5 px-2 rounded tracking-wide uppercase">
+                  QUALITY APPROVED CHEMICAL TAG
+                </div>
+
+                {/* Body */}
+                <div className="flex gap-3 items-stretch">
+                  {/* Left QR */}
+                  <div className="w-[78px] min-w-[78px] border border-slate-900 rounded-md p-1.5 flex flex-col items-center justify-center bg-slate-50">
+                    <svg width="64" height="64" viewBox="0 0 100 100">
+                      <rect width="100" height="100" fill="#fff" />
+                      <rect x="8" y="8" width="30" height="30" fill="#000"/>
+                      <rect x="13" y="13" width="20" height="20" fill="#fff"/>
+                      <rect x="18" y="18" width="10" height="10" fill="#000"/>
+                      <rect x="62" y="8" width="30" height="30" fill="#000"/>
+                      <rect x="67" y="13" width="20" height="20" fill="#fff"/>
+                      <rect x="72" y="18" width="10" height="10" fill="#000"/>
+                      <rect x="8" y="62" width="30" height="30" fill="#000"/>
+                      <rect x="13" y="67" width="20" height="20" fill="#fff"/>
+                      <rect x="18" y="72" width="10" height="10" fill="#000"/>
+                      <rect x="45" y="45" width="12" height="12" fill="#000"/>
+                      <rect x="62" y="52" width="14" height="14" fill="#000"/>
+                      <rect x="45" y="65" width="10" height="18" fill="#000"/>
+                      <rect x="62" y="72" width="20" height="15" fill="#000"/>
+                    </svg>
+                    <span className="text-[7.5px] font-mono font-bold text-slate-900 mt-1 max-w-[70px] truncate text-center">
+                      {activePrintItem.batch_lot}
+                    </span>
+                  </div>
+
+                  {/* Right Details */}
+                  <div className="flex-1 text-[10.5px] space-y-1 leading-tight flex flex-col justify-between">
+                    <div>
+                      <div className="text-[8px] font-bold text-slate-500 uppercase">BATCH / LOT NO:</div>
+                      <div className="font-mono font-bold text-xs text-slate-950 truncate">{activePrintItem.batch_lot}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-[8px] font-bold text-slate-500 uppercase">CHEMICAL CODE:</div>
+                      <div className="font-bold text-[11px] text-indigo-700 truncate">{activePrintItem.chemical}</div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1 text-[9px]">
+                      <div>
+                        <span className="text-[7.5px] font-bold text-slate-500 block">SUPPLIER:</span>
+                        <span className="text-slate-800 truncate block">{activePrintItem.supplier || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[7.5px] font-bold text-slate-500 block">INSPECTOR:</span>
+                        <span className="text-slate-800 truncate block">{activePrintItem.inspector || 'QA Chemist'}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1 text-[9px]">
+                      <div>
+                        <span className="text-[7.5px] font-bold text-slate-500 block">MFG / EXP:</span>
+                        <span className="font-mono text-slate-800 block text-[8.5px] truncate">{activePrintItem.date || '-'} / {activePrintItem.expiration || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[7.5px] font-bold text-slate-500 block">QTY / WT:</span>
+                        <span className="font-mono font-bold text-slate-950 block">{activePrintItem.qty || '-'} pcs / {activePrintItem.weight || '0'} kg</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1 text-[9px] items-center pt-0.5">
+                      <div>
+                        <span className="text-[7.5px] font-bold text-slate-500 block">PACKAGING:</span>
+                        <span className="text-slate-800 truncate block">{activePrintItem.packaging || 'Normal'}</span>
+                      </div>
+                      <div>
+                        <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-black text-white text-center w-full ${
+                          activePrintItem.result === 'PASS' ? 'bg-emerald-600' : 'bg-rose-600'
+                        }`}>
+                          {activePrintItem.result || 'PASS'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Parameters Preview if present */}
+                {activePrintItem.items && activePrintItem.items.length > 0 && (
+                  <div className="bg-slate-50 border border-slate-200 rounded p-1.5 text-[8px] font-mono text-slate-700 leading-tight">
+                    <span className="font-bold text-slate-900">PARAM: </span>
+                    {activePrintItem.items.map(it => `${it.description}: ${it.value} (${it.status})`).join(' | ')}
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div className="border-t border-dashed border-slate-300 pt-1.5 text-[8px] text-slate-500 flex justify-between items-center">
+                  <span>IQA-02 Chemical Incoming Verification</span>
+                  <span>{activePrintItem.timestamp || (activePrintItem.date ? activePrintItem.date : new Date().toLocaleDateString('th-TH'))}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className={`flex flex-col sm:flex-row gap-2 pt-2 border-t ${
+              isLight ? 'border-slate-200' : 'border-slate-800'
+            }`}>
+              <button
+                type="button"
+                onClick={() => {
+                  const tagText = `[QUALITY APPROVED CHEMICAL TAG]\nBatch/Lot: ${activePrintItem.batch_lot}\nChemical: ${activePrintItem.chemical}\nSupplier: ${activePrintItem.supplier || '-'}\nInspector: ${activePrintItem.inspector}\nMFG/EXP: ${activePrintItem.date || '-'} / ${activePrintItem.expiration || '-'}\nWeight: ${activePrintItem.weight} kg, Qty: ${activePrintItem.qty} pcs\nResult: ${activePrintItem.result}`;
+                  navigator.clipboard.writeText(tagText);
+                  setCopiedTagInfo(true);
+                  setTimeout(() => setCopiedTagInfo(false), 2000);
+                }}
+                className={`flex-1 font-bold text-xs py-2.5 rounded-xl transition border flex items-center justify-center gap-1.5 ${
+                  isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+              >
+                {copiedTagInfo ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedTagInfo ? (isTh ? 'คัดลอกแล้ว!' : 'Copied!') : (isTh ? 'คัดลอกข้อมูล' : 'Copy Text')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerDirectPrint(activePrintItem)}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-md shadow-indigo-600/30 flex items-center justify-center gap-1.5"
+              >
+                <Printer className="w-4 h-4" />
+                <span>{isTh ? 'พิมพ์ Quality Tag (100x100mm)' : 'Print Tag Now'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BATCH TAG PRINT MODAL */}
+      {activeBatchPrintItems && (
+        <div className={`fixed inset-0 z-50 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto ${
+          isLight ? 'bg-slate-900/50' : 'bg-slate-950/85'
+        }`}>
+          <div className={`border rounded-2xl max-w-4xl w-full p-6 space-y-5 my-8 shadow-2xl relative max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 ${
+            isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+          }`}>
+            {/* Modal Header */}
+            <div className={`flex items-center justify-between border-b pb-4 shrink-0 ${
+              isLight ? 'border-slate-200' : 'border-slate-800'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2.5 rounded-xl border ${
+                  isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400'
+                }`}>
+                  <Printer className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className={`text-base font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                      {isTh ? 'พิมพ์ชุด Quality Tag ตรวจรับเคมี (Batch Tag Printing)' : 'Batch Print Chemical Quality Tags'}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-600 text-white">
+                      {activeBatchPrintItems.length} {isTh ? 'รายการ' : 'Tags'}
+                    </span>
+                  </div>
+                  <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {isTh ? 'เลือกรูปแบบการพิมพ์ที่ต้องการ (Label Roll หรือ กระดาษ A4)' : 'Choose your desired print layout format'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActiveBatchPrintItems(null)} 
+                className={`p-2 rounded-xl transition ${
+                  isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Layout Options & Summary KPIs */}
+            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 ${
+              isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
+            }`}>
+              {/* Layout Switcher */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className={`text-xs font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                  {isTh ? 'รูปแบบกระดาษ:' : 'Print Layout:'}
+                </span>
+                <div className={`p-1 rounded-xl border flex gap-1 ${
+                  isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+                }`}>
+                  <button
+                    type="button"
+                    onClick={() => setBatchPrintLayout('roll')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                      batchPrintLayout === 'roll'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Tag className="w-3.5 h-3.5" />
+                    <span>{isTh ? 'ม้วนสติกเกอร์ (100x100mm)' : 'Label Roll (100x100mm)'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBatchPrintLayout('grid')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                      batchPrintLayout === 'grid'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>{isTh ? 'กระดาษ A4 (4 ป้าย/แผ่น)' : 'A4 Sheet (4/page)'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Summary KPIs */}
+              <div className="flex items-center gap-4 text-xs">
+                <div>
+                  <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>{isTh ? 'จำนวนชุด:' : 'Batches:'} </span>
+                  <strong className={isLight ? 'text-slate-900' : 'text-white'}>{activeBatchPrintItems.length}</strong>
+                </div>
+                <div>
+                  <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>{isTh ? 'รวมจำนวน:' : 'Total Qty:'} </span>
+                  <strong className={isLight ? 'text-slate-900' : 'text-white'}>
+                    {activeBatchPrintItems.reduce((sum, item) => sum + (parseFloat(item.qty) || 0), 0).toLocaleString()} pcs
+                  </strong>
+                </div>
+                <div>
+                  <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>{isTh ? 'รวมน้ำหนัก:' : 'Total Wt:'} </span>
+                  <strong className="text-indigo-600">
+                    {activeBatchPrintItems.reduce((sum, item) => sum + (parseFloat(item.weight) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable Visual Previews */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-3 min-h-[260px]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeBatchPrintItems.map((item, idx) => (
+                  <div 
+                    key={idx} 
+                    className="border-2 border-indigo-700 rounded-xl p-3.5 bg-white text-slate-900 shadow-sm space-y-2.5 font-sans relative"
+                  >
+                    <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-900 font-mono text-[9px] font-bold">
+                      #{idx + 1}
+                    </div>
+
+                    {/* Header */}
+                    <div className="bg-indigo-700 text-white font-black text-[10.5px] text-center py-1 px-2 rounded tracking-wide uppercase">
+                      QUALITY APPROVED CHEMICAL TAG
+                    </div>
+
+                    {/* Body */}
+                    <div className="flex gap-3 items-stretch">
+                      {/* Left QR */}
+                      <div className="w-[72px] min-w-[72px] border border-slate-900 rounded-md p-1 flex flex-col items-center justify-center bg-slate-50">
+                        <svg width="58" height="58" viewBox="0 0 100 100">
+                          <rect width="100" height="100" fill="#fff" />
+                          <rect x="8" y="8" width="30" height="30" fill="#000"/>
+                          <rect x="13" y="13" width="20" height="20" fill="#fff"/>
+                          <rect x="18" y="18" width="10" height="10" fill="#000"/>
+                          <rect x="62" y="8" width="30" height="30" fill="#000"/>
+                          <rect x="67" y="13" width="20" height="20" fill="#fff"/>
+                          <rect x="72" y="18" width="10" height="10" fill="#000"/>
+                          <rect x="8" y="62" width="30" height="30" fill="#000"/>
+                          <rect x="13" y="67" width="20" height="20" fill="#fff"/>
+                          <rect x="18" y="72" width="10" height="10" fill="#000"/>
+                          <rect x="45" y="45" width="12" height="12" fill="#000"/>
+                          <rect x="62" y="52" width="14" height="14" fill="#000"/>
+                          <rect x="45" y="65" width="10" height="18" fill="#000"/>
+                          <rect x="62" y="72" width="20" height="15" fill="#000"/>
+                        </svg>
+                        <span className="text-[7px] font-mono font-bold text-slate-900 mt-1 max-w-[65px] truncate text-center">
+                          {item.batch_lot}
+                        </span>
+                      </div>
+
+                      {/* Right Details */}
+                      <div className="flex-1 text-[10px] space-y-1 leading-tight flex flex-col justify-between">
+                        <div>
+                          <div className="text-[7.5px] font-bold text-slate-500 uppercase">BATCH / LOT NO:</div>
+                          <div className="font-mono font-bold text-xs text-slate-950 truncate">{item.batch_lot}</div>
+                        </div>
+
+                        <div>
+                          <div className="text-[7.5px] font-bold text-slate-500 uppercase">CHEMICAL CODE:</div>
+                          <div className="font-bold text-[10.5px] text-indigo-700 truncate">{item.chemical}</div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1 text-[8.5px]">
+                          <div>
+                            <span className="text-[7px] font-bold text-slate-500 block">SUPPLIER:</span>
+                            <span className="text-slate-800 truncate block">{item.supplier || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[7px] font-bold text-slate-500 block">INSPECTOR:</span>
+                            <span className="text-slate-800 truncate block">{item.inspector || 'QA Chemist'}</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1 text-[8.5px]">
+                          <div>
+                            <span className="text-[7px] font-bold text-slate-500 block">MFG / EXP:</span>
+                            <span className="font-mono text-slate-800 block text-[8px] truncate">{item.date || '-'} / {item.expiration || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[7px] font-bold text-slate-500 block">QTY / WT:</span>
+                            <span className="font-mono font-bold text-slate-950 block">{item.qty || '-'} pcs / {item.weight || '0'} kg</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1 text-[8.5px] items-center pt-0.5">
+                          <div>
+                            <span className="text-[7px] font-bold text-slate-500 block">PACKAGING:</span>
+                            <span className="text-slate-800 truncate block">{item.packaging || 'Normal'}</span>
+                          </div>
+                          <div>
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-black text-white text-center w-full ${
+                              item.result === 'PASS' ? 'bg-emerald-600' : 'bg-rose-600'
+                            }`}>
+                              {item.result || 'PASS'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Parameters row */}
+                    {item.items && item.items.length > 0 && (
+                      <div className="bg-slate-50 border border-slate-200 rounded p-1 text-[7.5px] font-mono text-slate-700 truncate leading-tight">
+                        <span className="font-bold text-slate-900">PARAM: </span>
+                        {item.items.map(it => `${it.description}: ${it.value} (${it.status})`).join(' | ')}
+                      </div>
+                    )}
+
+                    {/* Footer */}
+                    <div className="border-t border-dashed border-slate-300 pt-1 text-[7.5px] text-slate-500 flex justify-between items-center">
+                      <span>IQA-02 Chemical Incoming Verification</span>
+                      <span>{item.timestamp || (item.date ? item.date : new Date().toLocaleDateString('th-TH'))}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t shrink-0 ${
+              isLight ? 'border-slate-200' : 'border-slate-800'
+            }`}>
+              <button
+                type="button"
+                onClick={() => {
+                  const allSummary = activeBatchPrintItems.map((item, i) => 
+                    `[TAG #${i+1}] Batch: ${item.batch_lot} | Chemical: ${item.chemical} | Supplier: ${item.supplier || '-'} | Qty: ${item.qty} pcs | Wt: ${item.weight} kg | Result: ${item.result}`
+                  ).join('\n');
+                  navigator.clipboard.writeText(allSummary);
+                  setBatchCopiedInfo(true);
+                  setTimeout(() => setBatchCopiedInfo(false), 2000);
+                }}
+                className={`font-bold text-xs px-4 py-2.5 rounded-xl transition border flex items-center gap-1.5 w-full sm:w-auto justify-center ${
+                  isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+              >
+                {batchCopiedInfo ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                <span>{batchCopiedInfo ? (isTh ? 'คัดลอกข้อมูลทั้งหมดแล้ว!' : 'All Data Copied!') : (isTh ? 'คัดลอกข้อมูลทั้งหมด' : 'Copy All Data')}</span>
+              </button>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setActiveBatchPrintItems(null)}
+                  className={`flex-1 sm:flex-none px-5 py-2.5 font-bold text-xs rounded-xl transition border ${
+                    isLight ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300' : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700'
+                  }`}
+                >
+                  {isTh ? 'ปิดหน้าต่าง' : 'Close'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => triggerDirectMultiplePrint(activeBatchPrintItems, batchPrintLayout)}
+                  className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition shadow-md shadow-indigo-600/30 flex items-center justify-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>
+                    {isTh 
+                      ? `พิมพ์ทั้งหมด ${activeBatchPrintItems.length} ป้าย (${batchPrintLayout === 'roll' ? 'ม้วนสติกเกอร์' : 'A4 Sheet'})` 
+                      : `Print All ${activeBatchPrintItems.length} Tags (${batchPrintLayout.toUpperCase()})`
+                    }
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
