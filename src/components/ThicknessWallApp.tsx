@@ -485,11 +485,13 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
 
   // Validate Table Item Against Spec
   const getRowValidationStatus = (desc: string, totalStr: string) => {
+    const cleanTotal = (totalStr || '').trim().replace(/,/g, '.');
+    if (!cleanTotal || cleanTotal === '-' || cleanTotal === 'N/A') return { status: 'NONE', label: '-' };
+
     const profName = profileInput.trim().toUpperCase();
     const specs = profileSpecs[profName];
     if (!specs || !profName) return { status: 'NONE', label: '-' };
 
-    const cleanTotal = (totalStr || '').trim().replace(/,/g, '.');
     const val = parseFloat(cleanTotal);
     if (isNaN(val)) return { status: 'NONE', label: '-' };
 

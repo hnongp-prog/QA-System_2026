@@ -54,8 +54,12 @@ const createEmptyPointArray = (count: number) => Array(Math.max(1, count)).fill(
 // Helper to calculate average of point values
 const calcZnAvg = (points: string | string[] | undefined): string => {
   const arr = toArray(points);
-  const nums = arr.map(p => parseFloat(p)).filter(n => !isNaN(n) && n > 0);
-  if (nums.length === 0) return '';
+  const nums = arr
+    .map(p => String(p || '').trim())
+    .filter(p => p !== '' && p !== '-' && p !== 'N/A')
+    .map(p => parseFloat(p))
+    .filter(n => !isNaN(n) && n > 0);
+  if (nums.length === 0) return '-';
   return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2);
 };
 
@@ -68,8 +72,16 @@ const formatZnDisplay = (val: string | string[] | undefined): string => {
 
 // Helper to calculate overall Zn average (combining Up and Lo)
 const getZnOverallAvg = (raUp: string | string[] | undefined, raLo: string | string[] | undefined): string => {
-  const upNums = toArray(raUp).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
-  const loNums = toArray(raLo).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+  const upNums = toArray(raUp)
+    .map(v => String(v || '').trim())
+    .filter(v => v !== '' && v !== '-' && v !== 'N/A')
+    .map(v => parseFloat(v))
+    .filter(v => !isNaN(v) && v > 0);
+  const loNums = toArray(raLo)
+    .map(v => String(v || '').trim())
+    .filter(v => v !== '' && v !== '-' && v !== 'N/A')
+    .map(v => parseFloat(v))
+    .filter(v => !isNaN(v) && v > 0);
   const all = [...upNums, ...loNums];
   if (all.length === 0) return '-';
   return (all.reduce((a, b) => a + b, 0) / all.length).toFixed(2);
@@ -239,6 +251,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
   // Header Info State (Clean initial state)
   const [headerInfo, setHeaderInfo] = useState({
     inspectorName: '',
+    shift: '',
     machine: '',
     date: new Date().toISOString().split('T')[0],
     profileName: '',
@@ -598,8 +611,13 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       coverageLo: parseFloat(headerInfo.requirementCoverageLimitLo) || 0
     };
 
-    const hasAnyZnUp = item.raUp.some(v => v.trim() !== '');
-    const hasAnyZnLo = item.raLo.some(v => v.trim() !== '');
+    const isValOrDash = (v?: string) => {
+      const s = String(v || '').trim();
+      return s === '-' || (s !== '' && !isNaN(parseFloat(s)));
+    };
+
+    const hasAnyZnUp = item.raUp.some(isValOrDash);
+    const hasAnyZnLo = item.raLo.some(isValOrDash);
 
     if (reqZnUp && !hasAnyZnUp) return 'Pending';
     if (reqZnLo && !hasAnyZnLo) return 'Pending';
@@ -610,8 +628,9 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
 
     if (reqZnUp) {
       for (const val of item.raUp) {
-        if (val.trim() !== '') {
-          const znUp = parseFloat(val);
+        const s = String(val || '').trim();
+        if (s !== '' && s !== '-' && s !== 'N/A') {
+          const znUp = parseFloat(s);
           if (specs.znMinUp > 0 && znUp < specs.znMinUp) pass = false;
           if (specs.znMaxUp > 0 && znUp > specs.znMaxUp) pass = false;
         }
@@ -620,28 +639,35 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
 
     if (reqZnLo) {
       for (const val of item.raLo) {
-        if (val.trim() !== '') {
-          const znLo = parseFloat(val);
+        const s = String(val || '').trim();
+        if (s !== '' && s !== '-' && s !== 'N/A') {
+          const znLo = parseFloat(s);
           if (specs.znMinLo > 0 && znLo < specs.znMinLo) pass = false;
           if (specs.znMaxLo > 0 && znLo > specs.znMaxLo) pass = false;
         }
       }
     }
 
-    if (reqFluxUp) {
+    if (reqFluxUp && item.rzUp !== '' && item.rzUp !== '-' && item.rzUp !== 'N/A') {
       const fluxUp = parseFloat(item.rzUp);
       if (specs.fluxMinUp > 0 && fluxUp < specs.fluxMinUp) pass = false;
       if (specs.fluxMaxUp > 0 && fluxUp > specs.fluxMaxUp) pass = false;
     }
 
-    if (reqFluxLo) {
+    if (reqFluxLo && item.rzLo !== '' && item.rzLo !== '-' && item.rzLo !== 'N/A') {
       const fluxLo = parseFloat(item.rzLo);
       if (specs.fluxMinLo > 0 && fluxLo < specs.fluxMinLo) pass = false;
       if (specs.fluxMaxLo > 0 && fluxLo > specs.fluxMaxLo) pass = false;
     }
 
-    if (reqCoverageUp && item.rtUp !== '' && parseFloat(item.rtUp) < specs.coverageUp) pass = false;
-    if (reqCoverageLo && item.rtLo !== '' && parseFloat(item.rtLo) < specs.coverageLo) pass = false;
+    if (reqCoverageUp && item.rtUp !== '' && item.rtUp !== '-' && item.rtUp !== 'N/A') {
+      const covUp = parseFloat(item.rtUp);
+      if (!isNaN(covUp) && covUp < specs.coverageUp) pass = false;
+    }
+    if (reqCoverageLo && item.rtLo !== '' && item.rtLo !== '-' && item.rtLo !== 'N/A') {
+      const covLo = parseFloat(item.rtLo);
+      if (!isNaN(covLo) && covLo < specs.coverageLo) pass = false;
+    }
 
     return pass ? 'Pass' : 'Fail';
   };
@@ -682,6 +708,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
   const handleResetForm = () => {
     setHeaderInfo({
       inspectorName: '',
+      shift: '',
       machine: '',
       date: new Date().toISOString().split('T')[0],
       profileName: '',
@@ -769,6 +796,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
           moduleTitleTh: 'การตรวจวัดด้วยรังสีเอกซ์ (X-Ray Measurement)',
           moduleTitleEn: 'X-Ray Coating Weight & Coverage Measurement System',
           inspector: headerInfo.inspectorName || 'X-Ray Technician',
+          shift: headerInfo.shift || '',
           batchLot: `${headerInfo.profileName} - ${item.lotNumber}`,
           result: decision === 'Pass' ? 'PASS' : 'REJECT',
           defectCount: decision === 'Fail' ? 1 : 0,
@@ -795,6 +823,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
         remarks: item.remarks,
         profileName: headerInfo.profileName,
         inspectorName: headerInfo.inspectorName || 'X-Ray Inspector',
+        shift: headerInfo.shift || '',
         machine: headerInfo.machine || 'XRAY-SURF-01',
         date: headerInfo.date,
         timestamp: now.toLocaleString('th-TH'),
@@ -1167,7 +1196,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
                   Profile Name *
@@ -1213,6 +1242,28 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                   placeholder={isTh ? 'ชื่อผู้ตรวจสอบ / Inspector name' : 'Inspector name'}
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
                 />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                  Shift (กะ)
+                </label>
+                <input
+                  list="xray-shift-options"
+                  type="text"
+                  name="shift"
+                  value={headerInfo.shift}
+                  onChange={handleHeaderChange}
+                  placeholder="e.g. Day / Night / Shift A..."
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
+                />
+                <datalist id="xray-shift-options">
+                  <option value="Day (กะกลางวัน / A)" />
+                  <option value="Night (กะกลางคืน / B)" />
+                  <option value="Shift A" />
+                  <option value="Shift B" />
+                  <option value="Shift C" />
+                </datalist>
               </div>
 
               <div>
@@ -2034,7 +2085,10 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                         {ins.status}
                       </span>
                     </td>
-                    <td className="px-3 py-3 font-sans text-slate-400">{ins.inspectorName}</td>
+                    <td className="px-3 py-3 font-sans text-slate-400">
+                      <div>{ins.inspectorName}</div>
+                      {ins.shift && <div className="text-[10px] text-slate-500">Shift: {ins.shift}</div>}
+                    </td>
                     <td className="px-3 py-3 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
@@ -2201,6 +2255,25 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                     onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, inspectorName: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
                   />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift (กะ)</label>
+                  <input
+                    list="edit-xray-shift-options"
+                    type="text"
+                    placeholder="e.g. Day / Night / Shift A..."
+                    value={editingHistoryItem.shift || ''}
+                    onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, shift: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                  />
+                  <datalist id="edit-xray-shift-options">
+                    <option value="Day (กะกลางวัน / A)" />
+                    <option value="Night (กะกลางคืน / B)" />
+                    <option value="Shift A" />
+                    <option value="Shift B" />
+                    <option value="Shift C" />
+                  </datalist>
                 </div>
 
                 <div>

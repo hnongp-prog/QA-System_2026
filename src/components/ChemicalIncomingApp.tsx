@@ -154,6 +154,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
   // Form Fields Header
   const [header, setHeader] = useState<ChemicalInspectionHeader>({
     inspector_name: '',
+    shift: '',
     coating_chemical: '',
     batch_lot: '',
     product_date: '',
@@ -321,12 +322,14 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
   // Validate single item row against selected coating chemical spec
   const validateItemRow = (chemicalName: string, description: string, rawVal: string | number): 'PASS' | 'FAIL' | '-' => {
     if (!chemicalName) return '-';
+    const rawStr = String(rawVal ?? '').trim();
+    if (rawStr === '' || rawStr === '-' || rawStr === 'N/A' || rawStr === 'none') return '-';
     const normChem = chemicalName.trim().toUpperCase();
     const chemicalSpecList = specs[normChem];
     if (!chemicalSpecList) return '-';
 
     const normDesc = description.trim().toUpperCase();
-    const val = parseFloat(String(rawVal));
+    const val = parseFloat(rawStr);
     if (isNaN(val)) return '-';
 
     const matched = chemicalSpecList.find(s => normDesc.startsWith(s.item.toUpperCase()));
@@ -494,6 +497,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
       id: entryId,
       timestamp: now.toLocaleString('th-TH'),
       inspector: header.inspector_name || 'QA Chemist',
+      shift: header.shift || '',
       batch_lot: header.batch_lot || 'N/A',
       chemical: header.coating_chemical.toUpperCase() || 'UNTITLED',
       date: header.product_date || '-',
@@ -528,6 +532,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
         moduleTitleTh: 'ตรวจรับเคมีเคลือบผิว (Chemical Incoming)',
         moduleTitleEn: 'Chemical Incoming Inspection',
         inspector: header.inspector_name || 'QA Chemist',
+        shift: header.shift || '',
         batchLot: `${header.coating_chemical} (${header.batch_lot})`,
         result: res === 'PASS' ? 'PASS' : 'REJECT',
         defectCount: res === 'FAIL' ? 1 : 0,
@@ -576,6 +581,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     setFileName('');
     setHeader({
       inspector_name: '',
+      shift: '',
       coating_chemical: '',
       batch_lot: '',
       product_date: '',
@@ -816,7 +822,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               </div>
               <div>
                 <span class="label">INSPECTOR:</span>
-                <span class="val">${item.inspector || 'QA Chemist'}</span>
+                <span class="val">${item.inspector || 'QA Chemist'}${item.shift ? ` (${item.shift})` : ''}</span>
               </div>
             </div>
 
@@ -1699,6 +1705,29 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 </div>
 
                 <div>
+                  <label className={`text-[10px] font-bold block uppercase mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Shift (กะ)
+                  </label>
+                  <input
+                    list="chem-shift-list"
+                    type="text"
+                    value={header.shift || ''}
+                    onChange={(e) => setHeader({ ...header, shift: e.target.value })}
+                    placeholder="e.g. Day / Night / Shift A..."
+                    className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 ${
+                      isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-200'
+                    }`}
+                  />
+                  <datalist id="chem-shift-list">
+                    <option value="Day (กะกลางวัน / A)" />
+                    <option value="Night (กะกลางคืน / B)" />
+                    <option value="Shift A" />
+                    <option value="Shift B" />
+                    <option value="Shift C" />
+                  </datalist>
+                </div>
+
+                <div>
                   <label className={`text-[10px] font-bold block uppercase mb-1 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`}>
                     Coating Chemical *
                   </label>
@@ -2135,7 +2164,13 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                         <td className={`px-4 py-3 font-mono text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{entry.timestamp}</td>
                         <td className={`px-4 py-3 font-bold ${isLight ? 'text-indigo-700' : 'text-indigo-400'}`}>{entry.chemical}</td>
                         <td className={`px-4 py-3 font-mono font-semibold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{entry.batch_lot}</td>
-                        <td className={`px-4 py-3 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{entry.supplier || '-'}</td>
+                        <td className={`px-4 py-3 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                          <div>{entry.supplier || '-'}</div>
+                          <div className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {entry.inspector || 'QA'}
+                            {entry.shift ? ` (${entry.shift})` : ''}
+                          </div>
+                        </td>
                         <td className="px-4 py-3 font-mono">
                           <span className={isLight ? 'text-slate-800' : 'text-slate-200'}>{entry.weight} kg</span> / <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>{entry.qty} pcs</span>
                         </td>
@@ -2538,6 +2573,27 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                     isLight ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-amber-500' : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
                   }`}
                 />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Shift (กะ)</label>
+                <input
+                  list="edit-chem-shift-options"
+                  type="text"
+                  placeholder="e.g. Day / Night / Shift A..."
+                  value={editingHistoryItem.shift || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, shift: e.target.value } : null)}
+                  className={`w-full border rounded-xl px-3 py-2 focus:outline-none ${
+                    isLight ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-amber-500' : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+                <datalist id="edit-chem-shift-options">
+                  <option value="Day (กะกลางวัน / A)" />
+                  <option value="Night (กะกลางคืน / B)" />
+                  <option value="Shift A" />
+                  <option value="Shift B" />
+                  <option value="Shift C" />
+                </datalist>
               </div>
 
               <div>

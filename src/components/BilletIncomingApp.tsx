@@ -26,6 +26,7 @@ import {
   Activity,
   ScanLine,
   UserCheck,
+  User,
   Search,
   Calendar,
   Filter,
@@ -151,9 +152,9 @@ const INITIAL_HISTORY: BilletInspectionItem[] = [
     xrf: "Verified Pass",
     quantity_pcs: 140,
     weight_kg: 4200,
-    cutting_surface_lt2: true,
-    billet_slid_lt25: true,
-    defect_2x50x100: false,
+    cutting_surface_lt2: "0.8 mm",
+    billet_slid_lt25: "1.2 mm",
+    defect_2x50x100: "None / OK",
     chemical_composition: {
       Si: 0.42, Fe: 0.18, Cu: 0.02, Mn: 0.03, Mg: 0.52, Cr: 0.01, Zn: 0.02, Ti: 0.01, Pb: 0.00, Cd: 0.00, Al: 98.79
     },
@@ -179,9 +180,9 @@ const INITIAL_HISTORY: BilletInspectionItem[] = [
     xrf: "Verified Pass",
     quantity_pcs: 95,
     weight_kg: 3800,
-    cutting_surface_lt2: true,
-    billet_slid_lt25: true,
-    defect_2x50x100: false,
+    cutting_surface_lt2: "1.1 mm",
+    billet_slid_lt25: "1.8 mm",
+    defect_2x50x100: "None / OK",
     chemical_composition: {
       Si: 0.65, Fe: 0.32, Cu: 0.24, Mn: 0.08, Mg: 0.95, Cr: 0.12, Zn: 0.05, Ti: 0.03, Pb: 0.00, Cd: 0.00, Al: 97.56
     },
@@ -207,9 +208,9 @@ const INITIAL_HISTORY: BilletInspectionItem[] = [
     xrf: "Mg Out of Spec",
     quantity_pcs: 60,
     weight_kg: 1800,
-    cutting_surface_lt2: false,
-    billet_slid_lt25: false,
-    defect_2x50x100: true,
+    cutting_surface_lt2: "2.4 mm (Over)",
+    billet_slid_lt25: "3.1 mm (Over)",
+    defect_2x50x100: "2.5x60x120 Surface Dent",
     chemical_composition: {
       Si: 0.15, Fe: 0.45, Cu: 0.12, Mn: 0.15, Mg: 0.30, Cr: 0.15, Zn: 0.18, Ti: 0.12, Pb: 0.06, Cd: 0.02, Al: 98.30
     },
@@ -262,8 +263,41 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState(false);
-  const [editingGrade, setEditingGrade] = useState<string>("");
+  const [editingGrade, setEditingGrade] = useState<string>("6063");
   const [tempGradeName, setTempGradeName] = useState("");
+
+  // Grade list derived from gradeSpecs
+  const availableGrades = useMemo(() => {
+    const keys = Object.keys(gradeSpecs || {}).filter(k => k !== "NEW_GRADE_PENDING" && Boolean(k.trim()));
+    return keys.length > 0 ? keys : ["6063", "6061", "6005", "6082"];
+  }, [gradeSpecs]);
+
+  // Supplier list derived from history and common suppliers
+  const availableSuppliers = useMemo(() => {
+    const defaults = [
+      "Siam Aluminum Industry",
+      "Siam Aluminum Co., Ltd.",
+      "Metal Tech Extrusions",
+      "Global Alloy Supply",
+      "Thai Metal Aluminium Co., Ltd.",
+      "Capral Aluminium",
+      "Press Metal Berhad"
+    ];
+    const fromHistory = (history || [])
+      .map(h => (h.supplier_name || "").trim())
+      .filter(s => s.length > 0);
+    return Array.from(new Set([...defaults, ...fromHistory])).sort();
+  }, [history]);
+
+  // Ensure an active grade is selected when gradeSpecs change
+  useEffect(() => {
+    if (!editingGrade || !gradeSpecs[editingGrade]) {
+      const available = Object.keys(gradeSpecs).filter(k => k !== "NEW_GRADE_PENDING");
+      if (available.length > 0) {
+        setEditingGrade(available[0]);
+      }
+    }
+  }, [gradeSpecs, editingGrade]);
 
   // History Item Editing State (Protected with password)
   const [isHistoryAuthOpen, setIsHistoryAuthOpen] = useState(false);
@@ -284,6 +318,30 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
     if (!scannedGrade) return null;
     const normalized = scannedGrade.toUpperCase().trim();
     if (gradeSpecs[normalized]) return gradeSpecs[normalized];
+    
+    // Case-insensitive direct match
+    const exactKey = Object.keys(gradeSpecs).find(
+      k => k.trim().toUpperCase() === normalized
+    );
+    if (exactKey) return gradeSpecs[exactKey];
+
+    // Cleaned match without spaces/dashes
+    const cleanScanned = normalized.replace(/[\s\-_]/g, '');
+    for (const key of Object.keys(gradeSpecs)) {
+      if (key === 'NEW_GRADE_PENDING') continue;
+      const cleanKey = key.toUpperCase().replace(/[\s\-_]/g, '');
+      if (cleanScanned === cleanKey || cleanScanned.includes(cleanKey) || cleanKey.includes(cleanScanned)) {
+        return gradeSpecs[key];
+      }
+    }
+
+    // Number/Alloy regex match e.g. "AA6063-T5" -> "6063"
+    const numberMatch = normalized.match(/\b(6\d{3}|1\d{3}|2\d{3}|3\d{3}|5\d{3}|7\d{3})\b/);
+    if (numberMatch && numberMatch[1]) {
+      const matchedKey = Object.keys(gradeSpecs).find(k => k.includes(numberMatch[1]));
+      if (matchedKey) return gradeSpecs[matchedKey];
+    }
+
     const prefix = normalized.substring(0, 4);
     const matchingKey = Object.keys(gradeSpecs).find(key => 
       key.toUpperCase().substring(0, 4) === prefix
@@ -297,14 +355,25 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
     if (!spec) return "NO SPEC";
     let isOk = true;
     chemElements.forEach(el => {
-      const val = parseFloat(String(item.chemical_composition?.[el] ?? NaN));
+      const raw = item.chemical_composition?.[el];
+      if (raw === undefined || raw === null) return;
+      const s = String(raw).trim();
+      if (s === '' || s === '-' || s === 'N/A' || s === 'none') return;
+      const val = parseFloat(s);
       const elementSpec = spec.elements[el];
       if (!isNaN(val) && elementSpec) {
         if (val < elementSpec.min || val > elementSpec.max) isOk = false;
       }
     });
     // Check visual defects
-    if (item.defect_2x50x100) isOk = false;
+    if (typeof item.defect_2x50x100 === 'boolean' && item.defect_2x50x100) {
+      isOk = false;
+    } else if (typeof item.defect_2x50x100 === 'string') {
+      const defStr = item.defect_2x50x100.trim().toLowerCase();
+      if (defStr && !['none', 'no', 'pass', 'passed', 'ok', 'nil', '-', '0', 'none / ok', 'none / pass', 'none/ok', 'none/pass'].includes(defStr)) {
+        isOk = false;
+      }
+    }
     return isOk ? "PASS" : "FAIL";
   };
 
@@ -357,9 +426,9 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
         xrf: 'Pass',
         quantity_pcs: 120,
         weight_kg: 3600,
-        cutting_surface_lt2: true,
-        billet_slid_lt25: true,
-        defect_2x50x100: false,
+        cutting_surface_lt2: '',
+        billet_slid_lt25: '',
+        defect_2x50x100: '',
         chemical_composition: {
           Si: 0.45, Fe: 0.20, Cu: 0.02, Mn: 0.03, Mg: 0.55, Cr: 0.01, Zn: 0.02, Ti: 0.01, Pb: 0.00, Cd: 0.00, Al: 98.71
         }
@@ -379,9 +448,9 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
         xrf: 'Pass',
         quantity_pcs: 90,
         weight_kg: 3600,
-        cutting_surface_lt2: true,
-        billet_slid_lt25: true,
-        defect_2x50x100: false,
+        cutting_surface_lt2: '',
+        billet_slid_lt25: '',
+        defect_2x50x100: '',
         chemical_composition: {
           Si: 0.62, Fe: 0.28, Cu: 0.22, Mn: 0.08, Mg: 0.92, Cr: 0.10, Zn: 0.04, Ti: 0.02, Pb: 0.00, Cd: 0.00, Al: 97.72
         }
@@ -685,9 +754,20 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
       delete newState[gradeToDelete];
       return newState;
     });
-    if (editingGrade === gradeToDelete) {
-      const remaining = Object.keys(gradeSpecs).filter(g => g !== gradeToDelete && g !== "NEW_GRADE_PENDING");
+    const remaining = Object.keys(gradeSpecs).filter(g => g !== gradeToDelete && g !== "NEW_GRADE_PENDING");
+    if (editingGrade === gradeToDelete || !remaining.includes(editingGrade)) {
       setEditingGrade(remaining.length > 0 ? remaining[0] : "");
+    }
+  };
+
+  const resetDefaultGradeSpecs = () => {
+    if (window.confirm(isTh ? 'คุณต้องการคืนค่าเกณฑ์มาตรฐานเกรดเริ่มต้น (6063, 6061, 6005, 6082) หรือไม่?' : 'Reset grade specs to default (6063, 6061, 6005, 6082)?')) {
+      setGradeSpecs(DEFAULT_GRADE_SPECS);
+      setEditingGrade("6063");
+      setStatus({
+        type: 'success',
+        message: isTh ? 'คืนค่าเกณฑ์มาตรฐานเกรดเริ่มต้นเรียบร้อยแล้ว' : 'Reset to default grade specs successfully'
+      });
     }
   };
 
@@ -1338,28 +1418,74 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                         </div>
 
                         <div>
-                          <label className={`text-[10px] font-bold block uppercase mb-1 ${
-                            isLight ? 'text-slate-500' : 'text-slate-400'
-                          }`}>
-                            Grade / Billet Size
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className={`text-[10px] font-bold uppercase ${
+                              isLight ? 'text-slate-500' : 'text-slate-400'
+                            }`}>
+                              Grade / Billet Size
+                            </label>
+                            {spec ? (
+                              <span 
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1"
+                                style={{
+                                  backgroundColor: `${spec.color}15`,
+                                  borderColor: `${spec.color}40`,
+                                  color: spec.color
+                                }}
+                                title={`Linked to Grade Spec: ${spec.name || item.grade}`}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: spec.color }} />
+                                Spec: {item.grade}
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-semibold text-amber-500 px-1 py-0.5 rounded bg-amber-500/10">
+                                ⚠ No Spec
+                              </span>
+                            )}
+                          </div>
                           <div className="flex gap-1.5 items-center">
-                            <input
-                              type="text"
-                              value={item.grade || ''}
-                              onChange={(e) => updateItemField(idx, 'grade', e.target.value)}
-                              style={{ color: spec?.color }}
-                              className={`w-1/2 rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none border ${
-                                isLight
-                                  ? 'bg-slate-50 border-slate-300 focus:border-blue-500'
-                                  : 'bg-slate-950 border-slate-800 focus:border-cyan-500'
-                              }`}
-                            />
+                            <div className="w-1/2 flex flex-col gap-1">
+                              <select
+                                value={availableGrades.includes(item.grade || '') ? item.grade : (item.grade ? '__CUSTOM__' : '')}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val !== '__CUSTOM__') {
+                                    updateItemField(idx, 'grade', val);
+                                  }
+                                }}
+                                style={{ color: spec?.color }}
+                                className={`w-full rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none border cursor-pointer ${
+                                  isLight
+                                    ? 'bg-slate-50 border-slate-300 focus:border-blue-500 text-slate-800'
+                                    : 'bg-slate-950 border-slate-800 focus:border-cyan-500 text-slate-100'
+                                }`}
+                              >
+                                <option value="">-- เลือกเกรด Spec --</option>
+                                {availableGrades.map(g => (
+                                  <option key={g} value={g}>
+                                    {g} {gradeSpecs[g]?.name ? `(${gradeSpecs[g].name})` : ''}
+                                  </option>
+                                ))}
+                                <option value="__CUSTOM__">✏️ พิมพ์เกรดอื่น...</option>
+                              </select>
+                              {(!availableGrades.includes(item.grade || '') || item.grade === '__CUSTOM__') && (
+                                <input
+                                  type="text"
+                                  placeholder="พิมพ์ชื่อเกรด..."
+                                  value={item.grade === '__CUSTOM__' ? '' : (item.grade || '')}
+                                  onChange={(e) => updateItemField(idx, 'grade', e.target.value)}
+                                  className={`w-full rounded-lg px-2 py-1 text-xs font-bold border ${
+                                    isLight ? 'bg-white border-blue-400 text-blue-700' : 'bg-slate-900 border-cyan-500 text-cyan-300'
+                                  }`}
+                                />
+                              )}
+                            </div>
                             <span className={isLight ? 'text-slate-400' : 'text-slate-600'}>/</span>
                             <input
                               type="text"
                               value={item.billet_size || ''}
                               onChange={(e) => updateItemField(idx, 'billet_size', e.target.value)}
+                              placeholder="e.g. 5 inch (127 mm)"
                               className={`w-1/2 rounded-lg px-2 py-1.5 text-xs font-semibold focus:outline-none border ${
                                 isLight
                                   ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-blue-500'
@@ -1400,15 +1526,22 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                         <div>
                           <label className={`text-[10px] block ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Supplier</label>
                           <input
+                            list={`supplier-list-${idx}`}
                             type="text"
+                            placeholder="Supplier..."
                             value={item.supplier_name || ''}
                             onChange={(e) => updateItemField(idx, 'supplier_name', e.target.value)}
                             className={`w-full rounded px-2 py-1 mt-0.5 border ${
                               isLight
-                                ? 'bg-white border-slate-300 text-slate-800'
-                                : 'bg-slate-900 border-slate-800 text-slate-200'
+                                ? 'bg-white border-slate-300 text-slate-800 focus:border-blue-500'
+                                : 'bg-slate-900 border-slate-800 text-slate-200 focus:border-cyan-500'
                             }`}
                           />
+                          <datalist id={`supplier-list-${idx}`}>
+                            {availableSuppliers.map(sup => (
+                              <option key={sup} value={sup} />
+                            ))}
+                          </datalist>
                         </div>
 
                         <div>
@@ -1465,6 +1598,239 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                                 : 'bg-slate-900 border-slate-800 text-cyan-300'
                             }`}
                           />
+                        </div>
+                      </div>
+
+                      {/* 3 Inspection Blocks: Inspector & Dimensions, Visual Check, Analysis */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                        {/* Block 1: INSPECTOR & DIMENSIONS */}
+                        <div className={`p-3.5 rounded-2xl border flex flex-col justify-between ${
+                          isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-950/70 border-slate-800 shadow-xs'
+                        }`}>
+                          <div>
+                            <h4 className={`text-[11px] font-bold uppercase tracking-wider mb-2.5 ${
+                              isLight ? 'text-indigo-600' : 'text-indigo-400'
+                            }`}>
+                              INSPECTOR & DIMENSIONS
+                            </h4>
+                            
+                            <div className="space-y-2.5">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                                    Inspector Name
+                                  </label>
+                                  <div className="relative">
+                                    <User className={`w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 ${isLight ? 'text-indigo-400' : 'text-indigo-400'}`} />
+                                    <input
+                                      type="text"
+                                      placeholder="Name..."
+                                      value={item.inspector_name || ''}
+                                      onChange={(e) => updateItemField(idx, 'inspector_name', e.target.value)}
+                                      className={`w-full rounded-lg pl-8 pr-2.5 py-1.5 text-xs font-medium focus:outline-none border ${
+                                        isLight
+                                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                          : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                      }`}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                                    Shift (กะ)
+                                  </label>
+                                  <input
+                                    list={`shift-list-${idx}`}
+                                    type="text"
+                                    placeholder="e.g. Day / Night / Shift A..."
+                                    value={item.shift || ''}
+                                    onChange={(e) => updateItemField(idx, 'shift', e.target.value)}
+                                    className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none border ${
+                                      isLight
+                                        ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                        : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                    }`}
+                                  />
+                                  <datalist id={`shift-list-${idx}`}>
+                                    <option value="Day (กะกลางวัน / A)" />
+                                    <option value="Night (กะกลางคืน / B)" />
+                                    <option value="Shift A" />
+                                    <option value="Shift B" />
+                                    <option value="Shift C" />
+                                  </datalist>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                                    Diameter
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.diameter || ''}
+                                    onChange={(e) => updateItemField(idx, 'diameter', e.target.value)}
+                                    className={`w-full rounded-lg px-2.5 py-1.5 text-xs focus:outline-none border ${
+                                      isLight
+                                        ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                        : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                    }`}
+                                  />
+                                </div>
+                                <div>
+                                  <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                                    Length
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.length || ''}
+                                    onChange={(e) => updateItemField(idx, 'length', e.target.value)}
+                                    className={`w-full rounded-lg px-2.5 py-1.5 text-xs focus:outline-none border ${
+                                      isLight
+                                        ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                        : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                    }`}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Block 2: VISUAL CHECK */}
+                        <div className={`p-3.5 rounded-2xl border flex flex-col justify-between ${
+                          isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-950/70 border-slate-800 shadow-xs'
+                        }`}>
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className={`text-[11px] font-bold uppercase tracking-wider ${
+                                isLight ? 'text-indigo-600' : 'text-indigo-400'
+                              }`}>
+                                VISUAL CHECK
+                              </h4>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 font-medium">
+                                {isTh ? 'เจ้าหน้าที่ลงผลเอง' : 'Manual Entry'}
+                              </span>
+                            </div>
+                            
+                            <div className="space-y-2.5">
+                              <div>
+                                <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                                  Cutting Surface &lt; 2mm
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder={isTh ? 'ระบุค่าที่วัดได้ (เช่น 0.8 mm)' : 'e.g. 0.8 mm'}
+                                  value={typeof item.cutting_surface_lt2 === 'boolean' ? (item.cutting_surface_lt2 ? '< 2 mm (Pass)' : '≥ 2 mm (Fail)') : (item.cutting_surface_lt2 || '')}
+                                  onChange={(e) => updateItemField(idx, 'cutting_surface_lt2', e.target.value)}
+                                  className={`w-full rounded-lg px-2.5 py-1.5 text-xs focus:outline-none border ${
+                                    isLight
+                                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                      : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                  }`}
+                                />
+                              </div>
+
+                              <div>
+                                <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                                  Billet Slid ≤ 2.5mm
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder={isTh ? 'ระบุค่าที่วัดได้ (เช่น 1.2 mm)' : 'e.g. 1.2 mm'}
+                                  value={typeof item.billet_slid_lt25 === 'boolean' ? (item.billet_slid_lt25 ? '≤ 2.5 mm (Pass)' : '> 2.5 mm (Fail)') : (item.billet_slid_lt25 || '')}
+                                  onChange={(e) => updateItemField(idx, 'billet_slid_lt25', e.target.value)}
+                                  className={`w-full rounded-lg px-2.5 py-1.5 text-xs focus:outline-none border ${
+                                    isLight
+                                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                      : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                  }`}
+                                />
+                              </div>
+
+                              <div>
+                                <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                                  Defect 2x50x100
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder={isTh ? 'ระบุผลตรวจ (เช่น ไม่มีตำหนิ / OK)' : 'e.g. None / OK'}
+                                  value={typeof item.defect_2x50x100 === 'boolean' ? (item.defect_2x50x100 ? 'Found Defect' : 'None / Pass') : (item.defect_2x50x100 || '')}
+                                  onChange={(e) => updateItemField(idx, 'defect_2x50x100', e.target.value)}
+                                  className={`w-full rounded-lg px-2.5 py-1.5 text-xs focus:outline-none border ${
+                                    isLight
+                                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                      : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Block 3: ANALYSIS */}
+                        <div className={`p-3.5 rounded-2xl border flex flex-col justify-between ${
+                          isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-950/70 border-slate-800 shadow-xs'
+                        }`}>
+                          <div>
+                            <h4 className={`text-[11px] font-bold uppercase tracking-wider mb-2.5 ${
+                              isLight ? 'text-indigo-600' : 'text-indigo-400'
+                            }`}>
+                              ANALYSIS
+                            </h4>
+                            
+                            <div className="space-y-2.5">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                                    Bending
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.bending || ''}
+                                    onChange={(e) => updateItemField(idx, 'bending', e.target.value)}
+                                    className={`w-full rounded-lg px-2.5 py-1.5 text-xs focus:outline-none border ${
+                                      isLight
+                                        ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                        : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                    }`}
+                                  />
+                                </div>
+                                <div>
+                                  <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                                    Appearance
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.appearance || ''}
+                                    onChange={(e) => updateItemField(idx, 'appearance', e.target.value)}
+                                    className={`w-full rounded-lg px-2.5 py-1.5 text-xs focus:outline-none border ${
+                                      isLight
+                                        ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                        : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                    }`}
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                                  XRF Results
+                                </label>
+                                <input
+                                  type="text"
+                                  value={item.xrf || ''}
+                                  onChange={(e) => updateItemField(idx, 'xrf', e.target.value)}
+                                  className={`w-full rounded-lg px-2.5 py-1.5 text-xs focus:outline-none border ${
+                                    isLight
+                                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                      : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -1805,7 +2171,10 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                         </td>
                         <td className="p-3">
                           <span className={`block font-medium ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{entry.supplier_name || '-'}</span>
-                          <span className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{entry.inspector_name || 'QA'}</span>
+                          <span className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {entry.inspector_name || 'QA'}
+                            {entry.shift ? ` (${entry.shift})` : ''}
+                          </span>
                         </td>
                         <td className="p-3 text-center font-mono">
                           <span className={`block ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{entry.quantity_pcs} pcs</span>
@@ -2005,6 +2374,22 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                     </div>
                   );
                 })}
+
+                <div className="pt-3 border-t border-dashed border-slate-300 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={resetDefaultGradeSpecs}
+                    className={`w-full text-[11px] py-1.5 px-2 rounded-lg border font-semibold flex items-center justify-center gap-1.5 transition ${
+                      isLight 
+                        ? 'text-slate-600 bg-slate-100 hover:bg-slate-200 border-slate-300' 
+                        : 'text-slate-400 bg-slate-900 hover:bg-slate-800 border-slate-800'
+                    }`}
+                    title={isTh ? 'คืนค่ามาตรฐานเกรดเริ่มต้น (6063, 6061, 6005, 6082)' : 'Reset default grade specs'}
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>{isTh ? 'คืนค่าเริ่มต้น (Reset Default)' : 'Reset Defaults'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Spec Editor Table */}
@@ -2367,17 +2752,63 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               </div>
 
               <div>
-                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Grade</label>
-                <input
-                  type="text"
-                  value={editingHistoryItem.grade || ''}
-                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, grade: e.target.value } : null)}
-                  className={`w-full rounded-xl px-3 py-2 font-bold focus:outline-none border ${
-                    isLight
-                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
-                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
-                  }`}
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className={`text-[10px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Grade</label>
+                  {(() => {
+                    const matchedSpec = findMatchingSpec(editingHistoryItem.grade);
+                    return matchedSpec ? (
+                      <span 
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1"
+                        style={{
+                          backgroundColor: `${matchedSpec.color}15`,
+                          borderColor: `${matchedSpec.color}40`,
+                          color: matchedSpec.color
+                        }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: matchedSpec.color }} />
+                        Spec Matched
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-amber-500 font-medium">⚠ No Spec</span>
+                    );
+                  })()}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <select
+                    value={availableGrades.includes(editingHistoryItem.grade || '') ? editingHistoryItem.grade : (editingHistoryItem.grade ? '__CUSTOM__' : '')}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val !== '__CUSTOM__') {
+                        setEditingHistoryItem(prev => prev ? { ...prev, grade: val } : null);
+                      }
+                    }}
+                    className={`w-full rounded-xl px-3 py-2 font-bold focus:outline-none border cursor-pointer ${
+                      isLight
+                        ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                        : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                    }`}
+                  >
+                    <option value="">-- เลือกเกรด / Select Grade --</option>
+                    {availableGrades.map(g => (
+                      <option key={g} value={g}>
+                        {g} {gradeSpecs[g]?.name ? `(${gradeSpecs[g].name})` : ''}
+                      </option>
+                    ))}
+                    <option value="__CUSTOM__">✏️ กำหนดเกรดอื่น / Custom...</option>
+                  </select>
+
+                  {(!availableGrades.includes(editingHistoryItem.grade || '') || editingHistoryItem.grade === '__CUSTOM__') && (
+                    <input
+                      type="text"
+                      placeholder="พิมพ์ชื่อเกรด..."
+                      value={editingHistoryItem.grade === '__CUSTOM__' ? '' : (editingHistoryItem.grade || '')}
+                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, grade: e.target.value } : null)}
+                      className={`w-full rounded-xl px-3 py-1.5 text-xs font-bold border ${
+                        isLight ? 'bg-white border-amber-400 text-amber-900' : 'bg-slate-900 border-amber-500 text-amber-200'
+                      }`}
+                    />
+                  )}
+                </div>
               </div>
 
               <div>
@@ -2396,16 +2827,25 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
               <div>
                 <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Supplier Name</label>
-                <input
-                  type="text"
-                  value={editingHistoryItem.supplier_name || ''}
-                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, supplier_name: e.target.value } : null)}
-                  className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
-                    isLight
-                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
-                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
-                  }`}
-                />
+                <div className="relative">
+                  <input
+                    list="edit-supplier-options"
+                    type="text"
+                    placeholder="Select or enter supplier..."
+                    value={editingHistoryItem.supplier_name || ''}
+                    onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, supplier_name: e.target.value } : null)}
+                    className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                      isLight
+                        ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                        : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                    }`}
+                  />
+                  <datalist id="edit-supplier-options">
+                    {availableSuppliers.map(sup => (
+                      <option key={sup} value={sup} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
 
               <div>
@@ -2420,6 +2860,29 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                       : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
                   }`}
                 />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Shift (กะ)</label>
+                <input
+                  list="edit-shift-options"
+                  type="text"
+                  placeholder="e.g. Day / Night / Shift A..."
+                  value={editingHistoryItem.shift || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, shift: e.target.value } : null)}
+                  className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+                <datalist id="edit-shift-options">
+                  <option value="Day (กะกลางวัน / A)" />
+                  <option value="Night (กะกลางคืน / B)" />
+                  <option value="Shift A" />
+                  <option value="Shift B" />
+                  <option value="Shift C" />
+                </datalist>
               </div>
 
               <div>
@@ -2476,6 +2939,123 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                       : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
                   }`}
                 />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Length</label>
+                <input
+                  type="text"
+                  value={editingHistoryItem.length || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, length: e.target.value } : null)}
+                  className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Bending</label>
+                <input
+                  type="text"
+                  value={editingHistoryItem.bending || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, bending: e.target.value } : null)}
+                  className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Appearance</label>
+                <input
+                  type="text"
+                  value={editingHistoryItem.appearance || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, appearance: e.target.value } : null)}
+                  className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>XRF Results</label>
+                <input
+                  type="text"
+                  value={editingHistoryItem.xrf || ''}
+                  onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, xrf: e.target.value } : null)}
+                  className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
+                  }`}
+                />
+              </div>
+            </div>
+
+            {/* Visual Checks in Edit Modal */}
+            <div className={`p-4 rounded-xl border space-y-3 text-xs ${
+              isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+            }`}>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">
+                Visual Inspection Measurements
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                    Cutting Surface &lt; 2mm
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 0.8 mm"
+                    value={typeof editingHistoryItem.cutting_surface_lt2 === 'boolean' ? (editingHistoryItem.cutting_surface_lt2 ? '< 2 mm (Pass)' : '≥ 2 mm (Fail)') : (editingHistoryItem.cutting_surface_lt2 || '')}
+                    onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, cutting_surface_lt2: e.target.value } : null)}
+                    className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                      isLight
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-amber-500'
+                        : 'bg-slate-900 border-slate-800 text-white focus:border-amber-500'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                    Billet Slid ≤ 2.5mm
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 1.2 mm"
+                    value={typeof editingHistoryItem.billet_slid_lt25 === 'boolean' ? (editingHistoryItem.billet_slid_lt25 ? '≤ 2.5 mm (Pass)' : '> 2.5 mm (Fail)') : (editingHistoryItem.billet_slid_lt25 || '')}
+                    onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, billet_slid_lt25: e.target.value } : null)}
+                    className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                      isLight
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-amber-500'
+                        : 'bg-slate-900 border-slate-800 text-white focus:border-amber-500'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                    Defect 2x50x100
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. None / OK"
+                    value={typeof editingHistoryItem.defect_2x50x100 === 'boolean' ? (editingHistoryItem.defect_2x50x100 ? 'Found Defect' : 'None / Pass') : (editingHistoryItem.defect_2x50x100 || '')}
+                    onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, defect_2x50x100: e.target.value } : null)}
+                    className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                      isLight
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-amber-500'
+                        : 'bg-slate-900 border-slate-800 text-white focus:border-amber-500'
+                    }`}
+                  />
+                </div>
               </div>
             </div>
 

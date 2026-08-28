@@ -236,7 +236,10 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
     // Chemical elements validation
     CHEM_ELEMENTS.forEach(el => {
       const valStr = item.chemical_composition?.[el];
-      const val = valStr !== undefined && valStr !== '' ? parseFloat(valStr) : NaN;
+      if (valStr === undefined || valStr === null) return;
+      const s = String(valStr).trim();
+      if (s === '' || s === '-' || s === 'N/A' || s === 'none') return;
+      const val = parseFloat(s);
       const elementSpec = spec[el];
       if (!isNaN(val) && elementSpec) {
         if (val < elementSpec.min || val > elementSpec.max) isOk = false;
@@ -244,15 +247,17 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
     });
 
     // Tensile strength validation
-    const tsVal = item.tensile_strength ? parseFloat(item.tensile_strength) : NaN;
-    if (!isNaN(tsVal) && spec.tensile_strength) {
-      if (tsVal < spec.tensile_strength.min || tsVal > spec.tensile_strength.max) isOk = false;
+    const tsStr = item.tensile_strength ? String(item.tensile_strength).trim() : '';
+    if (tsStr !== '' && tsStr !== '-' && tsStr !== 'N/A' && spec.tensile_strength) {
+      const tsVal = parseFloat(tsStr);
+      if (!isNaN(tsVal) && (tsVal < spec.tensile_strength.min || tsVal > spec.tensile_strength.max)) isOk = false;
     }
 
     // Elongation validation
-    const elVal = item.elongation ? parseFloat(item.elongation) : NaN;
-    if (!isNaN(elVal) && spec.elongation) {
-      if (elVal < spec.elongation.min || elVal > spec.elongation.max) isOk = false;
+    const elStr = item.elongation ? String(item.elongation).trim() : '';
+    if (elStr !== '' && elStr !== '-' && elStr !== 'N/A' && spec.elongation) {
+      const elVal = parseFloat(elStr);
+      if (!isNaN(elVal) && (elVal < spec.elongation.min || elVal > spec.elongation.max)) isOk = false;
     }
 
     return isOk ? "PASS" : "FAIL";
@@ -494,6 +499,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
           moduleTitleTh: 'ตรวจรับลวดสังกะสี (Zn Wire Incoming Inspection)',
           moduleTitleEn: 'Zn Wire Incoming Inspection & COA OCR System',
           inspector: item.inspector_name || 'Zn Wire Inspector',
+          shift: item.shift || '',
           batchLot: `${item.grade} - Heat:${item.heat_number}`,
           result: computedJudgement === 'PASS' ? 'PASS' : 'REJECT',
           defectCount: computedJudgement === 'FAIL' ? 1 : 0,
@@ -730,7 +736,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
             <div><strong>PO / DRUM:</strong> ${item.po_no || '-'} / ${item.drum || '-'}</div>
             <div><strong>QTY / WT:</strong> ${item.quantity_pcs || '-'} pcs / ${item.weight_kg || '0'} kg</div>
             <div><strong>SIZE / TS:</strong> ${item.diameter || '-'} / ${item.tensile_strength ? item.tensile_strength + ' MPa' : '-'}</div>
-            <div><strong>INSPECTOR:</strong> ${item.inspector_name || 'QA Team'}</div>
+            <div><strong>INSPECTOR:</strong> ${item.inspector_name || 'QA Team'}${item.shift ? ` (${item.shift})` : ''}</div>
             <div><strong>STATUS:</strong> <span class="badge" style="background: ${isPass ? '#10b981' : '#ef4444'};">${jg}</span></div>
           </div>
         </div>
@@ -1354,7 +1360,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                         </div>
 
                         {/* Top Metadata Fields */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
                           <div>
                             <label className="text-[9px] font-bold text-slate-500 uppercase block mb-1">Grade *</label>
                             <input
@@ -1397,6 +1403,36 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                               placeholder="DRUM-01"
                               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
                             />
+                          </div>
+
+                          <div>
+                            <label className="text-[9px] font-bold text-slate-500 uppercase block mb-1">Inspector</label>
+                            <input
+                              type="text"
+                              value={item.inspector_name || ''}
+                              onChange={(e) => updateItemField(idx, 'inspector_name', e.target.value)}
+                              placeholder="Inspector"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[9px] font-bold text-slate-500 uppercase block mb-1">Shift (กะ)</label>
+                            <input
+                              list="zn-shift-options"
+                              type="text"
+                              value={item.shift || ''}
+                              onChange={(e) => updateItemField(idx, 'shift', e.target.value)}
+                              placeholder="e.g. Day / Night / A"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                            />
+                            <datalist id="zn-shift-options">
+                              <option value="Day (กะกลางวัน / A)" />
+                              <option value="Night (กะกลางคืน / B)" />
+                              <option value="Shift A" />
+                              <option value="Shift B" />
+                              <option value="Shift C" />
+                            </datalist>
                           </div>
                         </div>
 
@@ -1663,7 +1699,9 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                           <td className="p-3 font-bold text-slate-200">{item.grade}</td>
                           <td className="p-3 text-slate-400 text-[11px]">
                             <div>{item.supplier || '-'}</div>
-                            <div className="text-[10px] text-slate-500">PO: {item.po_no || '-'} | Drum: {item.drum || '-'}</div>
+                            <div className="text-[10px] text-slate-500">
+                              {item.inspector_name || 'QA'}{item.shift ? ` (${item.shift})` : ''} • Drum: {item.drum || '-'}
+                            </div>
                           </td>
                           <td className="p-3 text-center font-mono font-bold text-slate-200">{item.weight_kg || '-'}</td>
                           <td className="p-3 text-center font-mono text-amber-300 font-bold">
@@ -2123,6 +2161,25 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                       onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, inspector_name: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
                     />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Shift (กะ)</label>
+                    <input
+                      list="edit-zn-shift-options"
+                      type="text"
+                      placeholder="e.g. Day / Night / Shift A..."
+                      value={editingHistoryItem.shift || ''}
+                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, shift: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                    />
+                    <datalist id="edit-zn-shift-options">
+                      <option value="Day (กะกลางวัน / A)" />
+                      <option value="Night (กะกลางคืน / B)" />
+                      <option value="Shift A" />
+                      <option value="Shift B" />
+                      <option value="Shift C" />
+                    </datalist>
                   </div>
                 </div>
               </div>

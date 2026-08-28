@@ -85,7 +85,7 @@ function getSharedCloudListener<T>(key: string, fallbackDefault: T, onUpdate: (d
           payload: initialToUpload,
           updatedAt: new Date().toISOString(),
           source: 'initial_bootstrap'
-        }, { merge: true });
+        });
 
         listenerSet.forEach(cb => {
           try {
@@ -238,7 +238,7 @@ export async function saveCloudData<T>(key: string, data: T): Promise<void> {
     await setDoc(docRef, {
       payload: data,
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    });
   } catch (error) {
     console.error(`[FirestoreSync] Failed to save cloud data for ${key}:`, error);
   }

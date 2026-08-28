@@ -119,30 +119,110 @@ const Sparkline = ({ data, color, label }: { data: number[]; color: string; labe
   );
 };
 
+const STANDARD_PROCESSES = [
+  'EXTRUSION',
+  'ANODIZE',
+  'COLD_ROLL',
+  'HOT_ROLL',
+  'DRAWING',
+  'SLITTING',
+  'MILL_FINISH',
+  'POWDER_COAT',
+  'ZN_SPRAY',
+  'GENERAL'
+];
+
+export const isProfileZnOrH = (name?: string): boolean => {
+  if (!name) return false;
+  const trimmed = name.trim().toUpperCase();
+  return trimmed.endsWith('Z') || trimmed.endsWith('H');
+};
+
 const DEFAULT_PROFILES: RoughnessProfileSpec[] = [
   { 
-    name: 'Standard_Default', 
+    id: 'prof-cr-smooth',
+    name: 'CR-SMOOTH-01', 
+    process: 'COLD_ROLL',
+    raUp: '0.4', raLo: '0.4', 
+    rzUp: '2.0', rzLo: '2.0', 
+    rzCalUp: '2.2', rzCalLo: '2.2', 
+    rtUp: '2.8', rtLo: '2.8',
+    ryUp: '2.0', ryLo: '2.0',
+    remarks: 'Cold rolled high-precision smooth strip'
+  },
+  { 
+    id: 'prof-cr-zinc-100z',
+    name: 'CR-ZINC-100Z', 
+    process: 'COLD_ROLL',
+    raUp: '0.5', raLo: '0.5', 
+    rzUp: '2.5', rzLo: '2.5', 
+    rzCalUp: '2.8', rzCalLo: '2.8', 
+    rtUp: '3.2', rtLo: '3.2',
+    ryUp: '2.5', ryLo: '2.5',
+    unZnSprayRaUp: '0.6', unZnSprayRaLo: '0.6',
+    unZnSprayRzUp: '3.0', unZnSprayRzLo: '3.0',
+    unZnSprayRtUp: '3.8', unZnSprayRtLo: '3.8',
+    unZnSprayRyUp: '3.0', unZnSprayRyLo: '3.0',
+    remarks: 'Zinc-coated cold roll (Profile ending with Z requires Un Zn spray measurement)'
+  },
+  { 
+    id: 'prof-ext-hybrid-20h',
+    name: 'EXT-HYBRID-20H', 
+    process: 'EXTRUSION',
+    raUp: '0.9', raLo: '0.9', 
+    rzUp: '3.6', rzLo: '3.6', 
+    rzCalUp: '4.0', rzCalLo: '4.0', 
+    rtUp: '4.8', rtLo: '4.8',
+    ryUp: '3.6', ryLo: '3.6',
+    unZnSprayRaUp: '1.0', unZnSprayRaLo: '1.0',
+    unZnSprayRzUp: '4.2', unZnSprayRzLo: '4.2',
+    unZnSprayRtUp: '5.2', unZnSprayRtLo: '5.2',
+    unZnSprayRyUp: '4.2', unZnSprayRyLo: '4.2',
+    remarks: 'Hybrid extrusion profile (Ending with H requires Un Zn spray roughness check)'
+  },
+  { 
+    id: 'prof-ext-std',
+    name: 'EXT-STD-01', 
+    process: 'EXTRUSION',
     raUp: '0.8', raLo: '0.8', 
     rzUp: '3.2', rzLo: '3.2', 
     rzCalUp: '3.5', rzCalLo: '3.5', 
     rtUp: '4.0', rtLo: '4.0',
-    ryUp: '3.2', ryLo: '3.2'
+    ryUp: '3.2', ryLo: '3.2',
+    remarks: 'Extrusion standard profile finish'
+  },
+  { 
+    id: 'prof-ano-matte',
+    name: 'ANO-MATTE-01', 
+    process: 'ANODIZE',
+    raUp: '1.2', raLo: '1.2', 
+    rzUp: '4.8', rzLo: '4.8', 
+    rzCalUp: '5.2', rzCalLo: '5.2', 
+    rtUp: '6.0', rtLo: '6.0',
+    ryUp: '4.8', ryLo: '4.8',
+    remarks: 'Anodized matte surface specification'
   },
   {
-    name: 'CR-SMOOTH-01',
-    raUp: '0.4', raLo: '0.4',
-    rzUp: '2.0', rzLo: '2.0',
-    rzCalUp: '2.2', rzCalLo: '2.2',
-    rtUp: '2.8', rtLo: '2.8',
-    ryUp: '2.0', ryLo: '2.0'
-  },
-  {
+    id: 'prof-hr-rough',
     name: 'HR-ROUGH-02',
+    process: 'HOT_ROLL',
     raUp: '1.6', raLo: '1.6',
     rzUp: '6.3', rzLo: '6.3',
     rzCalUp: '6.8', rzCalLo: '6.8',
     rtUp: '8.0', rtLo: '8.0',
-    ryUp: '6.3', ryLo: '6.3'
+    ryUp: '6.3', ryLo: '6.3',
+    remarks: 'Hot rolled heavy strip finish'
+  },
+  { 
+    id: 'prof-general-def',
+    name: 'Standard_Default', 
+    process: 'GENERAL',
+    raUp: '0.8', raLo: '0.8', 
+    rzUp: '3.2', rzLo: '3.2', 
+    rzCalUp: '3.5', rzCalLo: '3.5', 
+    rtUp: '4.0', rtLo: '4.0',
+    ryUp: '3.2', ryLo: '3.2',
+    remarks: 'General standard profile spec'
   }
 ];
 
@@ -188,6 +268,31 @@ const INITIAL_INSPECTIONS: RoughnessInspectionRecord[] = [
     machineName: 'SURFTEST-01',
     date: '2026-08-05',
     timestamp: '05/08/2026, 10:30:00'
+  },
+  {
+    id: 'rec-rough-003',
+    lotNumber: 'COIL-2026-Z201',
+    partId: 'FULL-STRIP',
+    process: 'COLD_ROLL',
+    raUp: ['0.45'], raLo: ['0.42'],
+    rzUp: ['2.40'], rzLo: ['2.30'],
+    rtUp: ['3.00'], rtLo: ['2.85'],
+    ryUp: ['2.35'], ryLo: ['2.25'],
+    unZnSprayRaUp: ['0.52'], unZnSprayRaLo: ['0.50'],
+    unZnSprayRzUp: ['2.75'], unZnSprayRzLo: ['2.65'],
+    unZnSprayRaMax: '0.520',
+    unZnSprayRzMax: '2.750',
+    raMax: '0.450',
+    rzMax: '2.400',
+    rtMax: '3.000',
+    ryMax: '2.350',
+    calculatedRzCal: '2.450',
+    status: 'Pass',
+    profileName: 'CR-ZINC-100Z',
+    inspectorName: 'Somchai P. (IPQA)',
+    machineName: 'SURFTEST-02',
+    date: '2026-08-06',
+    timestamp: '06/08/2026, 14:20:00'
   }
 ];
 
@@ -211,7 +316,8 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     ra: 1,
     rz: 1,
     rt: 1,
-    ry: 1
+    ry: 1,
+    unZnSpray: 1
   });
 
   // Admin Auth State
@@ -220,17 +326,28 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [showPasswordError, setShowPasswordError] = useState(false);
 
+  // Profile Filter in Admin Sidebar
+  const [profileProcessFilter, setProfileProcessFilter] = useState('ALL');
+  const [profileSearchTerm, setProfileSearchTerm] = useState('');
+
   // Header State (Clean start for new inspection entry)
   const [headerInfo, setHeaderInfo] = useState({
     inspectorName: '',
+    shift: '',
     machineName: '',
     date: new Date().toISOString().split('T')[0],
     profileName: '',
+    process: '',
     requirementRaUp: '', requirementRaLo: '',
     requirementRzUp: '', requirementRzLo: '',
     requirementRzCalUp: '', requirementRzCalLo: '',
     requirementRtUp: '', requirementRtLo: '',
-    requirementRyUp: '', requirementRyLo: ''
+    requirementRyUp: '', requirementRyLo: '',
+    unZnSprayRaUp: '', unZnSprayRaLo: '',
+    unZnSprayRzUp: '', unZnSprayRzLo: '',
+    unZnSprayRtUp: '', unZnSprayRtLo: '',
+    unZnSprayRyUp: '', unZnSprayRyLo: '',
+    remarks: ''
   });
 
   const [profileStatus, setProfileStatus] = useState<'found' | 'not-found'>('not-found');
@@ -249,6 +366,8 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
       rzUp: createEmptyPointArray(1), rzLo: createEmptyPointArray(1), 
       rtUp: createEmptyPointArray(1), rtLo: createEmptyPointArray(1), 
       ryUp: createEmptyPointArray(1), ryLo: createEmptyPointArray(1),
+      unZnSprayRaUp: createEmptyPointArray(1), unZnSprayRaLo: createEmptyPointArray(1),
+      unZnSprayRzUp: createEmptyPointArray(1), unZnSprayRzLo: createEmptyPointArray(1),
       status: 'Pending' as 'Pass' | 'Fail' | 'Pending', 
       remarks: '' 
     }
@@ -308,14 +427,25 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
   }, [inspections]);
 
   // Point Addition Handler
-  const addPoint = (type: 'ra' | 'rz' | 'rt' | 'ry') => {
+  const addPoint = (type: 'ra' | 'rz' | 'rt' | 'ry' | 'unZnSpray') => {
     setPointConfig(prev => {
       const newCount = prev[type] + 1;
-      setBatchItems(prevItems => prevItems.map(item => ({
-        ...item,
-        [`${type}Up`]: [...item[`${type}Up` as keyof typeof item] as string[], ''],
-        [`${type}Lo`]: [...item[`${type}Lo` as keyof typeof item] as string[], '']
-      })));
+      setBatchItems(prevItems => prevItems.map(item => {
+        if (type === 'unZnSpray') {
+          return {
+            ...item,
+            unZnSprayRaUp: [...item.unZnSprayRaUp, ''],
+            unZnSprayRaLo: [...item.unZnSprayRaLo, ''],
+            unZnSprayRzUp: [...item.unZnSprayRzUp, ''],
+            unZnSprayRzLo: [...item.unZnSprayRzLo, '']
+          };
+        }
+        return {
+          ...item,
+          [`${type}Up`]: [...(item[`${type}Up` as keyof typeof item] as string[]), ''],
+          [`${type}Lo`]: [...(item[`${type}Lo` as keyof typeof item] as string[]), '']
+        };
+      }));
       return { ...prev, [type]: newCount };
     });
   };
@@ -438,10 +568,90 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     return String(val);
   };
 
+  // Helper: Find exact or best matching spec for a given profile and process
+  const getSpecForProfileAndProcess = (profileName: string, processName?: string): RoughnessProfileSpec | null => {
+    if (!profileName) return null;
+    const pNameLower = profileName.trim().toLowerCase();
+    const procLower = processName?.trim().toLowerCase();
+
+    // 1. Exact match on profileName and process
+    if (procLower) {
+      const exactMatch = savedProfiles.find(
+        p => p.name.toLowerCase() === pNameLower && p.process?.toLowerCase() === procLower
+      );
+      if (exactMatch) return exactMatch;
+    }
+
+    // 2. Profile match with GENERAL or empty process
+    const generalMatch = savedProfiles.find(
+      p => p.name.toLowerCase() === pNameLower && (!p.process || p.process.toLowerCase() === 'general' || p.process.toLowerCase() === 'all')
+    );
+    if (generalMatch) return generalMatch;
+
+    // 3. Any profile with matching name
+    const nameMatch = savedProfiles.find(p => p.name.toLowerCase() === pNameLower);
+    return nameMatch || null;
+  };
+
+  // Helper: Calculate effective roughness limits for an inspection row based on its specific process
+  const getRowEffectiveSpec = (item: typeof batchItems[0]) => {
+    const rowProcess = item.process || headerInfo.process;
+    const spec = getSpecForProfileAndProcess(headerInfo.profileName, rowProcess);
+    if (spec) {
+      return {
+        raUp: parseFloat(spec.raUp) || 0,
+        raLo: parseFloat(spec.raLo) || 0,
+        rzUp: parseFloat(spec.rzUp) || 0,
+        rzLo: parseFloat(spec.rzLo) || 0,
+        rtUp: parseFloat(spec.rtUp) || 0,
+        rtLo: parseFloat(spec.rtLo) || 0,
+        ryUp: parseFloat(spec.ryUp) || 0,
+        ryLo: parseFloat(spec.ryLo) || 0,
+        rzCalUp: parseFloat(spec.rzCalUp) || 0,
+        rzCalLo: parseFloat(spec.rzCalLo) || 0,
+        unZnSprayRaUp: parseFloat(spec.unZnSprayRaUp || '0') || 0,
+        unZnSprayRaLo: parseFloat(spec.unZnSprayRaLo || '0') || 0,
+        unZnSprayRzUp: parseFloat(spec.unZnSprayRzUp || '0') || 0,
+        unZnSprayRzLo: parseFloat(spec.unZnSprayRzLo || '0') || 0,
+        unZnSprayRtUp: parseFloat(spec.unZnSprayRtUp || '0') || 0,
+        unZnSprayRtLo: parseFloat(spec.unZnSprayRtLo || '0') || 0,
+        unZnSprayRyUp: parseFloat(spec.unZnSprayRyUp || '0') || 0,
+        unZnSprayRyLo: parseFloat(spec.unZnSprayRyLo || '0') || 0,
+        isZnOrH: isProfileZnOrH(spec.name),
+        process: spec.process || rowProcess || 'GENERAL',
+        specName: spec.name
+      };
+    }
+    return {
+      raUp: parseFloat(headerInfo.requirementRaUp) || 0,
+      raLo: parseFloat(headerInfo.requirementRaLo) || 0,
+      rzUp: parseFloat(headerInfo.requirementRzUp) || 0,
+      rzLo: parseFloat(headerInfo.requirementRzLo) || 0,
+      rtUp: parseFloat(headerInfo.requirementRtUp) || 0,
+      rtLo: parseFloat(headerInfo.requirementRtLo) || 0,
+      ryUp: parseFloat(headerInfo.requirementRyUp) || 0,
+      ryLo: parseFloat(headerInfo.requirementRyLo) || 0,
+      rzCalUp: parseFloat(headerInfo.requirementRzCalUp) || 0,
+      rzCalLo: parseFloat(headerInfo.requirementRzCalLo) || 0,
+      unZnSprayRaUp: parseFloat(headerInfo.unZnSprayRaUp) || 0,
+      unZnSprayRaLo: parseFloat(headerInfo.unZnSprayRaLo) || 0,
+      unZnSprayRzUp: parseFloat(headerInfo.unZnSprayRzUp) || 0,
+      unZnSprayRzLo: parseFloat(headerInfo.unZnSprayRzLo) || 0,
+      unZnSprayRtUp: parseFloat(headerInfo.unZnSprayRtUp) || 0,
+      unZnSprayRtLo: parseFloat(headerInfo.unZnSprayRtLo) || 0,
+      unZnSprayRyUp: parseFloat(headerInfo.unZnSprayRyUp) || 0,
+      unZnSprayRyLo: parseFloat(headerInfo.unZnSprayRyLo) || 0,
+      isZnOrH: isProfileZnOrH(headerInfo.profileName),
+      process: rowProcess || 'GENERAL',
+      specName: headerInfo.profileName || 'Default'
+    };
+  };
+
   const selectProfile = (profile: RoughnessProfileSpec) => {
     setHeaderInfo(prev => ({
       ...prev,
       profileName: profile.name,
+      process: profile.process || prev.process || 'EXTRUSION',
       requirementRaUp: formatSpecValue(profile.raUp),
       requirementRaLo: formatSpecValue(profile.raLo),
       requirementRzUp: formatSpecValue(profile.rzUp),
@@ -451,14 +661,32 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
       requirementRtUp: formatSpecValue(profile.rtUp),
       requirementRtLo: formatSpecValue(profile.rtLo),
       requirementRyUp: formatSpecValue(profile.ryUp),
-      requirementRyLo: formatSpecValue(profile.ryLo)
+      requirementRyLo: formatSpecValue(profile.ryLo),
+      unZnSprayRaUp: formatSpecValue(profile.unZnSprayRaUp),
+      unZnSprayRaLo: formatSpecValue(profile.unZnSprayRaLo),
+      unZnSprayRzUp: formatSpecValue(profile.unZnSprayRzUp),
+      unZnSprayRzLo: formatSpecValue(profile.unZnSprayRzLo),
+      unZnSprayRtUp: formatSpecValue(profile.unZnSprayRtUp),
+      unZnSprayRtLo: formatSpecValue(profile.unZnSprayRtLo),
+      unZnSprayRyUp: formatSpecValue(profile.unZnSprayRyUp),
+      unZnSprayRyLo: formatSpecValue(profile.unZnSprayRyLo),
+      remarks: profile.remarks || ''
     }));
     setProfileStatus('found');
+
+    // Auto populate batch row process if not filled
+    if (profile.process) {
+      setBatchItems(prev => prev.map(item => ({
+        ...item,
+        process: item.process || profile.process || ''
+      })));
+    }
   };
 
+  // Sync spec when profileName or headerInfo.process changes
   useEffect(() => {
     if (headerInfo.profileName) {
-      const match = savedProfiles.find(p => p.name.toLowerCase() === headerInfo.profileName.toLowerCase());
+      const match = getSpecForProfileAndProcess(headerInfo.profileName, headerInfo.process);
       if (match) {
         setHeaderInfo(prev => ({
           ...prev,
@@ -471,49 +699,74 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
           requirementRtUp: formatSpecValue(match.rtUp),
           requirementRtLo: formatSpecValue(match.rtLo),
           requirementRyUp: formatSpecValue(match.ryUp),
-          requirementRyLo: formatSpecValue(match.ryLo)
+          requirementRyLo: formatSpecValue(match.ryLo),
+          unZnSprayRaUp: formatSpecValue(match.unZnSprayRaUp),
+          unZnSprayRaLo: formatSpecValue(match.unZnSprayRaLo),
+          unZnSprayRzUp: formatSpecValue(match.unZnSprayRzUp),
+          unZnSprayRzLo: formatSpecValue(match.unZnSprayRzLo),
+          unZnSprayRtUp: formatSpecValue(match.unZnSprayRtUp),
+          unZnSprayRtLo: formatSpecValue(match.unZnSprayRtLo),
+          unZnSprayRyUp: formatSpecValue(match.unZnSprayRyUp),
+          unZnSprayRyLo: formatSpecValue(match.unZnSprayRyLo),
+          remarks: match.remarks || prev.remarks || ''
         }));
         setProfileStatus('found');
       } else {
         setProfileStatus('not-found');
       }
     }
-  }, [headerInfo.profileName, savedProfiles]);
+  }, [headerInfo.profileName, headerInfo.process, savedProfiles]);
 
   const handleSaveProfile = () => {
     if (!headerInfo.profileName.trim()) {
       showNotification(isTh ? 'กรุณาระบุชื่อ Profile ก่อนบันทึก' : 'Please enter Profile Name before saving', 'error');
       return;
     }
+    const targetProcess = (headerInfo.process || 'GENERAL').trim().toUpperCase();
+
     const newProfile: RoughnessProfileSpec = {
+      id: `prof-${Date.now()}`,
       name: headerInfo.profileName.trim(),
+      process: targetProcess,
       raUp: headerInfo.requirementRaUp, raLo: headerInfo.requirementRaLo,
       rzUp: headerInfo.requirementRzUp, rzLo: headerInfo.requirementRzLo,
       rzCalUp: headerInfo.requirementRzCalUp, rzCalLo: headerInfo.requirementRzCalLo,
       rtUp: headerInfo.requirementRtUp, rtLo: headerInfo.requirementRtLo,
       ryUp: headerInfo.requirementRyUp, ryLo: headerInfo.requirementRyLo,
+      unZnSprayRaUp: headerInfo.unZnSprayRaUp, unZnSprayRaLo: headerInfo.unZnSprayRaLo,
+      unZnSprayRzUp: headerInfo.unZnSprayRzUp, unZnSprayRzLo: headerInfo.unZnSprayRzLo,
+      unZnSprayRtUp: headerInfo.unZnSprayRtUp, unZnSprayRtLo: headerInfo.unZnSprayRtLo,
+      unZnSprayRyUp: headerInfo.unZnSprayRyUp, unZnSprayRyLo: headerInfo.unZnSprayRyLo,
+      remarks: headerInfo.remarks || ''
     };
 
     setSavedProfiles(prev => {
-      const idx = prev.findIndex(p => p.name.toLowerCase() === newProfile.name.toLowerCase());
+      // Find existing profile with same name AND process
+      const idx = prev.findIndex(p => 
+        p.name.toLowerCase() === newProfile.name.toLowerCase() && 
+        (p.process || 'GENERAL').toLowerCase() === targetProcess.toLowerCase()
+      );
       if (idx >= 0) {
         const copy = [...prev];
-        copy[idx] = newProfile;
+        copy[idx] = { ...copy[idx], ...newProfile };
         return copy;
       }
       return [...prev, newProfile];
     });
 
-    showNotification(isTh ? `บันทึก Profile "${newProfile.name}" สำเร็จ` : `Saved profile "${newProfile.name}" successfully`);
+    showNotification(isTh 
+      ? `บันทึก Profile "${newProfile.name}" [Process: ${targetProcess}] สำเร็จ` 
+      : `Saved profile "${newProfile.name}" [Process: ${targetProcess}] successfully`
+    );
   };
 
-  const handleDeleteProfile = (profileName: string) => {
-    setSavedProfiles(prev => prev.filter(p => p.name !== profileName));
-    if (headerInfo.profileName === profileName) {
-      setHeaderInfo(prev => ({ ...prev, profileName: '' }));
+  const handleDeleteProfile = (identifier: string) => {
+    setSavedProfiles(prev => prev.filter(p => (p.id || p.name) !== identifier && `${p.name}__${p.process}` !== identifier));
+    if (headerInfo.profileName === identifier) {
+      setHeaderInfo(prev => ({ ...prev, profileName: '', process: '' }));
       setProfileStatus('not-found');
     }
-    showNotification(isTh ? `ลบ Profile "${profileName}" สำเร็จ` : `Deleted profile "${profileName}"`);
+    showNotification(isTh ? `ลบ Profile สำเร็จ` : `Deleted profile spec successfully`);
     setDeleteConfirm(null);
   };
 
@@ -528,8 +781,20 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     const relatedItems = batchItems.filter(i => i.lotNumber === lotNumber && i.process === process);
     const allRzValues: number[] = [];
     relatedItems.forEach(item => {
-      item.rzUp.forEach(v => v !== '' && allRzValues.push(parseFloat(v)));
-      item.rzLo.forEach(v => v !== '' && allRzValues.push(parseFloat(v)));
+      item.rzUp.forEach(v => {
+        const s = String(v || '').trim();
+        if (s !== '' && s !== '-' && s !== 'N/A') {
+          const num = parseFloat(s);
+          if (!isNaN(num)) allRzValues.push(num);
+        }
+      });
+      item.rzLo.forEach(v => {
+        const s = String(v || '').trim();
+        if (s !== '' && s !== '-' && s !== 'N/A') {
+          const num = parseFloat(s);
+          if (!isNaN(num)) allRzValues.push(num);
+        }
+      });
     });
     return allRzValues;
   };
@@ -559,36 +824,61 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     return results;
   }, [batchItems]);
 
+  // Process-Aware & Profile-Aware Status Judgment:
+  // Evaluates against specific process roughness specs, and checks Un Zn Spray when profile ends with Z or H
   const judgeStatus = (item: typeof batchItems[0]): 'Pass' | 'Fail' | 'Pending' => {
-    const specs = {
-      raUp: parseFloat(headerInfo.requirementRaUp) || 0,
-      raLo: parseFloat(headerInfo.requirementRaLo) || 0,
-      rzUp: parseFloat(headerInfo.requirementRzUp) || 0,
-      rzLo: parseFloat(headerInfo.requirementRzLo) || 0,
-      rtUp: parseFloat(headerInfo.requirementRtUp) || 0,
-      rtLo: parseFloat(headerInfo.requirementRtLo) || 0,
-      ryUp: parseFloat(headerInfo.requirementRyUp) || 0,
-      ryLo: parseFloat(headerInfo.requirementRyLo) || 0,
-      rzCalUp: parseFloat(headerInfo.requirementRzCalUp) || 0,
-      rzCalLo: parseFloat(headerInfo.requirementRzCalLo) || 0
-    };
+    const specs = getRowEffectiveSpec(item);
 
     const isRaReq = specs.raUp > 0 || specs.raLo > 0;
     const isRzReq = specs.rzUp > 0 || specs.rzLo > 0;
     const isRtReq = specs.rtUp > 0 || specs.rtLo > 0;
     const isRyReq = specs.ryUp > 0 || specs.ryLo > 0;
 
-    const hasValue = (arr: string[]) => arr.some(v => v !== '' && !isNaN(parseFloat(v)));
+    // A field is considered filled if it has a number OR is explicitly marked as '-' (unmeasured)
+    const hasValue = (arr?: string[]) => Array.isArray(arr) && arr.some(v => {
+      const s = String(v || '').trim();
+      return s === '-' || (s !== '' && !isNaN(parseFloat(s)));
+    });
+
+    // Check if at least one actual number has been measured across the row
+    const hasAnyNumericMeasurement = [
+      ...(item.raUp || []), ...(item.raLo || []),
+      ...(item.rzUp || []), ...(item.rzLo || []),
+      ...(item.rtUp || []), ...(item.rtLo || []),
+      ...(item.ryUp || []), ...(item.ryLo || []),
+      ...(item.unZnSprayRaUp || []), ...(item.unZnSprayRaLo || []),
+      ...(item.unZnSprayRzUp || []), ...(item.unZnSprayRzLo || [])
+    ].some(v => {
+      const s = String(v || '').trim();
+      return s !== '' && s !== '-' && !isNaN(parseFloat(s));
+    });
+
+    if (!hasAnyNumericMeasurement) return 'Pending';
+
     if (isRaReq && (!hasValue(item.raUp) || !hasValue(item.raLo))) return 'Pending';
     if (isRzReq && (!hasValue(item.rzUp) || !hasValue(item.rzLo))) return 'Pending';
     if (isRtReq && (!hasValue(item.rtUp) || !hasValue(item.rtLo))) return 'Pending';
     if (isRyReq && (!hasValue(item.ryUp) || !hasValue(item.ryLo))) return 'Pending';
 
+    // Check Un Zn Spray requirement for Profiles ending with Z or H
+    const isZnOrH = specs.isZnOrH || isProfileZnOrH(headerInfo.profileName);
+    const isUnZnReq = isZnOrH || specs.unZnSprayRaUp > 0 || specs.unZnSprayRzUp > 0;
+    if (isUnZnReq) {
+      if (!hasValue(item.unZnSprayRaUp) && !hasValue(item.unZnSprayRzUp)) {
+        return 'Pending';
+      }
+    }
+
     let pass = true;
 
-    const checkArrayAgainstLimit = (arr: string[], limit: number) => {
-      if (limit <= 0) return true;
-      return !arr.some(v => parseFloat(v) > limit);
+    const checkArrayAgainstLimit = (arr: string[] | undefined, limit: number) => {
+      if (!arr || limit <= 0) return true;
+      return !arr.some(v => {
+        const s = String(v || '').trim();
+        if (s === '' || s === '-' || s === 'N/A') return false; // unmeasured / ignored in decision
+        const num = parseFloat(s);
+        return !isNaN(num) && num > limit;
+      });
     };
 
     if (specs.raUp > 0 && !checkArrayAgainstLimit(item.raUp, specs.raUp)) pass = false;
@@ -599,6 +889,12 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     if (specs.rtLo > 0 && !checkArrayAgainstLimit(item.rtLo, specs.rtLo)) pass = false;
     if (specs.ryUp > 0 && !checkArrayAgainstLimit(item.ryUp, specs.ryUp)) pass = false;
     if (specs.ryLo > 0 && !checkArrayAgainstLimit(item.ryLo, specs.ryLo)) pass = false;
+
+    // Un Zn Spray Limit validation
+    if (specs.unZnSprayRaUp > 0 && !checkArrayAgainstLimit(item.unZnSprayRaUp, specs.unZnSprayRaUp)) pass = false;
+    if (specs.unZnSprayRaLo > 0 && !checkArrayAgainstLimit(item.unZnSprayRaLo, specs.unZnSprayRaLo)) pass = false;
+    if (specs.unZnSprayRzUp > 0 && !checkArrayAgainstLimit(item.unZnSprayRzUp, specs.unZnSprayRzUp)) pass = false;
+    if (specs.unZnSprayRzLo > 0 && !checkArrayAgainstLimit(item.unZnSprayRzLo, specs.unZnSprayRzLo)) pass = false;
 
     const stats = calculatedStats[`${item.lotNumber}-${item.process}`];
     if (stats) {
@@ -615,14 +911,21 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
   const handleResetForm = () => {
     setHeaderInfo({
       inspectorName: '',
+      shift: '',
       machineName: '',
       date: new Date().toISOString().split('T')[0],
       profileName: '',
+      process: '',
       requirementRaUp: '', requirementRaLo: '',
       requirementRzUp: '', requirementRzLo: '',
       requirementRzCalUp: '', requirementRzCalLo: '',
       requirementRtUp: '', requirementRtLo: '',
-      requirementRyUp: '', requirementRyLo: ''
+      requirementRyUp: '', requirementRyLo: '',
+      unZnSprayRaUp: '', unZnSprayRaLo: '',
+      unZnSprayRzUp: '', unZnSprayRzLo: '',
+      unZnSprayRtUp: '', unZnSprayRtLo: '',
+      unZnSprayRyUp: '', unZnSprayRyLo: '',
+      remarks: ''
     });
     setProfileStatus('not-found');
     setBatchItems([{ 
@@ -634,6 +937,8 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
       rzUp: createEmptyPointArray(pointConfig.rz), rzLo: createEmptyPointArray(pointConfig.rz), 
       rtUp: createEmptyPointArray(pointConfig.rt), rtLo: createEmptyPointArray(pointConfig.rt), 
       ryUp: createEmptyPointArray(pointConfig.ry), ryLo: createEmptyPointArray(pointConfig.ry),
+      unZnSprayRaUp: createEmptyPointArray(pointConfig.unZnSpray), unZnSprayRaLo: createEmptyPointArray(pointConfig.unZnSpray),
+      unZnSprayRzUp: createEmptyPointArray(pointConfig.unZnSpray), unZnSprayRzLo: createEmptyPointArray(pointConfig.unZnSpray),
       status: 'Pending', remarks: '' 
     }]);
   };
@@ -653,6 +958,10 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
       rtLo: createEmptyPointArray(pointConfig.rt), 
       ryUp: createEmptyPointArray(pointConfig.ry),
       ryLo: createEmptyPointArray(pointConfig.ry),
+      unZnSprayRaUp: createEmptyPointArray(pointConfig.unZnSpray),
+      unZnSprayRaLo: createEmptyPointArray(pointConfig.unZnSpray),
+      unZnSprayRzUp: createEmptyPointArray(pointConfig.unZnSpray),
+      unZnSprayRzLo: createEmptyPointArray(pointConfig.unZnSpray),
       status: 'Pending', remarks: '' 
     }]);
   };
@@ -669,7 +978,8 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
   const handleDynamicPointChange = (id: number, field: string, index: number, value: string) => {
     setBatchItems(prevItems => prevItems.map(item => {
       if (item.id === id) {
-        const newArr = [...(item[field as keyof typeof item] as string[])];
+        const currentArr = (item[field as keyof typeof item] as string[]) || [];
+        const newArr = [...currentArr];
         newArr[index] = value;
         return { ...item, [field]: newArr };
       }
@@ -687,13 +997,26 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     const now = new Date();
     const newRecords: RoughnessInspectionRecord[] = validItems.map(item => {
       const stats = calculatedStats[`${item.lotNumber}-${item.process}`];
-      const getMax = (up: string[], lo: string[]) => Math.max(
-        ...up.map(v => parseFloat(v) || 0),
-        ...lo.map(v => parseFloat(v) || 0)
-      );
+      const getMax = (up?: string[], lo?: string[]) => {
+        const u = Array.isArray(up) ? up : [];
+        const l = Array.isArray(lo) ? lo : [];
+        const validNums = [...u, ...l]
+          .map(v => String(v || '').trim())
+          .filter(v => v !== '' && v !== '-' && v !== 'N/A' && !isNaN(parseFloat(v)))
+          .map(v => parseFloat(v));
+        if (validNums.length === 0) return '-';
+        return Math.max(...validNums).toFixed(3);
+      };
 
       const decision = judgeStatus(item);
       const recId = `rec-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+
+      const raMaxVal = getMax(item.raUp, item.raLo);
+      const rzMaxVal = getMax(item.rzUp, item.rzLo);
+      const rtMaxVal = getMax(item.rtUp, item.rtLo);
+      const ryMaxVal = getMax(item.ryUp, item.ryLo);
+      const unZnRaMaxVal = getMax(item.unZnSprayRaUp, item.unZnSprayRaLo);
+      const unZnRzMaxVal = getMax(item.unZnSprayRzUp, item.unZnSprayRzLo);
 
       if (onLogNewActivity) {
         onLogNewActivity({
@@ -703,14 +1026,15 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
           moduleTitleTh: 'การตรวจวัดความเรียบผิว (Roughness Measurement)',
           moduleTitleEn: 'Surface Roughness Measurement System (Ra/Rz/Rt/Ry)',
           inspector: headerInfo.inspectorName || 'IPQA Officer',
+          shift: headerInfo.shift || '',
           batchLot: `${headerInfo.profileName || 'General Profile'} - ${item.lotNumber}`,
           coilNo: item.lotNumber,
           profile: headerInfo.profileName,
           process: item.process,
-          inspectionResult: `${decision === 'Pass' ? 'PASS' : 'FAIL'} / Ra: ${getMax(item.raUp, item.raLo).toFixed(3)} µm, Rz: ${getMax(item.rzUp, item.rzLo).toFixed(3)} µm`,
+          inspectionResult: `${decision === 'Pass' ? 'PASS' : 'FAIL'} / Ra: ${raMaxVal} µm, Rz: ${rzMaxVal} µm${isProfileZnOrH(headerInfo.profileName) ? `, UnZn: ${unZnRaMaxVal}/${unZnRzMaxVal}` : ''}`,
           result: decision === 'Pass' ? 'PASS' : 'FAIL',
           defectCount: decision === 'Fail' ? 1 : 0,
-          remarks: `Ra Max: ${getMax(item.raUp, item.raLo).toFixed(3)} µm, Rz Max: ${getMax(item.rzUp, item.rzLo).toFixed(3)} µm, RzCal: ${stats ? stats.rzCal.toFixed(3) : '0.000'}`
+          remarks: `Ra Max: ${raMaxVal} µm, Rz Max: ${rzMaxVal} µm, RzCal: ${stats ? stats.rzCal.toFixed(3) : '0.000'}${isProfileZnOrH(headerInfo.profileName) ? ` | Un Zn Spray: Ra ${unZnRaMaxVal} µm, Rz ${unZnRzMaxVal} µm` : ''}`
         });
       }
 
@@ -727,14 +1051,21 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
         rtLo: item.rtLo,
         ryUp: item.ryUp,
         ryLo: item.ryLo,
-        raMax: getMax(item.raUp, item.raLo).toFixed(3),
-        rzMax: getMax(item.rzUp, item.rzLo).toFixed(3),
-        rtMax: getMax(item.rtUp, item.rtLo).toFixed(3),
-        ryMax: getMax(item.ryUp, item.ryLo).toFixed(3),
+        unZnSprayRaUp: item.unZnSprayRaUp,
+        unZnSprayRaLo: item.unZnSprayRaLo,
+        unZnSprayRzUp: item.unZnSprayRzUp,
+        unZnSprayRzLo: item.unZnSprayRzLo,
+        unZnSprayRaMax: unZnRaMaxVal,
+        unZnSprayRzMax: unZnRzMaxVal,
+        raMax: raMaxVal,
+        rzMax: rzMaxVal,
+        rtMax: rtMaxVal,
+        ryMax: ryMaxVal,
         status: decision,
         remarks: item.remarks,
         profileName: headerInfo.profileName,
         inspectorName: headerInfo.inspectorName || 'IPQA Inspector',
+        shift: headerInfo.shift || '',
         machineName: headerInfo.machineName || 'SURFTEST-01',
         date: headerInfo.date,
         calculatedRzCal: stats ? stats.rzCal.toFixed(3) : '0.000',
@@ -752,6 +1083,8 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
       rzUp: createEmptyPointArray(pointConfig.rz), rzLo: createEmptyPointArray(pointConfig.rz),
       rtUp: createEmptyPointArray(pointConfig.rt), rtLo: createEmptyPointArray(pointConfig.rt),
       ryUp: createEmptyPointArray(pointConfig.ry), ryLo: createEmptyPointArray(pointConfig.ry),
+      unZnSprayRaUp: createEmptyPointArray(pointConfig.unZnSpray), unZnSprayRaLo: createEmptyPointArray(pointConfig.unZnSpray),
+      unZnSprayRzUp: createEmptyPointArray(pointConfig.unZnSpray), unZnSprayRzLo: createEmptyPointArray(pointConfig.unZnSpray),
       status: 'Pending', remarks: '' 
     }]);
 
@@ -766,6 +1099,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     const headers = [
       'Timestamp', 'Date', 'Coil No.', 'Side', 'Process', 'Profile Name', 
       'Ra Max', 'Rz Max', 'Rt Max', 'Ry Max', 
+      'Un Zn Spray Ra Max', 'Un Zn Spray Rz Max',
       'Rz Cal (Batch)', 'Status', 'Machine', 'Inspector'
     ];
     const csvContent = [
@@ -778,6 +1112,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
         `"${item.process}"`,
         `"${item.profileName}"`,
         item.raMax, item.rzMax, item.rtMax, (item.ryMax || '0.000'),
+        (item.unZnSprayRaMax || '-'), (item.unZnSprayRzMax || '-'),
         item.calculatedRzCal,
         `"${item.status}"`,
         `"${item.machineName}"`,
@@ -817,11 +1152,13 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     }
   };
 
+  const isProfileEndingZnOrH = isProfileZnOrH(headerInfo.profileName);
   const isRaActive = !headerInfo.profileName || parseFloat(headerInfo.requirementRaUp) > 0 || parseFloat(headerInfo.requirementRaLo) > 0;
   const isRzActive = !headerInfo.profileName || parseFloat(headerInfo.requirementRzUp) > 0 || parseFloat(headerInfo.requirementRzLo) > 0;
   const isRtActive = !headerInfo.profileName || parseFloat(headerInfo.requirementRtUp) > 0 || parseFloat(headerInfo.requirementRtLo) > 0;
   const isRyActive = !headerInfo.profileName || parseFloat(headerInfo.requirementRyUp) > 0 || parseFloat(headerInfo.requirementRyLo) > 0;
   const isRzCalActive = !headerInfo.profileName || parseFloat(headerInfo.requirementRzCalUp) > 0 || parseFloat(headerInfo.requirementRzCalLo) > 0;
+  const isUnZnSprayActive = isProfileEndingZnOrH || parseFloat(headerInfo.unZnSprayRaUp) > 0 || parseFloat(headerInfo.unZnSprayRzUp) > 0;
 
   // Filter history
   const filteredInspections = useMemo(() => {
@@ -1131,7 +1468,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
                   Profile Name *
@@ -1152,17 +1489,51 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                       }));
                       setProfileStatus('not-found');
                     } else {
-                      const selected = savedProfiles.find(p => p.name === pName);
+                      const selected = savedProfiles.find(p => p.name === pName && (!headerInfo.process || p.process === headerInfo.process)) 
+                        || savedProfiles.find(p => p.name === pName);
                       if (selected) selectProfile(selected);
+                      else setHeaderInfo(prev => ({ ...prev, profileName: pName }));
                     }
                   }}
                   className="w-full bg-slate-950 border border-cyan-900/80 text-cyan-300 font-bold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-400 uppercase"
                 >
                   <option value="">-- {isTh ? 'เลือก Profile' : 'Select Profile'} --</option>
-                  {savedProfiles.map(p => (
-                    <option key={p.name} value={p.name}>{p.name}</option>
+                  {Array.from(new Set(savedProfiles.map(p => p.name))).map(name => (
+                    <option key={name} value={name}>{name}</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 flex items-center justify-between">
+                  <span>Process *</span>
+                  <span className="text-[9px] text-cyan-400 lowercase">{isTh ? 'กระบวนการ' : 'process'}</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="process"
+                    list="roughness-header-processes"
+                    value={headerInfo.process}
+                    onChange={(e) => {
+                      const proc = e.target.value;
+                      setHeaderInfo(prev => ({ ...prev, process: proc }));
+                      if (proc) {
+                        setBatchItems(prev => prev.map(item => ({
+                          ...item,
+                          process: item.process || proc
+                        })));
+                      }
+                    }}
+                    placeholder="e.g. COLD_ROLL"
+                    className="w-full bg-slate-950 border border-slate-800 text-cyan-300 font-bold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500 uppercase font-mono"
+                  />
+                  <datalist id="roughness-header-processes">
+                    {STANDARD_PROCESSES.map(p => (
+                      <option key={p} value={p} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
 
               <div>
@@ -1177,6 +1548,28 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                   placeholder={isTh ? 'ชื่อผู้ตรวจสอบ / Inspector name' : 'Inspector name'}
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500"
                 />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                  Shift (กะ)
+                </label>
+                <input
+                  list="roughness-shift-options"
+                  type="text"
+                  name="shift"
+                  value={headerInfo.shift}
+                  onChange={handleHeaderChange}
+                  placeholder="e.g. Day / Night / Shift A..."
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500"
+                />
+                <datalist id="roughness-shift-options">
+                  <option value="Day (กะกลางวัน / A)" />
+                  <option value="Night (กะกลางคืน / B)" />
+                  <option value="Shift A" />
+                  <option value="Shift B" />
+                  <option value="Shift C" />
+                </datalist>
               </div>
 
               <div>
@@ -1208,12 +1601,30 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
             </div>
 
             {/* Spec summary row */}
-            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs grid grid-cols-2 sm:grid-cols-5 gap-2 text-slate-300">
-              <div><span className="text-slate-500">Max Ra Limit:</span> <strong className="text-cyan-300">{headerInfo.requirementRaUp ? `≤ ${headerInfo.requirementRaUp} µm` : '-'}</strong></div>
-              <div><span className="text-slate-500">Max Rz Limit:</span> <strong className="text-emerald-300">{headerInfo.requirementRzUp ? `≤ ${headerInfo.requirementRzUp} µm` : '-'}</strong></div>
-              <div><span className="text-slate-500">Max Rt Limit:</span> <strong className="text-amber-300">{headerInfo.requirementRtUp ? `≤ ${headerInfo.requirementRtUp} µm` : '-'}</strong></div>
-              <div><span className="text-slate-500">Max Ry Limit:</span> <strong className="text-indigo-300">{headerInfo.requirementRyUp ? `≤ ${headerInfo.requirementRyUp} µm` : '-'}</strong></div>
-              <div><span className="text-slate-500">3-Sigma Rz Cal:</span> <strong className="text-rose-300">{headerInfo.requirementRzCalUp ? `≤ ${headerInfo.requirementRzCalUp} µm` : '-'}</strong></div>
+            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs grid grid-cols-2 sm:grid-cols-6 gap-2 text-slate-300 items-center">
+              <div>
+                <span className="text-slate-500 block text-[10px]">Active Process Spec:</span> 
+                <span className="inline-block px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800 text-[11px] font-mono font-bold">
+                  {headerInfo.process || 'GENERAL'}
+                </span>
+              </div>
+              <div><span className="text-slate-500">Max Ra:</span> <strong className="text-cyan-300 font-mono">{headerInfo.requirementRaUp ? `≤ ${headerInfo.requirementRaUp} µm` : '-'}</strong></div>
+              <div><span className="text-slate-500">Max Rz:</span> <strong className="text-emerald-300 font-mono">{headerInfo.requirementRzUp ? `≤ ${headerInfo.requirementRzUp} µm` : '-'}</strong></div>
+              <div><span className="text-slate-500">Max Rt:</span> <strong className="text-amber-300 font-mono">{headerInfo.requirementRtUp ? `≤ ${headerInfo.requirementRtUp} µm` : '-'}</strong></div>
+              <div><span className="text-slate-500">Max Ry:</span> <strong className="text-indigo-300 font-mono">{headerInfo.requirementRyUp ? `≤ ${headerInfo.requirementRyUp} µm` : '-'}</strong></div>
+              <div><span className="text-slate-500">3-Sigma Rz Cal:</span> <strong className="text-rose-300 font-mono">{headerInfo.requirementRzCalUp ? `≤ ${headerInfo.requirementRzCalUp} µm` : '-'}</strong></div>
+              {isUnZnSprayActive && (
+                <div className="col-span-2 sm:col-span-6 flex flex-wrap items-center gap-4 pt-2 mt-1 border-t border-teal-900/50 text-[11px] text-teal-300 bg-teal-950/20 px-3 py-1.5 rounded-lg border border-teal-800/40">
+                  <span className="font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+                    <span>Un Zn Spray Spec ({headerInfo.profileName || 'Profile'}):</span>
+                  </span>
+                  <span>Max Ra: <strong className="font-mono text-teal-200">{headerInfo.unZnSprayRaUp ? `≤ ${headerInfo.unZnSprayRaUp} µm` : '-'}</strong></span>
+                  <span>Max Rz: <strong className="font-mono text-teal-200">{headerInfo.unZnSprayRzUp ? `≤ ${headerInfo.unZnSprayRzUp} µm` : '-'}</strong></span>
+                  <span>Max Rt: <strong className="font-mono text-teal-200">{headerInfo.unZnSprayRtUp ? `≤ ${headerInfo.unZnSprayRtUp} µm` : '-'}</strong></span>
+                  <span>Max Ry: <strong className="font-mono text-teal-200">{headerInfo.unZnSprayRyUp ? `≤ ${headerInfo.unZnSprayRyUp} µm` : '-'}</strong></span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1307,6 +1718,24 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                           </div>
                         </th>
                       )}
+                      {isUnZnSprayActive && (
+                        <th className="px-3 py-3 text-center bg-teal-950/40 text-teal-300 border-l border-teal-800" colSpan={pointConfig.unZnSpray * 4}>
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="font-bold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
+                              Un Zn Spray (Ra & Rz)
+                            </span>
+                            <button 
+                              type="button" 
+                              onClick={() => addPoint('unZnSpray')} 
+                              className="p-0.5 bg-teal-600 text-slate-950 rounded hover:bg-teal-500 transition"
+                              title="Add Un Zn Spray Point"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </th>
+                      )}
                       <th className="px-3 py-3 text-center border-l border-slate-800">Status</th>
                       <th className="px-2 py-3"></th>
                     </tr>
@@ -1315,6 +1744,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                     {batchItems.map((item, index) => {
                       const stats = calculatedStats[`${item.lotNumber}-${item.process}`];
                       const currentStatus = judgeStatus(item);
+                      const rowSpec = getRowEffectiveSpec(item);
                       return (
                         <tr key={item.id} className="hover:bg-slate-950/40">
                           <td className="px-3 py-3 space-y-1">
@@ -1336,12 +1766,24 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                               />
                               <input
                                 type="text"
-                                placeholder="Proc"
+                                list="roughness-row-processes"
+                                placeholder="Process"
                                 value={item.process}
                                 onChange={(e) => handleItemChange(item.id, 'process', e.target.value)}
-                                className="w-1/2 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-[10px] text-slate-300 uppercase focus:outline-none"
+                                className="w-1/2 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-[10px] text-cyan-300 font-bold uppercase focus:outline-none"
                               />
+                              <datalist id="roughness-row-processes">
+                                {STANDARD_PROCESSES.map(p => (
+                                  <option key={p} value={p} />
+                                ))}
+                              </datalist>
                             </div>
+                            {item.process && (
+                              <div className="text-[9px] text-slate-500 font-mono flex items-center gap-1">
+                                <span className="text-cyan-400 font-bold">{rowSpec.process}</span>
+                                <span>(Ra≤{rowSpec.raUp || '-'} | Rz≤{rowSpec.rzUp || '-'})</span>
+                              </div>
+                            )}
                           </td>
 
                           {/* Ra Points */}
@@ -1357,7 +1799,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                                       onChange={(e) => handleDynamicPointChange(item.id, 'raUp', pIdx, e.target.value)}
                                       placeholder="Up"
                                       className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.raUp[pIdx] && parseFloat(item.raUp[pIdx]) > parseFloat(headerInfo.requirementRaUp)
+                                        item.raUp[pIdx] && parseFloat(item.raUp[pIdx]) > rowSpec.raUp && rowSpec.raUp > 0
                                           ? 'border-rose-500 text-rose-300 bg-rose-950/40'
                                           : 'border-slate-800 text-cyan-300'
                                       }`}
@@ -1369,7 +1811,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                                       onChange={(e) => handleDynamicPointChange(item.id, 'raLo', pIdx, e.target.value)}
                                       placeholder="Lo"
                                       className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.raLo[pIdx] && parseFloat(item.raLo[pIdx]) > parseFloat(headerInfo.requirementRaLo)
+                                        item.raLo[pIdx] && parseFloat(item.raLo[pIdx]) > rowSpec.raLo && rowSpec.raLo > 0
                                           ? 'border-rose-500 text-rose-300 bg-rose-950/40'
                                           : 'border-slate-800 text-cyan-300'
                                       }`}
@@ -1393,7 +1835,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                                       onChange={(e) => handleDynamicPointChange(item.id, 'rzUp', pIdx, e.target.value)}
                                       placeholder="Up"
                                       className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.rzUp[pIdx] && parseFloat(item.rzUp[pIdx]) > parseFloat(headerInfo.requirementRzUp)
+                                        item.rzUp[pIdx] && parseFloat(item.rzUp[pIdx]) > rowSpec.rzUp && rowSpec.rzUp > 0
                                           ? 'border-rose-500 text-rose-300 bg-rose-950/40'
                                           : 'border-slate-800 text-emerald-300'
                                       }`}
@@ -1405,7 +1847,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                                       onChange={(e) => handleDynamicPointChange(item.id, 'rzLo', pIdx, e.target.value)}
                                       placeholder="Lo"
                                       className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.rzLo[pIdx] && parseFloat(item.rzLo[pIdx]) > parseFloat(headerInfo.requirementRzLo)
+                                        item.rzLo[pIdx] && parseFloat(item.rzLo[pIdx]) > rowSpec.rzLo && rowSpec.rzLo > 0
                                           ? 'border-rose-500 text-rose-300 bg-rose-950/40'
                                           : 'border-slate-800 text-emerald-300'
                                       }`}
@@ -1419,7 +1861,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                           {/* Rz Cal */}
                           {isRzCalActive && (
                             <td className="px-3 py-3 text-center border-l border-slate-800 font-mono font-bold text-xs bg-rose-950/10">
-                              <span className={stats && (stats.rzCal > parseFloat(headerInfo.requirementRzCalUp)) ? 'text-rose-400' : 'text-rose-300'}>
+                              <span className={stats && (rowSpec.rzCalUp > 0 && stats.rzCal > rowSpec.rzCalUp) ? 'text-rose-400' : 'text-rose-300'}>
                                 {stats ? stats.rzCal.toFixed(3) : '-'}
                               </span>
                             </td>
@@ -1438,7 +1880,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                                       onChange={(e) => handleDynamicPointChange(item.id, 'rtUp', pIdx, e.target.value)}
                                       placeholder="Up"
                                       className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.rtUp[pIdx] && parseFloat(item.rtUp[pIdx]) > parseFloat(headerInfo.requirementRtUp)
+                                        item.rtUp[pIdx] && parseFloat(item.rtUp[pIdx]) > rowSpec.rtUp && rowSpec.rtUp > 0
                                           ? 'border-rose-500 text-rose-300 bg-rose-950/40'
                                           : 'border-slate-800 text-amber-300'
                                       }`}
@@ -1450,7 +1892,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                                       onChange={(e) => handleDynamicPointChange(item.id, 'rtLo', pIdx, e.target.value)}
                                       placeholder="Lo"
                                       className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.rtLo[pIdx] && parseFloat(item.rtLo[pIdx]) > parseFloat(headerInfo.requirementRtLo)
+                                        item.rtLo[pIdx] && parseFloat(item.rtLo[pIdx]) > rowSpec.rtLo && rowSpec.rtLo > 0
                                           ? 'border-rose-500 text-rose-300 bg-rose-950/40'
                                           : 'border-slate-800 text-amber-300'
                                       }`}
@@ -1474,7 +1916,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                                       onChange={(e) => handleDynamicPointChange(item.id, 'ryUp', pIdx, e.target.value)}
                                       placeholder="Up"
                                       className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.ryUp[pIdx] && parseFloat(item.ryUp[pIdx]) > parseFloat(headerInfo.requirementRyUp)
+                                        item.ryUp[pIdx] && parseFloat(item.ryUp[pIdx]) > rowSpec.ryUp && rowSpec.ryUp > 0
                                           ? 'border-rose-500 text-rose-300 bg-rose-950/40'
                                           : 'border-slate-800 text-indigo-300'
                                       }`}
@@ -1486,11 +1928,89 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                                       onChange={(e) => handleDynamicPointChange(item.id, 'ryLo', pIdx, e.target.value)}
                                       placeholder="Lo"
                                       className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.ryLo[pIdx] && parseFloat(item.ryLo[pIdx]) > parseFloat(headerInfo.requirementRyLo)
+                                        item.ryLo[pIdx] && parseFloat(item.ryLo[pIdx]) > rowSpec.ryLo && rowSpec.ryLo > 0
                                           ? 'border-rose-500 text-rose-300 bg-rose-950/40'
                                           : 'border-slate-800 text-indigo-300'
                                       }`}
                                     />
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          )}
+
+                          {/* Un Zn Spray Points */}
+                          {isUnZnSprayActive && (
+                            <td className="px-2 py-3 bg-teal-950/20 border-l border-teal-800/70" colSpan={pointConfig.unZnSpray * 4}>
+                              <div className="flex gap-2 justify-center">
+                                {Array(pointConfig.unZnSpray).fill(0).map((_, pIdx) => (
+                                  <div key={pIdx} className="flex gap-1.5 items-center bg-slate-950/60 p-1 rounded-lg border border-teal-900/40">
+                                    <div className="flex flex-col items-center">
+                                      <span className="text-[8px] text-teal-400 font-mono font-bold leading-none mb-1">
+                                        Pt{pIdx + 1} Ra
+                                      </span>
+                                      <div className="flex gap-1">
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={item.unZnSprayRaUp[pIdx] || ''}
+                                          onChange={(e) => handleDynamicPointChange(item.id, 'unZnSprayRaUp', pIdx, e.target.value)}
+                                          placeholder="Up"
+                                          title="Un Zn Spray Ra Up"
+                                          className={`w-11 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
+                                            item.unZnSprayRaUp[pIdx] && parseFloat(item.unZnSprayRaUp[pIdx]) > rowSpec.unZnSprayRaUp && rowSpec.unZnSprayRaUp > 0
+                                              ? 'border-rose-500 text-rose-300 bg-rose-950/40'
+                                              : 'border-teal-800 text-teal-300'
+                                          }`}
+                                        />
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={item.unZnSprayRaLo[pIdx] || ''}
+                                          onChange={(e) => handleDynamicPointChange(item.id, 'unZnSprayRaLo', pIdx, e.target.value)}
+                                          placeholder="Lo"
+                                          title="Un Zn Spray Ra Lo"
+                                          className={`w-11 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
+                                            item.unZnSprayRaLo[pIdx] && parseFloat(item.unZnSprayRaLo[pIdx]) > rowSpec.unZnSprayRaLo && rowSpec.unZnSprayRaLo > 0
+                                              ? 'border-rose-500 text-rose-300 bg-rose-950/40'
+                                              : 'border-teal-800 text-teal-300'
+                                          }`}
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-col items-center border-l border-teal-900/50 pl-1.5">
+                                      <span className="text-[8px] text-emerald-400 font-mono font-bold leading-none mb-1">
+                                        Pt{pIdx + 1} Rz
+                                      </span>
+                                      <div className="flex gap-1">
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={item.unZnSprayRzUp[pIdx] || ''}
+                                          onChange={(e) => handleDynamicPointChange(item.id, 'unZnSprayRzUp', pIdx, e.target.value)}
+                                          placeholder="Up"
+                                          title="Un Zn Spray Rz Up"
+                                          className={`w-11 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
+                                            item.unZnSprayRzUp[pIdx] && parseFloat(item.unZnSprayRzUp[pIdx]) > rowSpec.unZnSprayRzUp && rowSpec.unZnSprayRzUp > 0
+                                              ? 'border-rose-500 text-rose-300 bg-rose-950/40'
+                                              : 'border-teal-800 text-emerald-300'
+                                          }`}
+                                        />
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={item.unZnSprayRzLo[pIdx] || ''}
+                                          onChange={(e) => handleDynamicPointChange(item.id, 'unZnSprayRzLo', pIdx, e.target.value)}
+                                          placeholder="Lo"
+                                          title="Un Zn Spray Rz Lo"
+                                          className={`w-11 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
+                                            item.unZnSprayRzLo[pIdx] && parseFloat(item.unZnSprayRzLo[pIdx]) > rowSpec.unZnSprayRzLo && rowSpec.unZnSprayRzLo > 0
+                                              ? 'border-rose-500 text-rose-300 bg-rose-950/40'
+                                              : 'border-teal-800 text-emerald-300'
+                                          }`}
+                                        />
+                                      </div>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -1604,18 +2124,46 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
 
             {/* Spec Form Editor */}
             <div className="md:col-span-2 bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-5">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                  Profile Name / Model Code *
-                </label>
-                <input
-                  type="text"
-                  name="profileName"
-                  value={headerInfo.profileName}
-                  onChange={handleHeaderChange}
-                  placeholder="e.g. CR-SMOOTH-01"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-cyan-300 focus:outline-none focus:border-cyan-500 uppercase"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                    Profile Name / Model Code *
+                  </label>
+                  <input
+                    type="text"
+                    name="profileName"
+                    value={headerInfo.profileName}
+                    onChange={handleHeaderChange}
+                    placeholder="e.g. CR-ZINC-100Z, EXT-HYBRID-20H"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-cyan-300 focus:outline-none focus:border-cyan-500 uppercase"
+                  />
+                  {isProfileZnOrH(headerInfo.profileName) && (
+                    <span className="text-[10px] text-teal-400 font-bold block mt-1 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
+                      Profile ลงท้ายด้วย Z หรือ H: ต้องระบุค่า Spec Un Zn Spray
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                    Process Name / Operation *
+                  </label>
+                  <input
+                    type="text"
+                    name="process"
+                    list="spec-processes-list"
+                    value={headerInfo.process}
+                    onChange={handleHeaderChange}
+                    placeholder="e.g. COLD_ROLL, EXTRUSION, ZN_SPRAY"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-cyan-300 focus:outline-none focus:border-cyan-500 uppercase"
+                  />
+                  <datalist id="spec-processes-list">
+                    {STANDARD_PROCESSES.map(p => (
+                      <option key={p} value={p} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -1755,6 +2303,127 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                         onChange={handleHeaderChange}
                         className="w-full bg-slate-950 border border-rose-900/60 rounded-lg px-2 py-1.5 text-xs text-rose-300 font-mono font-bold"
                       />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Un Zn Spray Specification Section */}
+              <div className={`p-4 rounded-xl border space-y-3 ${
+                isProfileZnOrH(headerInfo.profileName)
+                  ? 'bg-teal-950/30 border-teal-700/60'
+                  : 'bg-slate-900/40 border-slate-800'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-800/80">
+                  <h5 className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-teal-400"></span>
+                    <span>Un Zn Spray Specification Limits (For Profiles ending in Z or H)</span>
+                  </h5>
+                  <span className="text-[10px] text-teal-300/80 font-medium">
+                    (เช่น CR-ZINC-100Z, EXT-HYBRID-20H)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Un Zn Spray Up */}
+                  <div className="bg-slate-950/60 p-3 rounded-lg border border-teal-900/40 space-y-2">
+                    <span className="text-[10px] font-bold text-teal-300 uppercase block">Un Zn Spray Up (USL)</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 block mb-1">Ra Up (µm)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="unZnSprayRaUp"
+                          value={headerInfo.unZnSprayRaUp}
+                          onChange={handleHeaderChange}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-teal-200 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 block mb-1">Rz Up (µm)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="unZnSprayRzUp"
+                          value={headerInfo.unZnSprayRzUp}
+                          onChange={handleHeaderChange}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-teal-200 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 block mb-1">Rt Up (µm)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="unZnSprayRtUp"
+                          value={headerInfo.unZnSprayRtUp}
+                          onChange={handleHeaderChange}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-teal-200 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 block mb-1">Ry Up (µm)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="unZnSprayRyUp"
+                          value={headerInfo.unZnSprayRyUp}
+                          onChange={handleHeaderChange}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-teal-200 font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Un Zn Spray Lo */}
+                  <div className="bg-slate-950/60 p-3 rounded-lg border border-teal-900/40 space-y-2">
+                    <span className="text-[10px] font-bold text-teal-300 uppercase block">Un Zn Spray Lo (USL)</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 block mb-1">Ra Lo (µm)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="unZnSprayRaLo"
+                          value={headerInfo.unZnSprayRaLo}
+                          onChange={handleHeaderChange}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-teal-200 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 block mb-1">Rz Lo (µm)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="unZnSprayRzLo"
+                          value={headerInfo.unZnSprayRzLo}
+                          onChange={handleHeaderChange}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-teal-200 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 block mb-1">Rt Lo (µm)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="unZnSprayRtLo"
+                          value={headerInfo.unZnSprayRtLo}
+                          onChange={handleHeaderChange}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-teal-200 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 block mb-1">Ry Lo (µm)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="unZnSprayRyLo"
+                          value={headerInfo.unZnSprayRyLo}
+                          onChange={handleHeaderChange}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-teal-200 font-mono"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1955,7 +2624,12 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                         <span className="text-[10px] text-slate-400">{ins.partId} | {ins.process}</span>
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-300">
-                        {ins.profileName}
+                        <div>{ins.profileName}</div>
+                        {isProfileZnOrH(ins.profileName) && (ins.unZnSprayRaMax || ins.unZnSprayRzMax) && (
+                          <div className="text-[10px] text-teal-400 font-mono">
+                            UnZn: Ra {ins.unZnSprayRaMax || '-'} / Rz {ins.unZnSprayRzMax || '-'} µm
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 font-mono">
                         <span className="text-cyan-300">{ins.raMax}</span> / <span className="text-emerald-300">{ins.rzMax}</span> / <span className="text-amber-300">{ins.rtMax}</span> / <span className="text-indigo-300">{ins.ryMax} µm</span>
@@ -1973,7 +2647,8 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-400">
-                        {ins.inspectorName}
+                        <div>{ins.inspectorName}</div>
+                        {ins.shift && <div className="text-[10px] text-slate-500">Shift: {ins.shift}</div>}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
@@ -2153,6 +2828,25 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                 </div>
 
                 <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift (กะ)</label>
+                  <input
+                    list="edit-roughness-shift-options"
+                    type="text"
+                    placeholder="e.g. Day / Night / Shift A..."
+                    value={editingHistoryItem.shift || ''}
+                    onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, shift: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                  />
+                  <datalist id="edit-roughness-shift-options">
+                    <option value="Day (กะกลางวัน / A)" />
+                    <option value="Night (กะกลางคืน / B)" />
+                    <option value="Shift A" />
+                    <option value="Shift B" />
+                    <option value="Shift C" />
+                  </datalist>
+                </div>
+
+                <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Status</label>
                   <select
                     value={editingHistoryItem.status}
@@ -2205,6 +2899,30 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                       value={editingHistoryItem.ryMax || ''}
                       onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, ryMax: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-indigo-300 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="text-[10px] font-bold text-teal-400 uppercase block mb-1">Un Zn Spray Ra Max (µm)</label>
+                    <input
+                      type="text"
+                      value={editingHistoryItem.unZnSprayRaMax || ''}
+                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, unZnSprayRaMax: e.target.value })}
+                      placeholder="e.g. 0.450"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-teal-300 focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-teal-400 uppercase block mb-1">Un Zn Spray Rz Max (µm)</label>
+                    <input
+                      type="text"
+                      value={editingHistoryItem.unZnSprayRzMax || ''}
+                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, unZnSprayRzMax: e.target.value })}
+                      placeholder="e.g. 2.100"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-teal-300 focus:outline-none focus:border-teal-500"
                     />
                   </div>
                 </div>

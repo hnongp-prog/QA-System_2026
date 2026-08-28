@@ -242,6 +242,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
   // Header Info State (Clean initial state)
   const [headerInfo, setHeaderInfo] = useState({
     inspectorName: '',
+    shift: '',
     machine: '',
     mixingLot: '',
     date: new Date().toISOString().split('T')[0],
@@ -267,61 +268,76 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
   const [profileStatus, setProfileStatus] = useState<'found' | 'not-found'>('not-found');
 
   // Auto calculate helper for row items using official IPQA-04 formulas:
-  // 1. Coating wt Up = (Dryer Wt - Empty Up) / (Width x 200 / 1000000)
-  // 2. Coating wt Lo = (Empty Up - Empty Lo) / (Width x 200 / 1000000)
-  // 3. Binder% = (Total Wt - Dryer Wt) / (Total Wt - min(Empty Up, Empty Lo)) * 100
-  // 4. Amt Binder = (Total Wt - Dryer Wt) / ((Width x 200 / 1000000) / 2)
-  const calculateAutoFields = (item: any) => {
-    const total = parseFloat(item.totalWeight) || 0;
-    const dryer = parseFloat(item.weightAfterDryer) || 0;
-    const wtUp = parseFloat(item.wtWithoutCoatUp) || 0;
-    const wtLo = parseFloat(item.wtWithoutCoatLo) || 0;
-    
-    // Sample Strip Width in mm (from item.width, item.coatingWidth, or default 100mm)
-    const rawWidth = parseFloat(item.width) || parseFloat(item.coatingWidth) || 100;
-    // Standard Length in mm (default 200 mm per formula)
-    const rawLength = parseFloat(item.length) || 200;
+  const parseNumOrNull = (val: any): number | null => {
+    if (val === undefined || val === null) return null;
+    const s = String(val).trim();
+    if (s === '' || s === '-' || s === 'N/A') return null;
+    const n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  };
 
-    // Formula denominator: (Width x 200 / 1000000) in m²
-    const coatingAreaVal = rawWidth > 0 && rawLength > 0 ? (rawWidth * rawLength) / 1000000 : 0;
+  // 1. Coating wt Up = (Dryer Wt - Empty Up) / (Std Coating Width x Std Length / 1,000,000)
+  // 2. Coating wt Lo = (Empty Up - Empty Lo) / (Std Coating Width x Std Length / 1,000,000)
+  // 3. Binder% = (Total Wt - Dryer Wt) / (Total Wt - min(Empty Up, Empty Lo)) * 100
+  // 4. Amt Binder = (Total Wt - Dryer Wt) / ((Std Coating Width x Std Length / 1,000,000) / 2)
+  const calculateAutoFields = (item: any, currentHeader = headerInfo) => {
+    const total = parseNumOrNull(item.totalWeight);
+    const dryer = parseNumOrNull(item.weightAfterDryer);
+    const wtUp = parseNumOrNull(item.wtWithoutCoatUp);
+    const wtLo = parseNumOrNull(item.wtWithoutCoatLo);
+    
+    // Sample Strip Dimensions from Spec (Standard Test Dimensions (mm)):
+    const stdCoatingWidth = parseNumOrNull(item.coatingWidth) || parseNumOrNull(currentHeader?.stdCoatingWidth) || 100;
+    const stdLength = parseNumOrNull(item.length) || parseNumOrNull(currentHeader?.stdLength) || 200;
+
+    // Formula denominator: (Std Coating Width x Std Length / 1000000) in m²
+    const coatingAreaVal = stdCoatingWidth > 0 && stdLength > 0 ? (stdCoatingWidth * stdLength) / 1000000 : 0;
     const coatingAreaStr = coatingAreaVal > 0 ? coatingAreaVal.toFixed(6) : '';
 
     // Binder Weight = Total Wt - Dryer Wt
-    const binderWtVal = total > 0 && dryer > 0 ? (total - dryer) : 0;
-    const binderWtStr = binderWtVal > 0 ? binderWtVal.toFixed(4) : '';
+    const binderWtVal = total !== null && dryer !== null && total > 0 && dryer > 0 ? (total - dryer) : null;
+    const binderWtStr = binderWtVal !== null && binderWtVal > 0 ? binderWtVal.toFixed(4) : '';
 
     // Total Coat & Binder Wt = Total Wt - min(Empty Up, Empty Lo)
-    let totalCoatBinderWtVal = 0;
+    let totalCoatBinderWtVal: number | null = null;
     let totalCoatBinderWtStr = '';
-    if (total > 0 && (wtUp > 0 || wtLo > 0)) {
-        const values = [wtUp, wtLo].filter(v => v > 0);
-        const minEmpty = Math.min(...values);
-        totalCoatBinderWtVal = (total - minEmpty);
-        totalCoatBinderWtStr = totalCoatBinderWtVal > 0 ? totalCoatBinderWtVal.toFixed(4) : '';
+    if (total !== null && total > 0 && (wtUp !== null || wtLo !== null)) {
+        const values = [wtUp, wtLo].filter((v): v is number => v !== null && v > 0);
+        if (values.length > 0) {
+          const minEmpty = Math.min(...values);
+          totalCoatBinderWtVal = (total - minEmpty);
+          totalCoatBinderWtStr = totalCoatBinderWtVal > 0 ? totalCoatBinderWtVal.toFixed(4) : '';
+        }
     }
 
     // 3. Binder% = (Total Wt - Dryer Wt) / (Total Wt - min(Empty Up, Empty Lo)) * 100
     let binderPercent = '';
-    if (binderWtVal > 0 && totalCoatBinderWtVal > 0) {
+    if (binderWtVal !== null && binderWtVal > 0 && totalCoatBinderWtVal !== null && totalCoatBinderWtVal > 0) {
       binderPercent = ((binderWtVal / totalCoatBinderWtVal) * 100).toFixed(2);
     }
 
-    // 4. Amt Binder = (Total Wt - Dryer Wt) / ((Width x 200 / 1000000) / 2)
+    // 4. Amt Binder = (Total Wt - Dryer Wt) / ((Std Coating Width x Std Length / 1000000) / 2)
     let amountOfBinder = '';
-    if (binderWtVal > 0 && coatingAreaVal > 0) {
+    if (binderWtVal !== null && binderWtVal > 0 && coatingAreaVal > 0) {
       amountOfBinder = (binderWtVal / (coatingAreaVal / 2)).toFixed(2);
     }
 
-    // 1. Coating wt Up = (Dryer Wt - Empty Up) / (Width x 200 / 1000000)
-    // 2. Coating wt Lo = (Empty Up - Empty Lo) / (Width x 200 / 1000000)
+    // 1. Coating wt Up = (Dryer Wt - Empty Up) / (Std Coating Width x Std Length / 1000000)
+    // 2. Coating wt Lo = (Empty Up - Empty Lo) / (Std Coating Width x Std Length / 1000000)
     let raUp = item.raUp || '';
     let raLo = item.raLo || '';
     if (coatingAreaVal > 0) {
-        if (dryer > 0 && wtUp > 0) raUp = ((dryer - wtUp) / coatingAreaVal).toFixed(2);
-        if (wtUp > 0 && wtLo > 0) raLo = ((wtUp - wtLo) / coatingAreaVal).toFixed(2);
+        if (dryer !== null && dryer > 0 && wtUp !== null && wtUp > 0) {
+          raUp = ((dryer - wtUp) / coatingAreaVal).toFixed(2);
+        }
+        if (wtUp !== null && wtUp > 0 && wtLo !== null && wtLo > 0) {
+          raLo = ((wtUp - wtLo) / coatingAreaVal).toFixed(2);
+        }
     }
 
     return { 
+      coatingWidth: String(stdCoatingWidth),
+      length: String(stdLength),
       coatingArea: coatingAreaStr, 
       binderWt: binderWtStr, 
       totalCoatBinderWt: totalCoatBinderWtStr, 
@@ -566,9 +582,11 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
   const selectProfile = (profile: CoatingProfileSpec) => {
     const tapeMaxUp = profile.scothMagicTapeMaxUp || profile.scothMagicTapeMax || profile.scothMagicTapeUp || profile.scothMagicTape || '0.50';
     const tapeMaxLo = profile.scothMagicTapeMaxLo || profile.scothMagicTapeMax || profile.scothMagicTapeLo || profile.scothMagicTape || '0.50';
+    const stdLen = formatSpecValue(profile.stdLength) || '200';
+    const stdCoatW = formatSpecValue(profile.stdCoatingWidth) || '100';
 
-    setHeaderInfo(prev => ({
-      ...prev,
+    const newHeader = {
+      ...headerInfo,
       profileName: profile.name,
       reqWidthMin: formatSpecValue(profile.widthMin),
       reqWidthMax: formatSpecValue(profile.widthMax),
@@ -590,10 +608,22 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       reqScothMagicTape: formatSpecValue(tapeMaxUp),
       reqScothMagicTapeUp: formatSpecValue(tapeMaxUp),
       reqScothMagicTapeLo: formatSpecValue(tapeMaxLo),
-      stdLength: formatSpecValue(profile.stdLength),
-      stdCoatingWidth: formatSpecValue(profile.stdCoatingWidth)
-    }));
+      stdLength: stdLen,
+      stdCoatingWidth: stdCoatW
+    };
+
+    setHeaderInfo(newHeader);
     setProfileStatus('found');
+
+    setBatchItems(prevItems => prevItems.map(item => {
+      const updated = {
+        ...item,
+        length: stdLen,
+        coatingWidth: stdCoatW
+      };
+      const autos = calculateAutoFields(updated, newHeader);
+      return { ...updated, ...autos };
+    }));
   };
 
   useEffect(() => {
@@ -602,6 +632,8 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       if (match) {
         const tapeMaxUp = match.scothMagicTapeMaxUp || match.scothMagicTapeMax || match.scothMagicTapeUp || match.scothMagicTape || '0.50';
         const tapeMaxLo = match.scothMagicTapeMaxLo || match.scothMagicTapeMax || match.scothMagicTapeLo || match.scothMagicTape || '0.50';
+        const stdLen = formatSpecValue(match.stdLength) || '200';
+        const stdCoatW = formatSpecValue(match.stdCoatingWidth) || '100';
 
         setHeaderInfo(prev => ({
           ...prev,
@@ -625,8 +657,8 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
           reqScothMagicTape: formatSpecValue(tapeMaxUp),
           reqScothMagicTapeUp: formatSpecValue(tapeMaxUp),
           reqScothMagicTapeLo: formatSpecValue(tapeMaxLo),
-          stdLength: formatSpecValue(match.stdLength),
-          stdCoatingWidth: formatSpecValue(match.stdCoatingWidth)
+          stdLength: stdLen,
+          stdCoatingWidth: stdCoatW
         }));
         setProfileStatus('found');
       } else {
@@ -640,6 +672,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
   const handleResetForm = () => {
     setHeaderInfo({
       inspectorName: '',
+      shift: '',
       machine: '',
       mixingLot: '',
       date: new Date().toISOString().split('T')[0],
@@ -658,7 +691,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       reqScothMagicTape: '0.50',
       reqScothMagicTapeUp: '0.50',
       reqScothMagicTapeLo: '0.50',
-      stdLength: '100',
+      stdLength: '200',
       stdCoatingWidth: '100'
     });
     setProfileStatus('not-found');
@@ -669,9 +702,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       width: '', 
       heightLeft: '', 
       heightRight: '',
-      length: '100', 
+      length: '200', 
       coatingWidth: '100', 
-      coatingArea: '0.010000', 
+      coatingArea: '0.020000', 
       totalWeight: '', 
       weightAfterDryer: '', 
       wtWithoutCoatUp: '', 
@@ -754,6 +787,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
   const isScothTapeFail = (measuredStr?: string, maxLimitStr?: string) => {
     if (!measuredStr || measuredStr.trim() === '') return false;
     const s = measuredStr.trim().toLowerCase();
+    if (s === '-' || s === 'n/a' || s === 'none' || s === 'untested') return false;
     if (s === 'fail' || s === 'ng') return true;
     if (s === 'pass' || s === 'ok' || s === 'no peeling') return false;
     const val = parseFloat(measuredStr);
@@ -769,8 +803,10 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     let pass = true;
 
     const checkMinMax = (valStr?: string, minStr?: string, maxStr?: string) => {
-      if (!valStr || valStr === '') return;
-      const v = parseFloat(valStr);
+      if (!valStr) return;
+      const s = String(valStr).trim();
+      if (s === '' || s === '-' || s === 'N/A') return; // Ignored if unmeasured
+      const v = parseFloat(s);
       if (isNaN(v)) return;
       const minVal = parseFloat(minStr || '0');
       const maxVal = parseFloat(maxStr || '0');
@@ -794,7 +830,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     if (isScothTapeFail(item.scothMagicTapeLo, maxTapeLo)) pass = false;
     if (isScothTapeFail(item.scothMagicTape, maxTapeUp)) pass = false;
 
-    if (!item.lotNumber && !item.totalWeight) return 'Pending';
+    if (!item.lotNumber && !item.totalWeight && !item.partId) return 'Pending';
 
     return pass ? 'Pass' : 'Fail';
   };
@@ -838,14 +874,28 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
 
   const handleHeaderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setHeaderInfo(prev => ({ ...prev, [name]: value }));
+    setHeaderInfo(prev => {
+      const next = { ...prev, [name]: value };
+      if (name === 'stdLength' || name === 'stdCoatingWidth') {
+        setBatchItems(prevItems => prevItems.map(item => {
+          const updated = {
+            ...item,
+            length: name === 'stdLength' ? value : (item.length || next.stdLength),
+            coatingWidth: name === 'stdCoatingWidth' ? value : (item.coatingWidth || next.stdCoatingWidth)
+          };
+          const autos = calculateAutoFields(updated, next);
+          return { ...updated, ...autos };
+        }));
+      }
+      return next;
+    });
   };
 
   const handleItemChange = (id: number, field: string, value: string) => {
     setBatchItems(prevItems => prevItems.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value };
-        const autos = calculateAutoFields(updated);
+        const autos = calculateAutoFields(updated, headerInfo);
         return { ...updated, ...autos };
       }
       return item;
@@ -872,6 +922,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
           moduleTitleTh: 'การตรวจวัดการเคลือบผิว (Coating Measurement)',
           moduleTitleEn: 'Coating Thickness, Area & Binder Measurement System',
           inspector: headerInfo.inspectorName || 'Coating Technician',
+          shift: headerInfo.shift || '',
           batchLot: `${headerInfo.profileName} - ${item.lotNumber}`,
           result: decision === 'Pass' ? 'PASS' : 'REJECT',
           defectCount: decision === 'Fail' ? 1 : 0,
@@ -909,6 +960,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
         remarks: item.remarks,
         profileName: headerInfo.profileName,
         inspectorName: headerInfo.inspectorName || 'Coating Inspector',
+        shift: headerInfo.shift || '',
         machine: headerInfo.machine || 'COAT-LINE-01',
         date: headerInfo.date,
         timestamp: now.toLocaleString('th-TH')
@@ -1229,7 +1281,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
                   Profile Name *
@@ -1266,6 +1318,28 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                   placeholder={isTh ? 'ชื่อผู้ตรวจสอบ' : 'Inspector name'}
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
                 />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                  Shift (กะ)
+                </label>
+                <input
+                  list="coating-shift-options"
+                  type="text"
+                  name="shift"
+                  value={headerInfo.shift}
+                  onChange={handleHeaderChange}
+                  placeholder="e.g. Day / Night / Shift A..."
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
+                />
+                <datalist id="coating-shift-options">
+                  <option value="Day (กะกลางวัน / A)" />
+                  <option value="Night (กะกลางคืน / B)" />
+                  <option value="Shift A" />
+                  <option value="Shift B" />
+                  <option value="Shift C" />
+                </datalist>
               </div>
 
               <div>
@@ -1818,17 +1892,25 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                 </div>
 
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 sm:col-span-2">
-                  <h5 className="text-xs font-bold text-slate-300">Standard Test Dimensions (mm)</h5>
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-bold text-slate-300">Standard Test Dimensions (mm)</h5>
+                    <span className="text-[10px] text-emerald-400 font-mono font-bold">ใช้ในสูตรคำนวณพื้นที่ (Area)</span>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[10px] text-slate-500 block">Std Length</label>
-                      <input type="number" name="stdLength" value={headerInfo.stdLength} onChange={handleHeaderChange} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200" />
+                      <label className="text-[10px] text-slate-500 block">Std Length (mm)</label>
+                      <input type="number" name="stdLength" value={headerInfo.stdLength} onChange={handleHeaderChange} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono" />
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-500 block">Std Coating Width</label>
-                      <input type="number" name="stdCoatingWidth" value={headerInfo.stdCoatingWidth} onChange={handleHeaderChange} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200" />
+                      <label className="text-[10px] text-slate-500 block">Std Coating Width (mm)</label>
+                      <input type="number" name="stdCoatingWidth" value={headerInfo.stdCoatingWidth} onChange={handleHeaderChange} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono" />
                     </div>
                   </div>
+                  <p className="text-[10px] text-slate-400">
+                    {isTh 
+                      ? '* ค่า Std Coating Width และ Std Length จะถูกนำไปใช้เป็นตัวหารในสูตรคำนวณ Coating Wt Up, Coating Wt Lo และ Amt Binder โดยอัตโนมัติ' 
+                      : '* Std Coating Width and Std Length are automatically used in the calculation denominators for Coating Wt Up, Coating Wt Lo, and Amt Binder.'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1970,6 +2052,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                   <th className="px-3 py-3">Timestamp</th>
                   <th className="px-3 py-3">Coil No.</th>
                   <th className="px-3 py-3">Profile</th>
+                  <th className="px-3 py-3">Inspector</th>
                   <th className="px-3 py-3 text-center">Coat Wt (Up/Lo)</th>
                   <th className="px-3 py-3 text-center">Binder %</th>
                   <th className="px-3 py-3 text-center">Amt Binder</th>
@@ -1985,6 +2068,10 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                     <td className="px-3 py-2.5 text-slate-400 text-[11px]">{ins.timestamp}</td>
                     <td className="px-3 py-2.5 font-bold text-slate-200">{ins.lotNumber}</td>
                     <td className="px-3 py-2.5 text-indigo-300 font-semibold">{ins.profileName}</td>
+                    <td className="px-3 py-2.5 text-slate-400">
+                      <div>{ins.inspectorName}</div>
+                      {ins.shift && <div className="text-[10px] text-slate-500">Shift: {ins.shift}</div>}
+                    </td>
                     <td className="px-3 py-2.5 text-center text-emerald-400 font-bold">
                       {ins.raUp || '-'}/{ins.raLo || '-'}
                     </td>
@@ -2183,6 +2270,25 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                 </div>
 
                 <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift (กะ)</label>
+                  <input
+                    list="edit-coating-shift-options"
+                    type="text"
+                    placeholder="e.g. Day / Night / Shift A..."
+                    value={editingHistoryItem.shift || ''}
+                    onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, shift: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                  />
+                  <datalist id="edit-coating-shift-options">
+                    <option value="Day (กะกลางวัน / A)" />
+                    <option value="Night (กะกลางคืน / B)" />
+                    <option value="Shift A" />
+                    <option value="Shift B" />
+                    <option value="Shift C" />
+                  </datalist>
+                </div>
+
+                <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Status</label>
                   <select
                     value={editingHistoryItem.status}
@@ -2341,10 +2447,12 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                   </span>
                 </div>
                 <div className="p-3 bg-slate-900 rounded-xl font-mono text-emerald-300 border border-slate-800 text-xs sm:text-sm text-center">
-                  Coating wt Up = (Dryer Wt - Empty Up) / (Width × 200 / 1,000,000)
+                  Coating wt Up = (Dryer Wt - Empty Up) / (Std Coating Width × Std Length / 1,000,000)
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  {isTh ? 'น้ำหนักเคลือบผิวแถบบน = (น้ำหนักหลังอบแห้ง - น้ำหนักแผ่นบนเปล่า) ÷ พื้นที่ตัวอย่าง (กว้าง × 200 ÷ 1,000,000 ม.²)' : 'Upper coating weight in g/m² divided by the sample area in m².'}
+                  {isTh 
+                    ? 'น้ำหนักเคลือบผิวแถบบน = (น้ำหนักหลังอบแห้ง - น้ำหนักแผ่นบนเปล่า) ÷ (Std Coating Width × Std Length ÷ 1,000,000 ม.²)' 
+                    : 'Upper coating weight in g/m² = (Dryer Wt - Empty Up) ÷ (Std Coating Width × Std Length / 1,000,000 m²)'}
                 </p>
               </div>
 
@@ -2359,10 +2467,12 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                   </span>
                 </div>
                 <div className="p-3 bg-slate-900 rounded-xl font-mono text-emerald-300 border border-slate-800 text-xs sm:text-sm text-center">
-                  Coating wt Lo = (Empty Up - Empty Lo) / (Width × 200 / 1,000,000)
+                  Coating wt Lo = (Empty Up - Empty Lo) / (Std Coating Width × Std Length / 1,000,000)
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  {isTh ? 'น้ำหนักเคลือบผิวแถบล่าง = (น้ำหนักแผ่นบนเปล่า - น้ำหนักแผ่นล่างเปล่า) ÷ พื้นที่ตัวอย่าง (กว้าง × 200 ÷ 1,000,000 ม.²)' : 'Lower coating weight in g/m² divided by the sample area in m².'}
+                  {isTh 
+                    ? 'น้ำหนักเคลือบผิวแถบล่าง = (น้ำหนักแผ่นบนเปล่า - น้ำหนักแผ่นล่างเปล่า) ÷ (Std Coating Width × Std Length ÷ 1,000,000 ม.²)' 
+                    : 'Lower coating weight in g/m² = (Empty Up - Empty Lo) ÷ (Std Coating Width × Std Length / 1,000,000 m²)'}
                 </p>
               </div>
 
@@ -2395,10 +2505,12 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                   </span>
                 </div>
                 <div className="p-3 bg-slate-900 rounded-xl font-mono text-purple-300 border border-slate-800 text-xs sm:text-sm text-center">
-                  Amt Binder = (Total Wt - Dryer Wt) / ((Width × 200 / 1,000,000) / 2)
+                  Amt Binder = (Total Wt - Dryer Wt) / ((Std Coating Width × Std Length / 1,000,000) / 2)
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  {isTh ? 'ปริมาณไบน์เดอร์ = (น้ำหนักรวม - น้ำหนักหลังอบแห้ง) ÷ (พื้นที่ตัวอย่าง ÷ 2)' : 'Amount of binder per half sample area unit.'}
+                  {isTh 
+                    ? 'ปริมาณไบน์เดอร์ = (น้ำหนักรวม - น้ำหนักหลังอบแห้ง) ÷ ((Std Coating Width × Std Length ÷ 1,000,000) ÷ 2)' 
+                    : 'Amount of binder = (Total Wt - Dryer Wt) ÷ ((Std Coating Width × Std Length / 1,000,000) / 2)'}
                 </p>
               </div>
 

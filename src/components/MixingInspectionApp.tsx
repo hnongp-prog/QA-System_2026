@@ -195,6 +195,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
   // Header Metadata State (Clean initial state)
   const [headerInfo, setHeaderInfo] = useState({
     inspectorName: '',
+    shift: '',
     mixingLot: '',
     date: new Date().toISOString().split('T')[0],
     coatingType: ''
@@ -323,8 +324,11 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
 
   // Logic for judging a value against spec string (e.g. "15.0 - 17.5", "< 25", "40.0 ± 2.0")
   const checkPass = (value?: string, spec?: string): 'PASS' | 'FAIL' | 'PENDING' => {
-    if (!value || value === '' || !spec || spec === '') return 'PENDING';
-    const num = parseFloat(value);
+    if (!value || value === '') return 'PENDING';
+    const s = value.trim();
+    if (s === '-' || s === 'N/A' || s === 'none') return 'PASS'; // Untested/unmeasured point ignored from decision
+    if (!spec || spec === '') return 'PENDING';
+    const num = parseFloat(s);
     if (isNaN(num)) return 'PENDING';
 
     try {
@@ -399,6 +403,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
   const handleResetForm = () => {
     setHeaderInfo({
       inspectorName: '',
+      shift: '',
       mixingLot: '',
       date: new Date().toISOString().split('T')[0],
       coatingType: ''
@@ -593,6 +598,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
           moduleTitleTh: 'การตรวจวัดคุณภาพสารผสม (Mixing Inspection)',
           moduleTitleEn: 'Mixing Inspection System & Coating Spec Manager',
           inspector: headerInfo.inspectorName || 'Mixing Auditor',
+          shift: headerInfo.shift || '',
           batchLot: `${headerInfo.coatingType} - ${headerInfo.mixingLot}`,
           result: item.judgment === 'PASS' ? 'PASS' : 'REJECT',
           defectCount: item.judgment === 'FAIL' ? 1 : 0,
@@ -603,6 +609,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
       return {
         id: recId,
         inspectorName: headerInfo.inspectorName || 'Mixing Inspector',
+        shift: headerInfo.shift || '',
         mixingLot: headerInfo.mixingLot,
         coatingType: headerInfo.coatingType,
         lotNumber: item.lotNumber,
@@ -657,7 +664,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
     }
 
     const headers = [
-      'Timestamp', 'Inspector', 'Mixing Lot', 'Coating Type', 'Cup No',
+      'Timestamp', 'Inspector', 'Shift', 'Mixing Lot', 'Coating Type', 'Cup No',
       'Cup Wt (g)', 'Coating Wt (g)', 'Cup+Coat Wt (g)', 'Dry 105 (g)', 'Dry 430 (g)',
       'Binder Wt (g)', 'Total Coat Wt (g)', 'Binder %', 'Solid %', 'Grindometer (µm)', 'Viscosity (s)', 'Judgment', 'Remarks'
     ];
@@ -665,6 +672,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
     const csvRows = inspections.map(ins => [
       `"${ins.timestamp}"`,
       `"${ins.inspectorName}"`,
+      `"${ins.shift || '-'}"`,
       `"${ins.mixingLot || '-'}"`,
       `"${ins.coatingType}"`,
       `"${ins.lotNumber}"`,
@@ -1077,6 +1085,28 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                   placeholder={isTh ? 'ชื่อผู้ตรวจสอบ' : 'Inspector Name'}
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
                 />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                  Shift (กะ)
+                </label>
+                <input
+                  list="mixing-shift-options"
+                  type="text"
+                  name="shift"
+                  value={headerInfo.shift}
+                  onChange={handleHeaderChange}
+                  placeholder="e.g. Day / Night / Shift A..."
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
+                />
+                <datalist id="mixing-shift-options">
+                  <option value="Day (กะกลางวัน / A)" />
+                  <option value="Night (กะกลางคืน / B)" />
+                  <option value="Shift A" />
+                  <option value="Shift B" />
+                  <option value="Shift C" />
+                </datalist>
               </div>
 
               <div>
@@ -1636,7 +1666,10 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                         {ins.judgment}
                       </span>
                     </td>
-                    <td className="p-3 text-center text-slate-400">{ins.inspectorName}</td>
+                    <td className="p-3 text-center text-slate-400">
+                      <div>{ins.inspectorName}</div>
+                      {ins.shift && <div className="text-[10px] text-cyan-400 font-mono">Shift: {ins.shift}</div>}
+                    </td>
                     <td className="p-3 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
@@ -1793,6 +1826,25 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                     onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, inspectorName: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
                   />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift (กะ)</label>
+                  <input
+                    list="edit-mixing-shift-options"
+                    type="text"
+                    placeholder="e.g. Day / Night / Shift A..."
+                    value={editingHistoryItem.shift || ''}
+                    onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, shift: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                  />
+                  <datalist id="edit-mixing-shift-options">
+                    <option value="Day (กะกลางวัน / A)" />
+                    <option value="Night (กะกลางคืน / B)" />
+                    <option value="Shift A" />
+                    <option value="Shift B" />
+                    <option value="Shift C" />
+                  </datalist>
                 </div>
 
                 <div>

@@ -127,8 +127,6 @@ const DEFAULT_PROFILES: CuttingProfileSpec[] = [
     widthName: 'ความกว้าง W (Width)',
     widthTarget: '100.00', widthTolPlus: '0.50', widthTolMinus: '0.50',
     heightName: 'ความสูง H (Height)',
-    heightLeftName: 'ความสูงซ้าย H-Left',
-    heightRightName: 'ความสูงขวา H-Right',
     heightTarget: '50.00', heightTolPlus: '0.30', heightTolMinus: '0.30',
     lengthName: 'ความยาวตัด L (Length)',
     lengthTarget: '2000.00', lengthTolPlus: '2.00', lengthTolMinus: '2.00',
@@ -167,8 +165,6 @@ const DEFAULT_PROFILES: CuttingProfileSpec[] = [
     widthName: 'ความกว้างหน้าตัด (Main Width)',
     widthTarget: '200.00', widthTolPlus: '1.00', widthTolMinus: '1.00',
     heightName: 'ความสูงชิ้นงาน (Main Height)',
-    heightLeftName: 'ความสูงซ้าย H-Left',
-    heightRightName: 'ความสูงขวา H-Right',
     heightTarget: '100.00', heightTolPlus: '0.50', heightTolMinus: '0.50',
     lengthName: 'ความยาวตัดท่อน (Cut Length)',
     lengthTarget: '3000.00', lengthTolPlus: '3.00', lengthTolMinus: '3.00',
@@ -210,6 +206,7 @@ const INITIAL_INSPECTIONS: CuttingInspectionRecord[] = [
     sampleName: 'Sample 1',
     workOrder: 'WO-2026-8801',
     width: '100.15',
+    height: '50.10',
     heightLeft: '50.10',
     heightRight: '50.12',
     length: '2000.50',
@@ -235,6 +232,7 @@ const INITIAL_INSPECTIONS: CuttingInspectionRecord[] = [
     sampleName: 'Sample 2',
     workOrder: 'WO-2026-8801',
     width: '101.20',
+    height: '50.80',
     heightLeft: '50.80',
     heightRight: '50.75',
     length: '2004.00',
@@ -278,6 +276,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   // Header Metadata State (including customControlPoints and customizable point names)
   const [headerInfo, setHeaderInfo] = useState<{
     inspectorName: string;
+    shift: string;
     employeeName: string;
     machine: string;
     workOrder: string;
@@ -290,8 +289,6 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     widthTolPlus: string;
     widthTolMinus: string;
     heightName: string;
-    heightLeftName: string;
-    heightRightName: string;
     heightTarget: string;
     heightTolPlus: string;
     heightTolMinus: string;
@@ -308,6 +305,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     customControlPoints: CuttingCustomPointSpec[];
   }>({
     inspectorName: '',
+    shift: '',
     employeeName: '',
     machine: '',
     workOrder: '',
@@ -318,8 +316,6 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     widthName: 'ความกว้าง (Width)',
     widthTarget: '', widthTolPlus: '', widthTolMinus: '',
     heightName: 'ความสูง (Height)',
-    heightLeftName: 'ความสูงซ้าย H-Left',
-    heightRightName: 'ความสูงขวา H-Right',
     heightTarget: '', heightTolPlus: '', heightTolMinus: '',
     lengthName: 'ความยาว (Length)',
     lengthTarget: '', lengthTolPlus: '', lengthTolMinus: '',
@@ -339,8 +335,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     id: number;
     sampleName: string;
     width: string;
-    heightLeft: string;
-    heightRight: string;
+    height: string;
     length: string;
     bending: string;
     camber: string;
@@ -353,8 +348,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       id: Date.now(),
       sampleName: 'Sample 1',
       width: '',
-      heightLeft: '',
-      heightRight: '',
+      height: '',
       length: '',
       bending: '',
       camber: '',
@@ -478,7 +472,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     const profileGroups: Record<string, { 
       name: string; total: number; pass: number; fail: number; 
       avgWidth: number; countWidth: number;
-      avgHeightLeft: number; countHeight: number;
+      avgHeight: number; countHeight: number;
       avgLength: number; countLength: number;
       avgBending: number; countBending: number;
     }> = {};
@@ -489,7 +483,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         profileGroups[pName] = { 
           name: pName, total: 0, pass: 0, fail: 0, 
           avgWidth: 0, countWidth: 0,
-          avgHeightLeft: 0, countHeight: 0,
+          avgHeight: 0, countHeight: 0,
           avgLength: 0, countLength: 0,
           avgBending: 0, countBending: 0,
         };
@@ -501,8 +495,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       const w = parseFloat(item.width || '0');
       if (!isNaN(w) && w > 0) { profileGroups[pName].avgWidth += w; profileGroups[pName].countWidth++; }
 
-      const h = parseFloat(item.heightLeft || '0');
-      if (!isNaN(h) && h > 0) { profileGroups[pName].avgHeightLeft += h; profileGroups[pName].countHeight++; }
+      const h = parseFloat(item.height || item.heightLeft || '0');
+      if (!isNaN(h) && h > 0) { profileGroups[pName].avgHeight += h; profileGroups[pName].countHeight++; }
 
       const l = parseFloat(item.length || '0');
       if (!isNaN(l) && l > 0) { profileGroups[pName].avgLength += l; profileGroups[pName].countLength++; }
@@ -515,7 +509,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       return {
         ...g,
         avgWidth: g.countWidth > 0 ? (g.avgWidth / g.countWidth).toFixed(2) : '-',
-        avgHeightLeft: g.countHeight > 0 ? (g.avgHeightLeft / g.countHeight).toFixed(2) : '-',
+        avgHeight: g.countHeight > 0 ? (g.avgHeight / g.countHeight).toFixed(2) : '-',
         avgLength: g.countLength > 0 ? (g.avgLength / g.countLength).toFixed(2) : '-',
         avgBending: g.countBending > 0 ? (g.avgBending / g.countBending).toFixed(2) : '-',
         passRate: ((g.pass / g.total) * 100).toFixed(1),
@@ -549,8 +543,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       const sortedHistory = [...g.history].reverse(); 
       const trends = {
         width: sortedHistory.map(item => parseFloat(item.width || '0')),
-        heightLeft: sortedHistory.map(item => parseFloat(item.heightLeft || '0')),
-        heightRight: sortedHistory.map(item => parseFloat(item.heightRight || '0')),
+        height: sortedHistory.map(item => parseFloat(item.height || item.heightLeft || '0')),
         length: sortedHistory.map(item => parseFloat(item.length || '0')),
         bending: sortedHistory.map(item => parseFloat(item.bending || '0')),
         camber: sortedHistory.map(item => parseFloat(item.camber || '0')),
@@ -575,8 +568,6 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       widthTolPlus: formatSpecValue(profile.widthTolPlus),
       widthTolMinus: formatSpecValue(profile.widthTolMinus),
       heightName: profile.heightName || 'ความสูง (Height)',
-      heightLeftName: profile.heightLeftName || 'ความสูงซ้าย H-Left',
-      heightRightName: profile.heightRightName || 'ความสูงขวา H-Right',
       heightTarget: formatSpecValue(profile.heightTarget),
       heightTolPlus: formatSpecValue(profile.heightTolPlus),
       heightTolMinus: formatSpecValue(profile.heightTolMinus),
@@ -607,8 +598,6 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
           widthTolPlus: formatSpecValue(match.widthTolPlus),
           widthTolMinus: formatSpecValue(match.widthTolMinus),
           heightName: match.heightName || prev.heightName || 'ความสูง (Height)',
-          heightLeftName: match.heightLeftName || prev.heightLeftName || 'ความสูงซ้าย H-Left',
-          heightRightName: match.heightRightName || prev.heightRightName || 'ความสูงขวา H-Right',
           heightTarget: formatSpecValue(match.heightTarget),
           heightTolPlus: formatSpecValue(match.heightTolPlus),
           heightTolMinus: formatSpecValue(match.heightTolMinus),
@@ -712,8 +701,10 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   };
 
   const validateCustomPoint = (valStr: string | undefined, point: CuttingCustomPointSpec): 'Pass' | 'Fail' | 'Pending' => {
-    if (!valStr || valStr.trim() === '') return 'Pending';
-    const v = parseFloat(valStr);
+    if (!valStr) return 'Pending';
+    const s = valStr.trim();
+    if (s === '' || s === '-' || s === 'N/A' || s === 'none') return 'Pending';
+    const v = parseFloat(s);
     if (isNaN(v)) return 'Pending';
 
     if (point.evalType === 'target_tol') {
@@ -744,6 +735,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   const handleResetForm = () => {
     setHeaderInfo({
       inspectorName: '',
+      shift: '',
       employeeName: '',
       machine: '',
       workOrder: '',
@@ -754,8 +746,6 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       widthName: 'ความกว้าง (Width)',
       widthTarget: '', widthTolPlus: '', widthTolMinus: '',
       heightName: 'ความสูง (Height)',
-      heightLeftName: 'ความสูงซ้าย H-Left',
-      heightRightName: 'ความสูงขวา H-Right',
       heightTarget: '', heightTolPlus: '', heightTolMinus: '',
       lengthName: 'ความยาว (Length)',
       lengthTarget: '', lengthTolPlus: '', lengthTolMinus: '',
@@ -773,8 +763,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         id: Date.now(),
         sampleName: 'Sample 1',
         width: '',
-        heightLeft: '',
-        heightRight: '',
+        height: '',
         length: '',
         bending: '',
         camber: '',
@@ -801,8 +790,6 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       widthTolPlus: headerInfo.widthTolPlus,
       widthTolMinus: headerInfo.widthTolMinus,
       heightName: headerInfo.heightName || 'ความสูง (Height)',
-      heightLeftName: headerInfo.heightLeftName || 'ความสูงซ้าย H-Left',
-      heightRightName: headerInfo.heightRightName || 'ความสูงขวา H-Right',
       heightTarget: headerInfo.heightTarget,
       heightTolPlus: headerInfo.heightTolPlus,
       heightTolMinus: headerInfo.heightTolMinus,
@@ -848,42 +835,57 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     setDeleteConfirm(null);
   };
 
+  // Determine active measurement points defined in profile spec
+  // If no profile is selected, display all standard fields for manual entry
+  // When a profile is loaded, strictly display only points specified with targets/limits in profile spec
+  const hasProfile = Boolean(headerInfo.profileName);
+  const showWidth = !hasProfile || Boolean(headerInfo.widthTarget && headerInfo.widthTarget.trim() !== '');
+  const showHeight = !hasProfile || Boolean(headerInfo.heightTarget && headerInfo.heightTarget.trim() !== '');
+  const showLength = !hasProfile || Boolean(headerInfo.lengthTarget && headerInfo.lengthTarget.trim() !== '');
+  const showBending = !hasProfile || Boolean(headerInfo.bendingMax && headerInfo.bendingMax.trim() !== '');
+  const showCamber = !hasProfile || Boolean(headerInfo.camberMax && headerInfo.camberMax.trim() !== '');
+  const showTwist = !hasProfile || Boolean(headerInfo.twistMax && headerInfo.twistMax.trim() !== '');
+  const activeCustomPoints = headerInfo.customControlPoints || [];
+
   const judgeStatus = (item: typeof batchItems[0]): 'Pass' | 'Fail' | 'Pending' => {
     let pass = true;
 
     const checkTargetTol = (valStr?: string, targetStr?: string, tolPlusStr?: string, tolMinusStr?: string) => {
-      if (!valStr || valStr === '') return;
-      const v = parseFloat(valStr);
+      if (!valStr) return;
+      const s = String(valStr).trim();
+      if (s === '' || s === '-' || s === 'N/A') return;
+      const v = parseFloat(s);
       if (isNaN(v)) return;
       const t = parseFloat(targetStr || '0');
       const tp = parseFloat(tolPlusStr || '0');
       const tm = parseFloat(tolMinusStr || '0');
-      if (t > 0) {
+      if (t > 0 || (targetStr !== undefined && targetStr.trim() !== '')) {
         if (v > t + tp) pass = false;
         if (v < t - tm) pass = false;
       }
     };
 
     const checkMaxLimit = (valStr?: string, maxStr?: string) => {
-      if (!valStr || valStr === '') return;
-      const v = parseFloat(valStr);
+      if (!valStr) return;
+      const s = String(valStr).trim();
+      if (s === '' || s === '-' || s === 'N/A') return;
+      const v = parseFloat(s);
       if (isNaN(v)) return;
       const mx = parseFloat(maxStr || '0');
       if (mx > 0 && v > mx) pass = false;
     };
 
-    checkTargetTol(item.width, headerInfo.widthTarget, headerInfo.widthTolPlus, headerInfo.widthTolMinus);
-    checkTargetTol(item.heightLeft, headerInfo.heightTarget, headerInfo.heightTolPlus, headerInfo.heightTolMinus);
-    checkTargetTol(item.heightRight, headerInfo.heightTarget, headerInfo.heightTolPlus, headerInfo.heightTolMinus);
-    checkTargetTol(item.length, headerInfo.lengthTarget, headerInfo.lengthTolPlus, headerInfo.lengthTolMinus);
+    if (showWidth) checkTargetTol(item.width, headerInfo.widthTarget, headerInfo.widthTolPlus, headerInfo.widthTolMinus);
+    if (showHeight) checkTargetTol(item.height, headerInfo.heightTarget, headerInfo.heightTolPlus, headerInfo.heightTolMinus);
+    if (showLength) checkTargetTol(item.length, headerInfo.lengthTarget, headerInfo.lengthTolPlus, headerInfo.lengthTolMinus);
 
-    checkMaxLimit(item.bending, headerInfo.bendingMax);
-    checkMaxLimit(item.camber, headerInfo.camberMax);
-    checkMaxLimit(item.twist, headerInfo.twistMax);
+    if (showBending) checkMaxLimit(item.bending, headerInfo.bendingMax);
+    if (showCamber) checkMaxLimit(item.camber, headerInfo.camberMax);
+    if (showTwist) checkMaxLimit(item.twist, headerInfo.twistMax);
 
     // Validate Custom Control Points
-    if (headerInfo.customControlPoints && headerInfo.customControlPoints.length > 0) {
-      for (const point of headerInfo.customControlPoints) {
+    if (activeCustomPoints.length > 0) {
+      for (const point of activeCustomPoints) {
         const val = item.customPointValues?.[point.id];
         if (val !== undefined && val.trim() !== '') {
           const res = validateCustomPoint(val, point);
@@ -894,8 +896,17 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       }
     }
 
-    const hasAnyCustomVal = Object.values(item.customPointValues || {}).some(v => v && String(v).trim() !== '');
-    if (!item.sampleName && !item.width && !item.length && !hasAnyCustomVal) return 'Pending';
+    const hasAnyCustomVal = Object.values(item.customPointValues || {}).some(v => v && String(v).trim() !== '' && String(v).trim() !== '-');
+    const hasAnyMeasurement = [
+      showWidth ? item.width : '',
+      showHeight ? item.height : '',
+      showLength ? item.length : '',
+      showBending ? item.bending : '',
+      showCamber ? item.camber : '',
+      showTwist ? item.twist : ''
+    ].some(v => v && v.trim() !== '' && v.trim() !== '-');
+
+    if (!item.sampleName && !hasAnyMeasurement && !hasAnyCustomVal) return 'Pending';
 
     return pass ? 'Pass' : 'Fail';
   };
@@ -922,10 +933,9 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       {
         id: Date.now() + Math.random(),
         sampleName: `Sample ${nextNum}`,
-        width: headerInfo.widthTarget || '',
-        heightLeft: headerInfo.heightTarget || '',
-        heightRight: headerInfo.heightTarget || '',
-        length: headerInfo.lengthTarget || '',
+        width: showWidth ? (headerInfo.widthTarget || '') : '',
+        height: showHeight ? (headerInfo.heightTarget || '') : '',
+        length: showLength ? (headerInfo.lengthTarget || '') : '',
         bending: '',
         camber: '',
         twist: '',
@@ -968,7 +978,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   const saveBatch = () => {
     const validItems = batchItems.filter(item => {
       const hasCustom = Object.values(item.customPointValues || {}).some(v => v && String(v).trim() !== '');
-      return (item.sampleName || item.width || item.length || hasCustom) && judgeStatus(item) !== 'Pending';
+      return (item.sampleName || item.width || item.height || item.length || hasCustom) && judgeStatus(item) !== 'Pending';
     });
 
     if (validItems.length === 0) {
@@ -988,8 +998,9 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         sampleName: item.sampleName,
         workOrder: headerInfo.workOrder,
         width: item.width,
-        heightLeft: item.heightLeft,
-        heightRight: item.heightRight,
+        height: item.height,
+        heightLeft: item.height,
+        heightRight: item.height,
         length: item.length,
         bending: item.bending,
         camber: item.camber,
@@ -999,6 +1010,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         remarks: item.remarks,
         profileName: headerInfo.profileName,
         inspectorName: headerInfo.inspectorName || 'Cutting Inspector',
+        shift: headerInfo.shift || '',
         employeeName: headerInfo.employeeName || '-',
         machine: headerInfo.machine || 'CUT-LINE-01',
         date: headerInfo.date,
@@ -1014,7 +1026,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
         const resText = isPass 
           ? `PASS (Standard & ${headerInfo.customControlPoints.length} Custom Points within tolerances)` 
-          : `FAIL / Out of Spec: W:${item.width || '-'}mm, H:${item.heightLeft || '-'}mm, L:${item.length || '-'}mm, Bending:${item.bending || '-'}mm ${customPointsSummary ? `[${customPointsSummary}]` : ''}`;
+          : `FAIL / Out of Spec: W:${item.width || '-'}mm, H:${item.height || '-'}mm, L:${item.length || '-'}mm, Bending:${item.bending || '-'}mm ${customPointsSummary ? `[${customPointsSummary}]` : ''}`;
 
         onLogNewActivity({
           id: recId,
@@ -1023,6 +1035,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
           moduleTitleTh: 'ตรวจสอบขนาดตัดชิ้นงาน (Cutting Dimension & Dynamic Profile Points)',
           moduleTitleEn: 'Cutting Dimension & Dynamic Profile Points Inspection',
           inspector: headerInfo.inspectorName || 'Cutting Inspector',
+          shift: headerInfo.shift || '',
           batchLot: `Coil: ${headerInfo.coilNo || '-'} (Profile: ${headerInfo.profileName})`,
           result: isPass ? 'PASS' : 'REJECT',
           defectCount: isPass ? 0 : 1,
@@ -1046,8 +1059,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         id: Date.now(),
         sampleName: 'Sample 1',
         width: '',
-        heightLeft: '',
-        heightRight: '',
+        height: '',
         length: '',
         bending: '',
         camber: '',
@@ -1088,7 +1100,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
     const baseHeaders = [
       'Timestamp', 'Inspector', 'Employee', 'Machine', 'Work Order', 'Coil No', 'Profile Name', 'Part No', 'Sample Name', 
-      'Width (mm)', 'H-Left (mm)', 'H-Right (mm)', 'Length (mm)', 'Bending (mm/m)', 'Camber (mm/m)', 'Twist (deg/m)'
+      'Width (mm)', 'Height (mm)', 'Length (mm)', 'Bending (mm/m)', 'Camber (mm/m)', 'Twist (deg/m)'
     ];
 
     const customHeaders = customPointKeys.map(k => `"${allCustomPointMap[k]}"`);
@@ -1105,7 +1117,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         `"${ins.profileName}"`,
         `"${ins.partId}"`,
         `"${ins.sampleName || '-'}"`,
-        ins.width || '-', ins.heightLeft || '-', ins.heightRight || '-', ins.length || '-',
+        ins.width || '-', ins.height || ins.heightLeft || '-', ins.length || '-',
         ins.bending || '-', ins.camber || '-', ins.twist || '-'
       ];
 
@@ -1451,6 +1463,28 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                  Shift (กะ)
+                </label>
+                <input
+                  list="cutting-shift-options"
+                  type="text"
+                  name="shift"
+                  value={headerInfo.shift}
+                  onChange={handleHeaderChange}
+                  placeholder="e.g. Day / Night / Shift A..."
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
+                />
+                <datalist id="cutting-shift-options">
+                  <option value="Day (กะกลางวัน / A)" />
+                  <option value="Night (กะกลางคืน / B)" />
+                  <option value="Shift A" />
+                  <option value="Shift B" />
+                  <option value="Shift C" />
+                </datalist>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
                   Operator Employee
                 </label>
                 <input
@@ -1494,12 +1528,12 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
             {/* Loaded Target Limits Quick Bar */}
             <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800/80 text-xs space-y-2.5">
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-slate-300">
-                <div><span className="text-slate-500">{headerInfo.widthName || 'Width'}:</span> <strong className="text-indigo-300">{headerInfo.widthTarget ? `${headerInfo.widthTarget} (+${headerInfo.widthTolPlus}/-${headerInfo.widthTolMinus}) mm` : '-'}</strong></div>
-                <div><span className="text-slate-500">{headerInfo.heightName || 'Height'}:</span> <strong className="text-indigo-300">{headerInfo.heightTarget ? `${headerInfo.heightTarget} (+${headerInfo.heightTolPlus}/-${headerInfo.heightTolMinus}) mm` : '-'}</strong></div>
-                <div><span className="text-slate-500">{headerInfo.lengthName || 'Length'}:</span> <strong className="text-indigo-300">{headerInfo.lengthTarget ? `${headerInfo.lengthTarget} (+${headerInfo.lengthTolPlus}/-${headerInfo.lengthTolMinus}) mm` : '-'}</strong></div>
-                <div><span className="text-slate-500">{headerInfo.bendingName || 'Bending'}:</span> <strong className="text-amber-300">{headerInfo.bendingMax ? `≤ ${headerInfo.bendingMax} mm/m` : '-'}</strong></div>
-                <div><span className="text-slate-500">{headerInfo.camberName || 'Camber'}:</span> <strong className="text-amber-300">{headerInfo.camberMax ? `≤ ${headerInfo.camberMax} mm/m` : '-'}</strong></div>
-                <div><span className="text-slate-500">{headerInfo.twistName || 'Twist'}:</span> <strong className="text-amber-300">{headerInfo.twistMax ? `≤ ${headerInfo.twistMax} deg/m` : '-'}</strong></div>
+                {showWidth && <div><span className="text-slate-500">{headerInfo.widthName || 'Width'}:</span> <strong className="text-indigo-300">{headerInfo.widthTarget ? `${headerInfo.widthTarget} (+${headerInfo.widthTolPlus}/-${headerInfo.widthTolMinus}) mm` : '-'}</strong></div>}
+                {showHeight && <div><span className="text-slate-500">{headerInfo.heightName || 'Height'}:</span> <strong className="text-indigo-300">{headerInfo.heightTarget ? `${headerInfo.heightTarget} (+${headerInfo.heightTolPlus}/-${headerInfo.heightTolMinus}) mm` : '-'}</strong></div>}
+                {showLength && <div><span className="text-slate-500">{headerInfo.lengthName || 'Length'}:</span> <strong className="text-indigo-300">{headerInfo.lengthTarget ? `${headerInfo.lengthTarget} (+${headerInfo.lengthTolPlus}/-${headerInfo.lengthTolMinus}) mm` : '-'}</strong></div>}
+                {showBending && <div><span className="text-slate-500">{headerInfo.bendingName || 'Bending'}:</span> <strong className="text-amber-300">{headerInfo.bendingMax ? `≤ ${headerInfo.bendingMax} mm/m` : '-'}</strong></div>}
+                {showCamber && <div><span className="text-slate-500">{headerInfo.camberName || 'Camber'}:</span> <strong className="text-amber-300">{headerInfo.camberMax ? `≤ ${headerInfo.camberMax} mm/m` : '-'}</strong></div>}
+                {showTwist && <div><span className="text-slate-500">{headerInfo.twistName || 'Twist'}:</span> <strong className="text-amber-300">{headerInfo.twistMax ? `≤ ${headerInfo.twistMax} deg/m` : '-'}</strong></div>}
                 <div><span className="text-slate-500">Part No:</span> <strong className="text-purple-300">{headerInfo.partNo || '-'}</strong></div>
               </div>
 
@@ -1573,13 +1607,12 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                     <tr className="bg-slate-950 text-slate-400 font-bold border-b border-slate-800 text-[11px] uppercase">
                       <th className="p-2.5 w-10 text-center">#</th>
                       <th className="p-2.5 min-w-[130px]">{isTh ? 'ชื่อตัวอย่าง / Sample' : 'Sample Name'}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.widthName || (isTh ? 'Width (mm)' : 'Width')}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.heightLeftName || (isTh ? 'H-Left (mm)' : 'Height L')}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.heightRightName || (isTh ? 'H-Right (mm)' : 'Height R')}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.lengthName || (isTh ? 'Length (mm)' : 'Length')}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.bendingName || (isTh ? 'Bending (mm/m)' : 'Bending')}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.camberName || (isTh ? 'Camber (mm/m)' : 'Camber')}</th>
-                      <th className="p-2.5 min-w-[100px] text-center">{headerInfo.twistName || (isTh ? 'Twist (deg/m)' : 'Twist')}</th>
+                      {showWidth && <th className="p-2.5 min-w-[100px] text-center">{headerInfo.widthName || (isTh ? 'ความกว้าง W (mm)' : 'Width (mm)')}</th>}
+                      {showHeight && <th className="p-2.5 min-w-[100px] text-center">{headerInfo.heightName || (isTh ? 'ความสูง H (mm)' : 'Height (mm)')}</th>}
+                      {showLength && <th className="p-2.5 min-w-[100px] text-center">{headerInfo.lengthName || (isTh ? 'ความยาว L (mm)' : 'Length (mm)')}</th>}
+                      {showBending && <th className="p-2.5 min-w-[100px] text-center">{headerInfo.bendingName || (isTh ? 'ความโก่ง (mm/m)' : 'Bending (mm/m)')}</th>}
+                      {showCamber && <th className="p-2.5 min-w-[100px] text-center">{headerInfo.camberName || (isTh ? 'ความคด (mm/m)' : 'Camber (mm/m)')}</th>}
+                      {showTwist && <th className="p-2.5 min-w-[100px] text-center">{headerInfo.twistName || (isTh ? 'ความบิด (deg/m)' : 'Twist (deg/m)')}</th>}
                       
                       {/* Dynamic Columns for Custom Control Points */}
                       {headerInfo.customControlPoints?.map((cp) => (
@@ -1621,88 +1654,88 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                           </td>
 
                           {/* Width */}
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.width}
-                              onChange={(e) => handleItemChange(item.id, 'width', e.target.value)}
-                              placeholder={headerInfo.widthTarget}
-                              className="w-full bg-slate-950 border border-slate-800 text-slate-100 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500 font-semibold"
-                            />
-                          </td>
+                          {showWidth && (
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.width}
+                                onChange={(e) => handleItemChange(item.id, 'width', e.target.value)}
+                                placeholder={headerInfo.widthTarget}
+                                className="w-full bg-slate-950 border border-slate-800 text-slate-100 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500 font-semibold"
+                              />
+                            </td>
+                          )}
 
-                          {/* Height Left */}
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.heightLeft}
-                              onChange={(e) => handleItemChange(item.id, 'heightLeft', e.target.value)}
-                              placeholder={headerInfo.heightTarget}
-                              className="w-full bg-slate-950 border border-slate-800 text-slate-100 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500 font-semibold"
-                            />
-                          </td>
-
-                          {/* Height Right */}
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.heightRight}
-                              onChange={(e) => handleItemChange(item.id, 'heightRight', e.target.value)}
-                              placeholder={headerInfo.heightTarget}
-                              className="w-full bg-slate-950 border border-slate-800 text-slate-100 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500 font-semibold"
-                            />
-                          </td>
+                          {/* Height */}
+                          {showHeight && (
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.height}
+                                onChange={(e) => handleItemChange(item.id, 'height', e.target.value)}
+                                placeholder={headerInfo.heightTarget}
+                                className="w-full bg-slate-950 border border-slate-800 text-slate-100 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500 font-semibold"
+                              />
+                            </td>
+                          )}
 
                           {/* Length */}
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.length}
-                              onChange={(e) => handleItemChange(item.id, 'length', e.target.value)}
-                              placeholder={headerInfo.lengthTarget}
-                              className="w-full bg-slate-950 border border-slate-800 text-slate-100 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500 font-semibold"
-                            />
-                          </td>
+                          {showLength && (
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.length}
+                                onChange={(e) => handleItemChange(item.id, 'length', e.target.value)}
+                                placeholder={headerInfo.lengthTarget}
+                                className="w-full bg-slate-950 border border-slate-800 text-slate-100 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500 font-semibold"
+                              />
+                            </td>
+                          )}
 
                           {/* Bending */}
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.bending}
-                              onChange={(e) => handleItemChange(item.id, 'bending', e.target.value)}
-                              placeholder={`≤ ${headerInfo.bendingMax}`}
-                              className="w-full bg-slate-950 border border-slate-800 text-amber-300 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-amber-500 font-semibold"
-                            />
-                          </td>
+                          {showBending && (
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.bending}
+                                onChange={(e) => handleItemChange(item.id, 'bending', e.target.value)}
+                                placeholder={`≤ ${headerInfo.bendingMax}`}
+                                className="w-full bg-slate-950 border border-slate-800 text-amber-300 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-amber-500 font-semibold"
+                              />
+                            </td>
+                          )}
 
                           {/* Camber */}
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.camber}
-                              onChange={(e) => handleItemChange(item.id, 'camber', e.target.value)}
-                              placeholder={`≤ ${headerInfo.camberMax}`}
-                              className="w-full bg-slate-950 border border-slate-800 text-amber-300 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-amber-500 font-semibold"
-                            />
-                          </td>
+                          {showCamber && (
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.camber}
+                                onChange={(e) => handleItemChange(item.id, 'camber', e.target.value)}
+                                placeholder={`≤ ${headerInfo.camberMax}`}
+                                className="w-full bg-slate-950 border border-slate-800 text-amber-300 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-amber-500 font-semibold"
+                              />
+                            </td>
+                          )}
 
                           {/* Twist */}
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.twist}
-                              onChange={(e) => handleItemChange(item.id, 'twist', e.target.value)}
-                              placeholder={`≤ ${headerInfo.twistMax}`}
-                              className="w-full bg-slate-950 border border-slate-800 text-purple-300 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-purple-500 font-semibold"
-                            />
-                          </td>
+                          {showTwist && (
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.twist}
+                                onChange={(e) => handleItemChange(item.id, 'twist', e.target.value)}
+                                placeholder={`≤ ${headerInfo.twistMax}`}
+                                className="w-full bg-slate-950 border border-slate-800 text-purple-300 font-mono text-center rounded-lg px-2 py-1.5 focus:outline-none focus:border-purple-500 font-semibold"
+                              />
+                            </td>
+                          )}
 
                           {/* Dynamic Custom Control Point Input Cells */}
                           {headerInfo.customControlPoints?.map((cp) => {
@@ -2551,7 +2584,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
                     <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300 pt-1">
                       <div>Width Avg: <strong className="text-indigo-300">{p.avgWidth} mm</strong></div>
-                      <div>Height Avg: <strong className="text-indigo-300">{p.avgHeightLeft} mm</strong></div>
+                      <div>Height Avg: <strong className="text-indigo-300">{p.avgHeight || p.avgHeightLeft} mm</strong></div>
                       <div>Length Avg: <strong className="text-indigo-300">{p.avgLength} mm</strong></div>
                       <div>Bending Avg: <strong className="text-amber-300">{p.avgBending} mm/m</strong></div>
                     </div>
@@ -2606,7 +2639,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <Sparkline data={group.trends.width} color="#818cf8" label="Width (mm)" />
-                      <Sparkline data={group.trends.heightLeft} color="#34d399" label="Height Left (mm)" />
+                      <Sparkline data={group.trends.height || group.trends.heightLeft} color="#34d399" label="Height (mm)" />
                       <Sparkline data={group.trends.length} color="#a78bfa" label="Length (mm)" />
                       <Sparkline data={group.trends.bending} color="#f59e0b" label="Bending (mm/m)" />
                     </div>
@@ -2656,7 +2689,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                   <th className="p-2.5">Profile & Part</th>
                   <th className="p-2.5">Coil / WO</th>
                   <th className="p-2.5 text-center">Width</th>
-                  <th className="p-2.5 text-center">Height L/R</th>
+                  <th className="p-2.5 text-center">Height</th>
                   <th className="p-2.5 text-center">Length</th>
                   <th className="p-2.5 text-center">Bending</th>
                   <th className="p-2.5 text-center">Camber</th>
@@ -2686,7 +2719,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                         <div className="text-[10px] text-slate-400">WO: {ins.workOrder || '-'}</div>
                       </td>
                       <td className="p-2.5 text-center font-mono font-semibold text-slate-200">{ins.width || '-'}</td>
-                      <td className="p-2.5 text-center font-mono font-semibold text-slate-200">{ins.heightLeft || '-'}/{ins.heightRight || '-'}</td>
+                      <td className="p-2.5 text-center font-mono font-semibold text-slate-200">{ins.height || ins.heightLeft || '-'}</td>
                       <td className="p-2.5 text-center font-mono font-semibold text-slate-200">{ins.length || '-'}</td>
                       <td className="p-2.5 text-center font-mono font-semibold text-amber-300">{ins.bending || '-'}</td>
                       <td className="p-2.5 text-center font-mono font-semibold text-amber-300">{ins.camber || '-'}</td>
@@ -2707,6 +2740,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                       </td>
                       <td className="p-2.5 text-slate-300">
                         <div>{ins.inspectorName}</div>
+                        {ins.shift && <div className="text-[10px] text-cyan-400">Shift: {ins.shift}</div>}
                         <div className="text-[10px] text-slate-500">Op: {ins.employeeName || '-'}</div>
                       </td>
                       <td className="p-2.5 text-center">
@@ -2871,6 +2905,25 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                 </div>
 
                 <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift (กะ)</label>
+                  <input
+                    list="edit-cutting-shift-options"
+                    type="text"
+                    placeholder="e.g. Day / Night / Shift A..."
+                    value={editingHistoryItem.shift || ''}
+                    onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, shift: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                  />
+                  <datalist id="edit-cutting-shift-options">
+                    <option value="Day (กะกลางวัน / A)" />
+                    <option value="Night (กะกลางคืน / B)" />
+                    <option value="Shift A" />
+                    <option value="Shift B" />
+                    <option value="Shift C" />
+                  </datalist>
+                </div>
+
+                <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Status</label>
                   <select
                     value={editingHistoryItem.status}
@@ -2896,20 +2949,16 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Height Left (mm)</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Height (mm)</label>
                     <input
                       type="text"
-                      value={editingHistoryItem.heightLeft || ''}
-                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, heightLeft: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Height Right (mm)</label>
-                    <input
-                      type="text"
-                      value={editingHistoryItem.heightRight || ''}
-                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, heightRight: e.target.value })}
+                      value={editingHistoryItem.height || editingHistoryItem.heightLeft || ''}
+                      onChange={(e) => setEditingHistoryItem({ 
+                        ...editingHistoryItem, 
+                        height: e.target.value,
+                        heightLeft: e.target.value,
+                        heightRight: e.target.value
+                      })}
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
                     />
                   </div>

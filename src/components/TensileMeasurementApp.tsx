@@ -216,6 +216,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   const [mainProcess, setMainProcess] = useState('');
   const [mainMachine, setMainMachine] = useState('');
   const [mainInspector, setMainInspector] = useState('');
+  const [mainShift, setMainShift] = useState('');
 
   // Active top blank input row for rapid continuous entry
   const [topRow, setTopRow] = useState<{
@@ -345,6 +346,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     setMainProcess('');
     setMainMachine('');
     setMainInspector('');
+    setMainShift('');
     handleResetTopRow();
     setEnteredRows([]);
   };
@@ -359,25 +361,52 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     elong: string;
   }): 'PASS' | 'FAIL' | 'PENDING' => {
     if (!matchedSpec) return 'PENDING';
-    const w = parseFloat(row.width);
-    const hl = parseFloat(row.h_left);
-    const hr = parseFloat(row.h_right);
-    const t = parseFloat(row.tensile);
-    const y = parseFloat(row.yield_val);
-    const e = parseFloat(row.elong);
+    const parseVal = (v: string) => {
+      if (v === undefined || v === null) return null;
+      const s = String(v).trim();
+      if (s === '' || s === '-' || s === 'N/A') return null; // unmeasured / exempt
+      const num = parseFloat(s);
+      return isNaN(num) ? NaN : num;
+    };
 
-    if (isNaN(w) || isNaN(hl) || isNaN(hr) || isNaN(t) || isNaN(y) || isNaN(e)) {
+    const w = parseVal(row.width);
+    const hl = parseVal(row.h_left);
+    const hr = parseVal(row.h_right);
+    const t = parseVal(row.tensile);
+    const y = parseVal(row.yield_val);
+    const e = parseVal(row.elong);
+
+    // If any field has invalid NaN (non-numeric text other than '-' or blank), return PENDING
+    if ([w, hl, hr, t, y, e].some(v => typeof v === 'number' && isNaN(v))) {
       return 'PENDING';
     }
 
-    const passDim = w >= matchedSpec.min_w && w <= matchedSpec.max_w &&
-                    hl >= matchedSpec.min_h && hl <= matchedSpec.max_h &&
-                    hr >= matchedSpec.min_h && hr <= matchedSpec.max_h;
-    const passTensile = t >= matchedSpec.tensile;
-    const passYield = y >= matchedSpec.yield;
-    const passElong = isElongPass(e, matchedSpec);
+    // Check if at least one field has been measured
+    const hasAnyMeasured = [w, hl, hr, t, y, e].some(v => v !== null);
+    if (!hasAnyMeasured) return 'PENDING';
 
-    return passDim && passTensile && passYield && passElong ? 'PASS' : 'FAIL';
+    let pass = true;
+
+    if (w !== null) {
+      if (w < matchedSpec.min_w || w > matchedSpec.max_w) pass = false;
+    }
+    if (hl !== null) {
+      if (hl < matchedSpec.min_h || hl > matchedSpec.max_h) pass = false;
+    }
+    if (hr !== null) {
+      if (hr < matchedSpec.min_h || hr > matchedSpec.max_h) pass = false;
+    }
+    if (t !== null) {
+      if (t < matchedSpec.tensile) pass = false;
+    }
+    if (y !== null) {
+      if (y < matchedSpec.yield) pass = false;
+    }
+    if (e !== null) {
+      if (!isElongPass(e, matchedSpec)) pass = false;
+    }
+
+    return pass ? 'PASS' : 'FAIL';
   };
 
   // Add Item from Top Row into List (Pushes down previous items)
@@ -385,7 +414,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     if (e) e.preventDefault();
 
     // Check if at least some key values are typed
-    const hasValues = topRow.tensile.trim() || topRow.width.trim() || topRow.coil_no.trim() || topRow.sample_name.trim();
+    const hasValues = topRow.tensile.trim() || topRow.width.trim() || topRow.h_left.trim() || topRow.h_right.trim() || topRow.yield_val.trim() || topRow.elong.trim() || topRow.coil_no.trim() || topRow.sample_name.trim();
     if (!hasValues) {
       alert(isTh ? 'กรุณากรอกข้อมูลในฟิลด์แถวด้านบนก่อนกดเพิ่มรายการ' : 'Please enter measurement values in the top row before adding');
       return;
@@ -401,12 +430,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       coil_no: cleanCoil,
       heat_no: cleanHeat,
       sample_name: cleanSample,
-      width: topRow.width,
-      h_left: topRow.h_left,
-      h_right: topRow.h_right,
-      tensile: topRow.tensile,
-      yield_val: topRow.yield_val,
-      elong: topRow.elong
+      width: topRow.width.trim() || '-',
+      h_left: topRow.h_left.trim() || '-',
+      h_right: topRow.h_right.trim() || '-',
+      tensile: topRow.tensile.trim() || '-',
+      yield_val: topRow.yield_val.trim() || '-',
+      elong: topRow.elong.trim() || '-'
     };
 
     // Prepend to enteredRows so previous rows shift downward
@@ -455,18 +484,19 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     const rowsToProcess = [...enteredRows];
 
     // If operator has filled numbers in the top row without clicking Add, include it too
-    if (topRow.width.trim() && topRow.tensile.trim()) {
+    const hasTopRowData = (topRow.width.trim() && topRow.width.trim() !== '-') || (topRow.tensile.trim() && topRow.tensile.trim() !== '-');
+    if (hasTopRowData) {
       rowsToProcess.unshift({
         id: `entry-top-${Date.now()}`,
         coil_no: topRow.coil_no.trim().toUpperCase() || 'COIL-01',
         heat_no: topRow.heat_no.trim().toUpperCase() || 'HEAT-01',
         sample_name: topRow.sample_name.trim().toUpperCase() || `SAMPLE-${rowsToProcess.length + 1}`,
-        width: topRow.width,
-        h_left: topRow.h_left,
-        h_right: topRow.h_right,
-        tensile: topRow.tensile,
-        yield_val: topRow.yield_val,
-        elong: topRow.elong
+        width: topRow.width.trim() || '-',
+        h_left: topRow.h_left.trim() || '-',
+        h_right: topRow.h_right.trim() || '-',
+        tensile: topRow.tensile.trim() || '-',
+        yield_val: topRow.yield_val.trim() || '-',
+        elong: topRow.elong.trim() || '-'
       });
     }
 
@@ -478,17 +508,26 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     const newRecordsToSave: TensileRecord[] = [];
     const now = new Date();
 
+    const parseOrDash = (v: string) => {
+      const s = String(v || '').trim();
+      if (!s || s === '-' || s === 'N/A') return '-';
+      const n = parseFloat(s);
+      return isNaN(n) ? '-' : n;
+    };
+
     rowsToProcess.forEach((row, i) => {
-      const w = parseFloat(row.width);
-      const hl = parseFloat(row.h_left);
-      const hr = parseFloat(row.h_right);
-      const t = parseFloat(row.tensile);
-      const y = parseFloat(row.yield_val);
-      const e = parseFloat(row.elong);
+      const w = parseOrDash(row.width);
+      const hl = parseOrDash(row.h_left);
+      const hr = parseOrDash(row.h_right);
+      const t = parseOrDash(row.tensile);
+      const y = parseOrDash(row.yield_val);
+      const e = parseOrDash(row.elong);
 
-      if (isNaN(w) || isNaN(t)) return;
+      // Check if at least one field has been entered
+      if ([w, hl, hr, t, y, e].every(v => v === '-')) return;
 
-      const decision = evaluateRow(row) === 'PASS' ? 'PASS' : 'FAIL';
+      const evalResult = evaluateRow(row);
+      const decision = evalResult === 'FAIL' ? 'FAIL' : 'PASS';
       const recId = `rec-${Date.now()}-${i}`;
 
       const rec: TensileRecord = {
@@ -499,6 +538,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
         process: matchedSpec.process,
         machine: mainMachine.trim().toUpperCase() || 'TENSILE-M01',
         inspector: mainInspector.trim() || 'IPQA Officer',
+        shift: mainShift.trim() || '',
         sample_name: row.sample_name.trim().toUpperCase() || `SAMPLE-${i+1}`,
         width: w,
         h_left: hl,
@@ -526,6 +566,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
           moduleTitleTh: 'การทดสอบแรงดึง (Tensile Measurement)',
           moduleTitleEn: 'Tensile Measurement & Quality Spec System',
           inspector: mainInspector.trim() || 'IPQA Officer',
+          shift: mainShift.trim() || '',
           batchLot: `${matchedSpec.profile} - ${row.coil_no}`,
           result: decision === 'PASS' ? 'PASS' : 'REJECT',
           defectCount: decision === 'FAIL' ? 1 : 0,
@@ -748,9 +789,9 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
         index: i + 1,
         coil: r.coil_no,
         sample: r.sample_name,
-        tensile: r.tensile,
-        yield: r.yield,
-        elong: r.elong,
+        tensile: typeof r.tensile === 'number' ? r.tensile : (parseFloat(String(r.tensile)) || null),
+        yield: typeof r.yield === 'number' ? r.yield : (parseFloat(String(r.yield)) || null),
+        elong: typeof r.elong === 'number' ? r.elong : (parseFloat(String(r.elong)) || null),
         specTensile: recordSpec?.tensile || 400,
         specYield: recordSpec?.yield || 250,
         specElongMin: recordSpec?.elong ?? 20,
@@ -1030,7 +1071,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
                   Profile Name *
@@ -1084,6 +1125,27 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                   placeholder={isTh ? 'ชื่อผู้ตรวจสอบ (Inspector)' : 'Inspector Name'}
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500"
                 />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                  Shift (กะ)
+                </label>
+                <input
+                  list="tensile-shift-options"
+                  type="text"
+                  value={mainShift}
+                  onChange={(e) => setMainShift(e.target.value)}
+                  placeholder="e.g. Day / Night / Shift A..."
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500"
+                />
+                <datalist id="tensile-shift-options">
+                  <option value="Day (กะกลางวัน / A)" />
+                  <option value="Night (กะกลางคืน / B)" />
+                  <option value="Shift A" />
+                  <option value="Shift B" />
+                  <option value="Shift C" />
+                </datalist>
               </div>
             </div>
 
@@ -1214,12 +1276,11 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 <div>
                   <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">W (mm)</label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
                     value={topRow.width}
                     onChange={(e) => setTopRow(prev => ({ ...prev, width: e.target.value }))}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={matchedSpec ? `${matchedSpec.min_w}` : '0.00'}
+                    placeholder={matchedSpec ? `${matchedSpec.min_w}` : '0.00 / -'}
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400"
                   />
                 </div>
@@ -1227,12 +1288,11 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 <div>
                   <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">H_Left</label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
                     value={topRow.h_left}
                     onChange={(e) => setTopRow(prev => ({ ...prev, h_left: e.target.value }))}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={matchedSpec ? `${matchedSpec.min_h}` : '0.00'}
+                    placeholder={matchedSpec ? `${matchedSpec.min_h}` : '0.00 / -'}
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400"
                   />
                 </div>
@@ -1240,12 +1300,11 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 <div>
                   <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">H_Right</label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
                     value={topRow.h_right}
                     onChange={(e) => setTopRow(prev => ({ ...prev, h_right: e.target.value }))}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={matchedSpec ? `${matchedSpec.max_h}` : '0.00'}
+                    placeholder={matchedSpec ? `${matchedSpec.max_h}` : '0.00 / -'}
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400"
                   />
                 </div>
@@ -1253,12 +1312,11 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 <div>
                   <label className="text-[9px] font-bold text-cyan-400 block uppercase mb-1">Tensile (MPa)</label>
                   <input
-                    type="number"
-                    step="0.1"
+                    type="text"
                     value={topRow.tensile}
                     onChange={(e) => setTopRow(prev => ({ ...prev, tensile: e.target.value }))}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={matchedSpec ? `≥${matchedSpec.tensile}` : 'MPa'}
+                    placeholder={matchedSpec ? `≥${matchedSpec.tensile}` : 'MPa / -'}
                     className="w-full bg-slate-900 border border-cyan-900/80 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
                   />
                 </div>
@@ -1266,12 +1324,11 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 <div>
                   <label className="text-[9px] font-bold text-emerald-400 block uppercase mb-1">Yield (MPa)</label>
                   <input
-                    type="number"
-                    step="0.1"
+                    type="text"
                     value={topRow.yield_val}
                     onChange={(e) => setTopRow(prev => ({ ...prev, yield_val: e.target.value }))}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={matchedSpec ? `≥${matchedSpec.yield}` : 'MPa'}
+                    placeholder={matchedSpec ? `≥${matchedSpec.yield}` : 'MPa / -'}
                     className="w-full bg-slate-900 border border-emerald-900/80 rounded-lg px-2.5 py-1.5 text-xs text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
                   />
                 </div>
@@ -1279,12 +1336,11 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 <div>
                   <label className="text-[9px] font-bold text-amber-400 block uppercase mb-1">Elong (%)</label>
                   <input
-                    type="number"
-                    step="0.1"
+                    type="text"
                     value={topRow.elong}
                     onChange={(e) => setTopRow(prev => ({ ...prev, elong: e.target.value }))}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={matchedSpec ? formatElongationSpec(matchedSpec) : '%'}
+                    placeholder={matchedSpec ? formatElongationSpec(matchedSpec) : '% / -'}
                     className="w-full bg-slate-900 border border-amber-900/80 rounded-lg px-2.5 py-1.5 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
                   />
                 </div>
@@ -1427,8 +1483,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                           <div>
                             <label className="text-[8px] font-bold text-slate-500 block uppercase">W (mm)</label>
                             <input
-                              type="number"
-                              step="0.01"
+                              type="text"
                               value={row.width}
                               onChange={(e) => handleUpdateEnteredRow(row.id, 'width', e.target.value)}
                               className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
@@ -1438,8 +1493,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                           <div>
                             <label className="text-[8px] font-bold text-slate-500 block uppercase">H_Left</label>
                             <input
-                              type="number"
-                              step="0.01"
+                              type="text"
                               value={row.h_left}
                               onChange={(e) => handleUpdateEnteredRow(row.id, 'h_left', e.target.value)}
                               className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
@@ -1449,8 +1503,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                           <div>
                             <label className="text-[8px] font-bold text-slate-500 block uppercase">H_Right</label>
                             <input
-                              type="number"
-                              step="0.01"
+                              type="text"
                               value={row.h_right}
                               onChange={(e) => handleUpdateEnteredRow(row.id, 'h_right', e.target.value)}
                               className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
@@ -1460,8 +1513,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                           <div>
                             <label className="text-[8px] font-bold text-cyan-400 block uppercase">Tensile (MPa)</label>
                             <input
-                              type="number"
-                              step="0.1"
+                              type="text"
                               value={row.tensile}
                               onChange={(e) => handleUpdateEnteredRow(row.id, 'tensile', e.target.value)}
                               className="w-full bg-slate-900 border border-cyan-900/60 rounded px-2 py-1 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
@@ -1471,8 +1523,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                           <div>
                             <label className="text-[8px] font-bold text-emerald-400 block uppercase">Yield (MPa)</label>
                             <input
-                              type="number"
-                              step="0.1"
+                              type="text"
                               value={row.yield_val}
                               onChange={(e) => handleUpdateEnteredRow(row.id, 'yield_val', e.target.value)}
                               className="w-full bg-slate-900 border border-emerald-900/60 rounded px-2 py-1 text-xs text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
@@ -1482,8 +1533,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                           <div>
                             <label className="text-[8px] font-bold text-amber-400 block uppercase">Elong (%)</label>
                             <input
-                              type="number"
-                              step="0.1"
+                              type="text"
                               value={row.elong}
                               onChange={(e) => handleUpdateEnteredRow(row.id, 'elong', e.target.value)}
                               className="w-full bg-slate-900 border border-amber-900/60 rounded px-2 py-1 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
@@ -1592,7 +1642,9 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                     <tr key={r.id} className="hover:bg-slate-950/40">
                       <td className="px-4 py-3 font-mono">
                         <strong className="text-cyan-300 text-xs block">{r.coil_no}</strong>
-                        <span className="text-[10px] text-slate-500">{r.timestamp}</span>
+                        <span className="text-[10px] text-slate-500">
+                          {r.timestamp} • {r.inspector || 'IPQA'}{r.shift ? ` (${r.shift})` : ''}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <span className="font-bold text-slate-200 block">{r.sample_name}</span>
@@ -2596,6 +2648,25 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                     onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, inspector: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
                   />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift (กะ)</label>
+                  <input
+                    list="edit-tensile-shift-options"
+                    type="text"
+                    placeholder="e.g. Day / Night / Shift A..."
+                    value={editingHistoryItem.shift || ''}
+                    onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, shift: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                  />
+                  <datalist id="edit-tensile-shift-options">
+                    <option value="Day (กะกลางวัน / A)" />
+                    <option value="Night (กะกลางคืน / B)" />
+                    <option value="Shift A" />
+                    <option value="Shift B" />
+                    <option value="Shift C" />
+                  </datalist>
                 </div>
 
                 <div>

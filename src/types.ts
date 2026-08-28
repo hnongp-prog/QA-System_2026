@@ -80,6 +80,7 @@ export interface InspectionActivity {
   moduleTitleTh: string;
   moduleTitleEn: string;
   inspector: string;
+  shift?: string;
   batchLot: string;
   result: 'PASS' | 'FAIL' | 'PENDING' | 'REJECT';
   defectCount?: number;
@@ -112,6 +113,7 @@ export interface NcrRecord {
   profile: string;               // Profile Name / Part No. / Spec
   inspectionDate: string;        // Inspection Date & Time
   inspector: string;             // Inspector name
+  shift?: string;                // Shift (e.g. Day / Night / A / B / C)
   process: string;               // Process station / Module
   inspectionResult: string;      // Out of spec / NG defect details
   status: NcrStatus;             // Quarantine / Open / CAPA / Closed
@@ -147,6 +149,7 @@ export type ChemComposition = {
 
 export interface GradeSpec {
   color: string;
+  name?: string;
   elements: {
     [key in ChemElementKey]?: ElementMinMax;
   };
@@ -163,6 +166,7 @@ export interface BilletInspectionItem {
   grade: string;
   supplier_name: string;
   inspector_name: string;
+  shift?: string;
   batch_no: string;
   invoice_no: string;
   diameter: string;
@@ -172,9 +176,9 @@ export interface BilletInspectionItem {
   xrf: string;
   quantity_pcs: string | number;
   weight_kg: string | number;
-  cutting_surface_lt2: boolean;
-  billet_slid_lt25: boolean;
-  defect_2x50x100: boolean;
+  cutting_surface_lt2?: string | boolean;
+  billet_slid_lt25?: string | boolean;
+  defect_2x50x100?: string | boolean;
   chemical_composition: ChemComposition;
   judgement?: 'PASS' | 'FAIL' | 'NO SPEC';
   timestamp?: string;
@@ -202,6 +206,7 @@ export interface ChemicalMeasureItem {
 
 export interface ChemicalInspectionHeader {
   inspector_name: string;
+  shift?: string;
   coating_chemical: string;
   batch_lot: string;
   product_date: string;
@@ -216,6 +221,7 @@ export interface ChemicalInspectionEntry {
   id: string;
   timestamp: string;
   inspector: string;
+  shift?: string;
   batch_lot: string;
   chemical: string;
   date: string;
@@ -259,13 +265,14 @@ export interface TensileRecord {
   process: string;
   machine: string;
   inspector: string;
+  shift?: string;
   sample_name: string;
-  width: number;
-  h_left: number;
-  h_right: number;
-  tensile: number;
-  yield: number;
-  elong: number;
+  width: number | string;
+  h_left: number | string;
+  h_right: number | string;
+  tensile: number | string;
+  yield: number | string;
+  elong: number | string;
   std?: TensileQualitySpec;
   decision: 'PASS' | 'FAIL';
   timestamp_raw: string;
@@ -274,7 +281,9 @@ export interface TensileRecord {
 
 // Roughness Measurement App Types (IPQA-02)
 export interface RoughnessProfileSpec {
+  id?: string;
   name: string;
+  process?: string; // e.g. 'EXTRUSION', 'ANODIZE', 'COLD_ROLL', 'HOT_ROLL', 'DRAWING', 'SLITTING', 'GENERAL'
   raUp: string;
   raLo: string;
   rzUp: string;
@@ -285,6 +294,16 @@ export interface RoughnessProfileSpec {
   rtLo: string;
   ryUp: string;
   ryLo: string;
+  // Un Zn Spray Roughness Spec for profiles ending with Z or H
+  unZnSprayRaUp?: string;
+  unZnSprayRaLo?: string;
+  unZnSprayRzUp?: string;
+  unZnSprayRzLo?: string;
+  unZnSprayRtUp?: string;
+  unZnSprayRtLo?: string;
+  unZnSprayRyUp?: string;
+  unZnSprayRyLo?: string;
+  remarks?: string;
 }
 
 export interface RoughnessInspectionRecord {
@@ -305,10 +324,18 @@ export interface RoughnessInspectionRecord {
   rtMax: string;
   ryMax: string;
   calculatedRzCal: string;
+  // Un Zn Spray Roughness Measurements (for Z or H profiles)
+  unZnSprayRaUp?: string[];
+  unZnSprayRaLo?: string[];
+  unZnSprayRzUp?: string[];
+  unZnSprayRzLo?: string[];
+  unZnSprayRaMax?: string;
+  unZnSprayRzMax?: string;
   status: 'Pass' | 'Fail' | 'Pending';
   remarks?: string;
   profileName: string;
   inspectorName: string;
+  shift?: string;
   machineName: string;
   date: string;
   timestamp: string;
@@ -349,6 +376,7 @@ export interface XRayInspectionRecord {
   remarks?: string;
   profileName: string;
   inspectorName: string;
+  shift?: string;
   machine?: string;
   date: string;
   timestamp: string;
@@ -413,6 +441,7 @@ export interface CoatingInspectionRecord {
   remarks?: string;
   profileName: string;
   inspectorName: string;
+  shift?: string;
   machine?: string;
   date: string;
   timestamp: string;
@@ -468,6 +497,7 @@ export interface CuttingInspectionRecord {
   sampleName?: string;
   workOrder?: string;
   width?: string;
+  height?: string;
   heightLeft?: string;
   heightRight?: string;
   length?: string;
@@ -479,6 +509,7 @@ export interface CuttingInspectionRecord {
   remarks?: string;
   profileName: string;
   inspectorName: string;
+  shift?: string;
   employeeName?: string;
   machine?: string;
   date: string;
@@ -498,6 +529,7 @@ export interface MixingCoatingSpec {
 export interface MixingInspectionRecord {
   id?: string;
   inspectorName: string;
+  shift?: string;
   mixingLot?: string;
   coatingType: string;
   lotNumber: string; // Cup No. / Lot No.
@@ -538,6 +570,7 @@ export interface ZnWireInspectionRecord {
   grade: string;
   supplier?: string;
   inspector_name?: string;
+  shift?: string;
   drum?: string;
   batch_no?: string;
   po_no?: string;
@@ -569,6 +602,7 @@ export interface InstrumentCalHistoryItem {
   certNo?: string;
   uncertainty?: number;
   officer?: string;
+  shift?: string;
   note?: string;
   symptom?: string;
   detail?: string;
@@ -622,6 +656,7 @@ export interface FgPreShipmentRecord {
   timestamp?: string;
   timestampRaw?: string;
   inspectorName: string;
+  shift?: string;
   destinationTo: string;
   profileName?: string;
   partNo: string;
@@ -677,6 +712,7 @@ export interface ThicknessWallRecord {
   timestamp: string;
   timestampRaw?: string;
   inspector: string;
+  shift?: string;
   process: string;
   coil: string;
   sample: string;
@@ -722,6 +758,7 @@ export interface FgOqc02InspectionRecord {
   timestamp: string;
   timestampRaw?: string;
   inspectorName: string;
+  shift?: string;
   partNo: string;
   partName: string;
   drawingNo: string;
@@ -1091,6 +1128,7 @@ export interface CoiIssueRecord {
   quantityPcs: number | string;
   totalWeightKg: number | string;
   inspectorName: string;
+  shift?: string;
   approverName: string;
   overallResult: 'PASS' | 'CONFORMS' | 'REJECT';
   remarks: string;

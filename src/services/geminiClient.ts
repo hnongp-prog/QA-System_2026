@@ -398,13 +398,13 @@ IMPORTANT INSTRUCTIONS:
       diameter: String(item.diameter || "").trim(),
       length: String(item.length || "").trim(),
       bending: String(item.bending || "").trim(),
-      appearance: String(item.appearance || "Passed").trim(),
-      xrf: String(item.xrf || "Pass").trim(),
+      appearance: String(item.appearance || "").trim(),
+      xrf: String(item.xrf || "").trim(),
       quantity_pcs: Number(item.quantity_pcs || item.quantity || item.qty || 0),
       weight_kg: Number(item.weight_kg || item.weight || 0),
-      cutting_surface_lt2: item.cutting_surface_lt2 !== undefined ? Boolean(item.cutting_surface_lt2) : true,
-      billet_slid_lt25: item.billet_slid_lt25 !== undefined ? Boolean(item.billet_slid_lt25) : true,
-      defect_2x50x100: item.defect_2x50x100 !== undefined ? Boolean(item.defect_2x50x100) : false,
+      cutting_surface_lt2: item.cutting_surface_lt2 ? String(item.cutting_surface_lt2).trim() : "",
+      billet_slid_lt25: item.billet_slid_lt25 ? String(item.billet_slid_lt25).trim() : "",
+      defect_2x50x100: item.defect_2x50x100 ? String(item.defect_2x50x100).trim() : "",
       chemical_composition: cleanChem
     };
   }).filter(Boolean);
