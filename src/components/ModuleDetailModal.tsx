@@ -414,19 +414,35 @@ ${module.specs.keyFeaturesTh.map((f, i) => `   - ${f}`).join('\n')}
           isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800'
         }`}>
           <div className={`text-[11px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-            Module Status: <span className="text-emerald-600 font-bold">READY</span>
+            Module Status: <span className="text-emerald-600 font-bold">READY (LIVE APP)</span>
           </div>
 
-          <button
-            onClick={onClose}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition ${
-              isLight
-                ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-            }`}
-          >
-            {isTh ? 'ปิดหน้าต่าง' : 'Close'}
-          </button>
+          <div className="flex items-center gap-2">
+            {onLaunchApp && (
+              <button
+                type="button"
+                onClick={() => {
+                  onLaunchApp(module.code);
+                  onClose();
+                }}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition active:scale-95"
+              >
+                <Play className="w-3.5 h-3.5 fill-white" />
+                <span>{isTh ? 'เปิดเข้าใช้งานแอปย่อยนี้' : 'Launch Sub-App'}</span>
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                isLight
+                  ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+              }`}
+            >
+              {isTh ? 'ปิดหน้าต่าง' : 'Close'}
+            </button>
+          </div>
         </div>
 
       </div>

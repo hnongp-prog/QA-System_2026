@@ -53,9 +53,30 @@
         "lastResult": { "type": "string" }
       },
       "required": ["id", "name", "spec", "frequency"]
+    },
+    "BilletCuttingRecord": {
+      "title": "Billet Cutting Inspection Record",
+      "description": "IPQA inspection log for billet cutting process",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "date": { "type": "string" },
+        "shift": { "type": "string" },
+        "inspectorName": { "type": "string" },
+        "lotNo": { "type": "string" },
+        "cuttingLength": { "type": "string" },
+        "machine": { "type": "string" },
+        "overallJudgement": { "type": "string", "enum": ["PASS", "FAIL"] }
+      },
+      "required": ["id", "timestamp", "shift", "inspectorName", "lotNo", "overallJudgement"]
     }
   },
   "firestore": {
+    "/qa_master_data/{key}": {
+      "schema": { "type": "object" },
+      "description": "Master synchronized real-time state for modules and specs"
+    },
     "/inspection_activities/{activityId}": {
       "schema": { "$ref": "#/entities/InspectionActivity" },
       "description": "Collection of global inspection activities"

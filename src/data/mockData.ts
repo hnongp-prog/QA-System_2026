@@ -415,6 +415,48 @@ export const INITIAL_MODULES: QAModule[] = [
     }
   },
   {
+    id: 'mod-ipqa-08',
+    code: 'IPQA-08',
+    titleTh: 'การตัดท่อนบิลเล็ต (Billet Cutting Inspection)',
+    titleEn: 'Billet Cutting Inspection & Quality Spec System',
+    descriptionTh: 'บันทึกและตรวจสอบมิติการตัดบิลเล็ต (Grade, Heat No, Supplier, Qty, Length, Diameter, Bending Lx0.15%, Cutting surface <2mm, Surface defect 2x50x100mm, Heat identify, Appearance, Judgement) พร้อม Dashboard สรุปผลตามเดือน/ปี, ประวัติ และ Export Excel (Admin Protection)',
+    descriptionEn: 'Billet cutting inspection for Grade, Heat No, Supplier, Length, Diameter, Bending (Lx0.15%), Cutting surface (<2mm), Surface defect (2x50x100mm), Heat identity, Appearance & Judgement with Month/Year Dashboard, History & Excel export.',
+    category: 'IPQA',
+    iconName: 'Scissors',
+    status: 'ACTIVE',
+    pinned: true,
+    isPopular: true,
+    version: 'v2.0.0 (Live App)',
+    badgeCount: 4,
+    badgeType: 'info',
+    metrics: [
+      { labelTh: 'ท่อนบิลเล็ตตัดวันนี้', labelEn: 'Billets Cut Today', value: '142 Pcs', trend: '+16%', trendUp: true },
+      { labelTh: 'อัตราผ่านเกณฑ์ (Pass Rate)', labelEn: 'Cutting Pass Rate', value: '99.4%', trend: '+0.4%', trendUp: true }
+    ],
+    specs: {
+      targetUsersTh: 'เจ้าหน้าที่ IPQA, ช่างเลื่อยตัดบิลเล็ต (Billet Saw Operator), วิศวกรหลอม/รีด (QA/QC Engineer)',
+      targetUsersEn: 'IPQA Auditor, Billet Saw Operator, QA/QC Engineer',
+      checklistItemsCount: 12,
+      estimatedTimeMin: 3,
+      outputReportTypeTh: 'รายงานการตรวจตัดท่อนบิลเล็ต (Billet Cutting Inspection Report)',
+      outputReportTypeEn: 'Billet Cutting Inspection Cloud Report (CSV/Excel)',
+      keyFeaturesTh: [
+        'บันทึก Header (Inspector name, Shift, Cutting length, Lot no.) และตารางวัดค่า Cutting measurement ครบถ้วน',
+        'คำนวณเกณฑ์โก่งงอ Bending Max อัตโนมัติด้วยสูตร Length x 0.15% และตรวจเกณฑ์ Cutting surface < 2 mm',
+        'ระบบบริหารจัดการ Billet Cutting Spec (Length, Diameter, Bending, Surface defect) ป้องกันด้วยรหัส admin2026',
+        'Dashboard สรุปผลแยกตาม Billet Grade, Supplier, Length, Q\'ty กรองดูเป็นรายเดือน / รายปี ได้อย่างยืดหยุ่น',
+        'ตารางประวัติย้อนหลังแสดงเบื้องต้นเฉพาะเดือนปัจจุบันเพื่อความรวดเร็ว พร้อม Export เป็น Excel / CSV (UTF-8 BOM)'
+      ],
+      keyFeaturesEn: [
+        'Header logging (Inspector, Shift, Cutting length, Lot no.) & full Cutting measurement data table',
+        'Auto-calculated Bending Max limit (Length x 0.15%) and Cutting surface tolerance check (< 2 mm)',
+        'Admin password-protected Billet Cutting Spec manager (admin2026)',
+        'Interactive Month/Year Dashboard summarizing Billet Grade, Supplier, Length & Total Q\'ty',
+        'Inspection History default-filtered to Current Month with Excel/CSV export and admin-protected Edit/Delete'
+      ]
+    }
+  },
+  {
     id: 'mod-oqa-01',
     code: 'OQA-01',
     titleTh: 'ตรวจสินค้าก่อนจัดส่ง FG Pre-Shipment (Tag Label Checker)',

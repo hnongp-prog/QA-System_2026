@@ -404,6 +404,7 @@ export interface XRayInspectionRecord {
 export interface CoatingProfileSpec {
   id?: string;
   name: string;
+  calcMode?: 'calculated' | 'manual'; // 'calculated' = Calculated Coating & Binder Metrics, 'manual' = Coating Manual
   widthMin: string;
   widthMax: string;
   heightMin: string;
@@ -432,6 +433,7 @@ export interface CoatingInspectionRecord {
   id?: string;
   lotNumber: string; // Coil No.
   partId: string; // Side
+  calcMode?: 'calculated' | 'manual';
   mixingLot?: string;
   width?: string;
   heightLeft?: string;
@@ -1188,4 +1190,70 @@ export interface CoiIssueRecord {
   qaSectionHeader?: string;
   docControlNo?: string;
 }
+
+// ==========================================
+// IPQA-08: Billet Cutting Measurement Types
+// ==========================================
+export interface BilletCuttingSpec {
+  id?: string;
+  name: string; // Profile / Spec Name (e.g. "6063-Ø5-L500", "6061-Ø7-L600")
+  billetGrade: string; // Billet Grade (e.g. "6063", "6061", "6082", "1050", "3003")
+  lengthNominal?: string; // Nominal Length in mm (e.g. "500")
+  lengthMin: string; // Min Length (mm)
+  lengthMax: string; // Max Length (mm)
+  diameterNominal?: string; // Nominal Diameter (mm or inch e.g. "127.0" / 5")
+  diameterMin: string; // Min Diameter (mm)
+  diameterMax: string; // Max Diameter (mm)
+  bendingMax?: string; // Auto calculate = length * 0.15% (e.g. 500 * 0.15% = 0.75 mm)
+  cuttingSurfaceMax: string; // Cutting Surface max limit (< 2 mm, default "2.0")
+  surfaceDefectSpecText?: string; // Standard limit (default "≤ 2x50x100 mm")
+  surfaceDefectMaxDepth?: string; // Max depth (e.g. "2.0")
+  surfaceDefectMaxWidth?: string; // Max width (e.g. "50.0")
+  surfaceDefectMaxLength?: string; // Max length (e.g. "100.0")
+  remarks?: string;
+}
+
+export interface BilletCuttingMeasurementItem {
+  id: string;
+  billetGrade: string; // เกรดบิลเล็ต
+  heatNo: string; // Heat No.
+  supplier: string; // Supplier
+  qty: number | string; // Q'ty (ชิ้น)
+  length: string; // ความยาว Length (mm)
+  diameter: string; // Diameter (mm)
+  bending: string; // Bending (mm)
+  bendingLimit?: string; // Auto calculate = Length * 0.15%
+  cuttingSurface: string; // Cutting surface (< 2 mm)
+  surfaceDefect: string; // Surface defect (≤ 2x50x100 mm)
+  heatIdentify: 'OK' | 'NG'; // Heat identify
+  appearance: 'OK' | 'NG'; // Appearance
+  judgement: 'PASS' | 'FAIL'; // Judgement
+  remarks?: string;
+}
+
+export interface BilletCuttingHeader {
+  inspectorName: string;
+  shift: string;
+  cuttingLength: string;
+  lotNo: string;
+  date: string;
+  machine?: string;
+  specProfileId?: string;
+}
+
+export interface BilletCuttingRecord {
+  id: string;
+  docId?: string;
+  timestamp: string;
+  timestampRaw: string;
+  header: BilletCuttingHeader;
+  items: BilletCuttingMeasurementItem[];
+  totalQty: number;
+  passedQty: number;
+  defectQty: number;
+  overallJudgement: 'PASS' | 'FAIL';
+  createdAt: string;
+  updatedAt?: string;
+}
+
 

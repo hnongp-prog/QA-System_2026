@@ -53,6 +53,7 @@ import { ZnWireIncomingApp } from './components/ZnWireIncomingApp';
 import { MetrologyCalibrationApp } from './components/MetrologyCalibrationApp';
 import { FgPreShipmentApp } from './components/FgPreShipmentApp';
 import { ThicknessWallApp } from './components/ThicknessWallApp';
+import { BilletCuttingApp } from './components/BilletCuttingApp';
 import { NcrManagementApp } from './components/NcrManagementApp';
 import { CoiManagementApp } from './components/CoiManagementApp';
 import { createNcrFromFailInspection, getStoredNcrRecords } from './utils/ncrStorage';
@@ -84,7 +85,6 @@ export default function App() {
   // Active Sub-App state
   const [activeSubApp, setActiveSubApp] = useState<string | null>(null);
 
-
   // UI Navigation & Controls
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [language, setLanguage] = useState<Language>('th');
@@ -101,6 +101,47 @@ export default function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const isTh = language === 'th';
+
+  // Automatically merge built-in initial modules (such as IPQA-08) into stored modules if missing
+  const effectiveModules = useMemo(() => {
+    const existingCodes = new Set(modules.map(m => m.code));
+    const missingSystemModules = INITIAL_MODULES.filter(im => !existingCodes.has(im.code));
+    
+    if (missingSystemModules.length === 0) {
+      return modules;
+    }
+
+    // Preserve system ordering and include missing built-in modules
+    const currentMap = new Map(modules.map(m => [m.code, m]));
+    const initialCodes = new Set(INITIAL_MODULES.map(m => m.code));
+    const mergedList: QAModule[] = [];
+
+    INITIAL_MODULES.forEach(im => {
+      if (currentMap.has(im.code)) {
+        mergedList.push(currentMap.get(im.code)!);
+      } else {
+        mergedList.push(im);
+      }
+    });
+
+    // Append custom modules added by users
+    modules.forEach(m => {
+      if (!initialCodes.has(m.code)) {
+        mergedList.push(m);
+      }
+    });
+
+    return mergedList;
+  }, [modules]);
+
+  // Sync missing modules back to Firestore state
+  useEffect(() => {
+    const existingCodes = new Set(modules.map(m => m.code));
+    const missing = INITIAL_MODULES.filter(im => !existingCodes.has(im.code));
+    if (missing.length > 0) {
+      setModules(effectiveModules);
+    }
+  }, [modules, effectiveModules, setModules]);
 
   // Toggle Module Pin
   const handleTogglePin = (id: string) => {
@@ -192,7 +233,7 @@ export default function App() {
 
   // Filtered Modules Calculation
   const filteredModules = useMemo(() => {
-    return modules
+    return effectiveModules
       .filter(mod => {
         // Category Filter
         if (selectedCategory !== 'ALL' && mod.category !== selectedCategory) {
@@ -219,7 +260,7 @@ export default function App() {
         if (!a.pinned && b.pinned) return 1;
         return 0;
       });
-  }, [modules, selectedCategory, searchQuery]);
+  }, [effectiveModules, selectedCategory, searchQuery]);
 
   // If a sub-app is active, render its full application screen (MUST be after all hooks)
   if (activeSubApp === 'IPQA-01' || activeSubApp === 'IPQC-01') {
@@ -366,6 +407,18 @@ export default function App() {
     );
   }
 
+  if (activeSubApp === 'IPQA-08' || activeSubApp === 'IPQC-08' || activeSubApp === 'mod-ipqa-08') {
+    return (
+      <BilletCuttingApp
+        onBack={() => setActiveSubApp(null)}
+        language={language}
+        theme={theme}
+        userRole={userProfile.role}
+        userName={userProfile.name}
+      />
+    );
+  }
+
   if (activeSubApp === 'NCR-01') {
     return (
       <NcrManagementApp
@@ -412,7 +465,7 @@ export default function App() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onOpenAddModal={() => setIsAddModalOpen(true)}
-        totalModulesCount={modules.length}
+        totalModulesCount={effectiveModules.length}
       />
 
       {/* Main Container */}
@@ -425,7 +478,7 @@ export default function App() {
           onSelectCategory={setSelectedCategory}
           language={language}
           theme={theme}
-          totalModulesCount={modules.length}
+          totalModulesCount={effectiveModules.length}
           filteredCount={filteredModules.length}
           onOpenNcr={() => setActiveSubApp('NCR-01')}
         />
@@ -516,6 +569,8 @@ export default function App() {
                   setActiveSubApp('OQA-01');
                 } else if (mod.code === 'IPQA-07' || mod.code === 'IPQC-07') {
                   setActiveSubApp('IPQA-07');
+                } else if (mod.code === 'IPQA-08' || mod.code === 'IPQC-08' || mod.id === 'mod-ipqa-08') {
+                  setActiveSubApp('IPQA-08');
                 } else if (mod.code === 'NCR-01') {
                   setActiveSubApp('NCR-01');
                 } else if (mod.code === 'COI-01') {

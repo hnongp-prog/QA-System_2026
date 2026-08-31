@@ -113,6 +113,7 @@ const Sparkline = ({ data, color, label }: { data: number[]; color: string; labe
 const DEFAULT_PROFILES: CoatingProfileSpec[] = [
   { 
     name: 'Standard_Coating_01', 
+    calcMode: 'calculated',
     widthMin: '1000', widthMax: '1020',
     heightMin: '0.40', heightMax: '0.60',
     binderMin: '5.00', binderMax: '10.00',
@@ -132,6 +133,7 @@ const DEFAULT_PROFILES: CoatingProfileSpec[] = [
   },
   {
     name: 'HEAVY-COATING-PRO',
+    calcMode: 'calculated',
     widthMin: '1200', widthMax: '1220',
     heightMin: '0.50', heightMax: '0.80',
     binderMin: '8.00', binderMax: '15.00',
@@ -250,6 +252,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     mixingLot: '',
     date: new Date().toISOString().split('T')[0],
     profileName: '',
+    calcMode: 'calculated' as 'calculated' | 'manual', // 'calculated' = Calculated Coating & Binder Metrics, 'manual' = Coating Manual
     reqWidthMin: '', reqWidthMax: '',
     reqHeightMin: '', reqHeightMax: '',
     reqBinderMin: '', reqBinderMax: '',
@@ -279,11 +282,16 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     return isNaN(n) ? null : n;
   };
 
-  // 1. Coating wt Up = (Dryer Wt - Empty Up) / (Std Coating Width x Std Length / 1,000,000)
-  // 2. Coating wt Lo = (Empty Up - Empty Lo) / (Std Coating Width x Std Length / 1,000,000)
-  // 3. Binder% = (Total Wt - Dryer Wt) / (Total Wt - min(Empty Up, Empty Lo)) * 100
-  // 4. Amt Binder = (Total Wt - Dryer Wt) / ((Std Coating Width x Std Length / 1,000,000) / 2)
+  // 1. Calculated Mode:
+  //    - Coating wt Up = (Dryer Wt - Empty Up) / (Std Coating Width x Std Length / 1,000,000)
+  //    - Coating wt Lo = (Empty Up - Empty Lo) / (Std Coating Width x Std Length / 1,000,000)
+  //    - Binder% = (Total Wt - Dryer Wt) / (Total Wt - min(Empty Up, Empty Lo)) * 100
+  //    - Amt Binder = (Total Wt - Dryer Wt) / ((Std Coating Width x Std Length / 1,000,000) / 2)
+  // 2. Coating Manual Mode:
+  //    - Binder% = (Total Wt - Dryer Wt)
+  //    - Coating wt up, Coating wt lo = Inspector Key Data
   const calculateAutoFields = (item: any, currentHeader = headerInfo) => {
+    const isManualMode = currentHeader?.calcMode === 'manual';
     const total = parseNumOrNull(item.totalWeight);
     const dryer = parseNumOrNull(item.weightAfterDryer);
     const wtUp = parseNumOrNull(item.wtWithoutCoatUp);
@@ -313,6 +321,29 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
         }
     }
 
+    if (isManualMode) {
+      // Coating Manual Mode:
+      // Binder % = (Total Wt - Dryer Wt)
+      let binderPercent = '';
+      if (total !== null && dryer !== null) {
+        const diff = total - dryer;
+        binderPercent = Number.isInteger(diff) ? String(diff) : Number(diff.toFixed(4)).toString();
+      }
+
+      return { 
+        coatingWidth: String(stdCoatingWidth),
+        length: String(stdLength),
+        coatingArea: coatingAreaStr, 
+        binderWt: binderWtStr, 
+        totalCoatBinderWt: totalCoatBinderWtStr, 
+        binderPercent, 
+        raUp: item.raUp !== undefined ? item.raUp : '', 
+        raLo: item.raLo !== undefined ? item.raLo : '', 
+        amountOfBinder: '' 
+      };
+    }
+
+    // Calculated Coating & Binder Metrics Mode:
     // 3. Binder% = (Total Wt - Dryer Wt) / (Total Wt - min(Empty Up, Empty Lo)) * 100
     let binderPercent = '';
     if (binderWtVal !== null && binderWtVal > 0 && totalCoatBinderWtVal !== null && totalCoatBinderWtVal > 0) {
@@ -587,10 +618,12 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     const tapeMaxLo = profile.scothMagicTapeMaxLo || profile.scothMagicTapeMax || profile.scothMagicTapeLo || profile.scothMagicTape || '0.50';
     const stdLen = formatSpecValue(profile.stdLength) || '200';
     const stdCoatW = formatSpecValue(profile.stdCoatingWidth) || '100';
+    const mode = profile.calcMode || 'calculated';
 
     const newHeader = {
       ...headerInfo,
       profileName: profile.name,
+      calcMode: mode,
       reqWidthMin: formatSpecValue(profile.widthMin),
       reqWidthMax: formatSpecValue(profile.widthMax),
       reqHeightMin: formatSpecValue(profile.heightMin),
@@ -637,9 +670,11 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
         const tapeMaxLo = match.scothMagicTapeMaxLo || match.scothMagicTapeMax || match.scothMagicTapeLo || match.scothMagicTape || '0.50';
         const stdLen = formatSpecValue(match.stdLength) || '200';
         const stdCoatW = formatSpecValue(match.stdCoatingWidth) || '100';
+        const mode = match.calcMode || 'calculated';
 
         setHeaderInfo(prev => ({
           ...prev,
+          calcMode: mode,
           reqWidthMin: formatSpecValue(match.widthMin),
           reqWidthMax: formatSpecValue(match.widthMax),
           reqHeightMin: formatSpecValue(match.heightMin),
@@ -676,10 +711,12 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     setHeaderInfo({
       inspectorName: '',
       shift: '',
+      process: 'COT',
       machine: '',
       mixingLot: '',
       date: new Date().toISOString().split('T')[0],
       profileName: '',
+      calcMode: 'calculated',
       reqWidthMin: '', reqWidthMax: '',
       reqHeightMin: '', reqHeightMax: '',
       reqBinderMin: '', reqBinderMax: '',
@@ -704,14 +741,14 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       lotNumber: '', 
       width: '', 
       heightLeft: '', 
-      heightRight: '',
+      heightRight: '', 
       length: '200', 
       coatingWidth: '100', 
       coatingArea: '0.020000', 
       totalWeight: '', 
       weightAfterDryer: '', 
       wtWithoutCoatUp: '', 
-      wtWithoutCoatLo: '',
+      wtWithoutCoatLo: '', 
       binderWt: '', 
       totalCoatBinderWt: '', 
       amountOfBinder: '',
@@ -740,6 +777,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
 
     const newProfile: CoatingProfileSpec = {
       name: headerInfo.profileName.trim(),
+      calcMode: headerInfo.calcMode || 'calculated',
       widthMin: headerInfo.reqWidthMin, widthMax: headerInfo.reqWidthMax,
       heightMin: headerInfo.reqHeightMin, heightMax: headerInfo.reqHeightMax,
       binderMin: headerInfo.reqBinderMin, binderMax: headerInfo.reqBinderMax,
@@ -829,7 +867,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     checkMinMax(item.raUp, headerInfo.reqCoatingWtMinUp, headerInfo.reqCoatingWtMaxUp);
     checkMinMax(item.raLo, headerInfo.reqCoatingWtMinLo, headerInfo.reqCoatingWtMaxLo);
     checkMinMax(item.binderPercent, headerInfo.reqBinderMin, headerInfo.reqBinderMax);
-    checkMinMax(item.amountOfBinder, headerInfo.reqAmtBinderMin, headerInfo.reqAmtBinderMax);
+    if (headerInfo.calcMode !== 'manual') {
+      checkMinMax(item.amountOfBinder, headerInfo.reqAmtBinderMin, headerInfo.reqAmtBinderMax);
+    }
 
     // Scoth Magic Tape evaluation (Weight check: measured weight must be <= standard max limit)
     const maxTapeUp = headerInfo.reqScothMagicTapeMaxUp || headerInfo.reqScothMagicTapeUp || headerInfo.reqScothMagicTapeMax || '0.50';
@@ -971,6 +1011,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
         status: decision,
         remarks: item.remarks,
         profileName: headerInfo.profileName,
+        calcMode: headerInfo.calcMode || 'calculated',
         inspectorName: headerInfo.inspectorName || 'Coating Inspector',
         shift: headerInfo.shift || '',
         machine: headerInfo.machine || 'COAT-LINE-01',
@@ -1397,11 +1438,28 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
             </div>
 
             {/* Spec summary row */}
-            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs grid grid-cols-1 sm:grid-cols-5 gap-2 text-slate-300">
+            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs grid grid-cols-1 sm:grid-cols-6 gap-2 text-slate-300">
+              <div className="flex items-center gap-1.5 font-bold">
+                <span className="text-slate-500">Mode:</span>
+                {headerInfo.calcMode === 'manual' ? (
+                  <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px]">
+                    Coating Manual
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px]">
+                    Calculated Metrics
+                  </span>
+                )}
+              </div>
               <div><span className="text-slate-500">Width Spec:</span> <strong className="text-indigo-300">{headerInfo.reqWidthMin ? `${headerInfo.reqWidthMin} - ${headerInfo.reqWidthMax} mm` : '-'}</strong></div>
               <div><span className="text-slate-500">Coating Wt:</span> <strong className="text-emerald-300">{headerInfo.reqCoatingWtMinUp ? `${headerInfo.reqCoatingWtMinUp} - ${headerInfo.reqCoatingWtMaxUp} g/m²` : '-'}</strong></div>
               <div><span className="text-slate-500">Binder %:</span> <strong className="text-amber-300">{headerInfo.reqBinderMin ? `${headerInfo.reqBinderMin} - ${headerInfo.reqBinderMax} %` : '-'}</strong></div>
-              <div><span className="text-slate-500">Amt Binder:</span> <strong className="text-purple-300">{headerInfo.reqAmtBinderMin ? `${headerInfo.reqAmtBinderMin} - ${headerInfo.reqAmtBinderMax} g/m²` : '-'}</strong></div>
+              <div>
+                <span className="text-slate-500">Amt Binder:</span>{' '}
+                <strong className={headerInfo.calcMode === 'manual' ? 'text-slate-500 line-through' : 'text-purple-300'}>
+                  {headerInfo.calcMode === 'manual' ? 'N/A (Manual)' : (headerInfo.reqAmtBinderMin ? `${headerInfo.reqAmtBinderMin} - ${headerInfo.reqAmtBinderMax} g/m²` : '-')}
+                </strong>
+              </div>
               <div>
                 <span className="text-slate-500">Scoth Tape Limit:</span>{' '}
                 <strong className="text-pink-300 font-mono">
@@ -1457,20 +1515,37 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                       <th className="px-3 py-3 text-center bg-indigo-950/30 text-indigo-300 border-l border-slate-800" colSpan={4}>
                         Weight Inputs (Total / Dryer / Empty Up / Lo)
                       </th>
-                      <th className="px-3 py-3 text-center bg-emerald-950/30 text-emerald-300 border-l border-slate-800" colSpan={4}>
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span>Calculated Coating & Binder Metrics</span>
-                          <button
-                            type="button"
-                            onClick={() => setShowFormulaModal(true)}
-                            className="text-emerald-400 hover:text-emerald-200 bg-emerald-900/50 hover:bg-emerald-800/80 px-1.5 py-0.5 rounded text-[9px] font-bold inline-flex items-center gap-0.5 border border-emerald-500/30 transition cursor-pointer"
-                            title="View Calculation Formulas"
-                          >
-                            <Calculator className="w-3 h-3" />
-                            <span>Formula fx</span>
-                          </button>
-                        </div>
-                      </th>
+                      {headerInfo.calcMode === 'manual' ? (
+                        <th className="px-3 py-3 text-center bg-amber-950/30 text-amber-300 border-l border-slate-800" colSpan={3}>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <span>Coating + Binder (M)</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowFormulaModal(true)}
+                              className="text-amber-400 hover:text-amber-200 bg-amber-900/50 hover:bg-amber-800/80 px-1.5 py-0.5 rounded text-[9px] font-bold inline-flex items-center gap-0.5 border border-amber-500/30 transition cursor-pointer"
+                              title="View Calculation Formulas & Manual Mode"
+                            >
+                              <Calculator className="w-3 h-3" />
+                              <span>Manual fx</span>
+                            </button>
+                          </div>
+                        </th>
+                      ) : (
+                        <th className="px-3 py-3 text-center bg-emerald-950/30 text-emerald-300 border-l border-slate-800" colSpan={4}>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <span>Calculated Coating & Binder Metrics</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowFormulaModal(true)}
+                              className="text-emerald-400 hover:text-emerald-200 bg-emerald-900/50 hover:bg-emerald-800/80 px-1.5 py-0.5 rounded text-[9px] font-bold inline-flex items-center gap-0.5 border border-emerald-500/30 transition cursor-pointer"
+                              title="View Calculation Formulas"
+                            >
+                              <Calculator className="w-3 h-3" />
+                              <span>Formula fx</span>
+                            </button>
+                          </div>
+                        </th>
+                      )}
                       <th className="px-3 py-3 text-center bg-purple-950/30 text-purple-300 border-l border-slate-800" colSpan={2}>
                         Hardness
                       </th>
@@ -1589,47 +1664,98 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                             </div>
                           </td>
 
-                          {/* Calculated Metrics */}
-                          <td className="px-2 py-2.5 text-center bg-emerald-950/10 border-l border-slate-800" colSpan={4}>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                              <div className="flex flex-col">
-                                <span className="text-[9px] text-slate-500 font-bold">Coat Wt Up</span>
-                                <input 
-                                  type="text" readOnly value={item.raUp || '-'} 
-                                  className={`w-full text-center border rounded-lg px-1 py-1 font-bold text-xs ${
-                                    isCoatUpFail ? 'border-rose-500 bg-rose-950 text-rose-300' : 'bg-slate-950 border-slate-800 text-emerald-400'
-                                  }`} 
-                                />
+                          {/* Calculated Metrics / Coating Manual (M) */}
+                          {headerInfo.calcMode === 'manual' ? (
+                            <td className="px-2 py-2.5 text-center bg-amber-950/10 border-l border-slate-800" colSpan={3}>
+                              <div className="grid grid-cols-3 gap-1.5">
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] text-amber-400 font-bold flex items-center justify-center gap-0.5">
+                                    <span>Coat Wt Up</span>
+                                    <span className="text-[8px] text-slate-500 font-normal">(Key)</span>
+                                  </span>
+                                  <input 
+                                    type="number" step="0.01" 
+                                    placeholder="Key In" 
+                                    value={item.raUp || ''} 
+                                    onChange={(e) => handleItemChange(item.id, 'raUp', e.target.value)} 
+                                    className={`w-full text-center border rounded-lg px-1 py-1 font-bold text-xs ${
+                                      isCoatUpFail ? 'border-rose-500 bg-rose-950 text-rose-300' : 'bg-slate-950 border-amber-500/40 text-amber-300 focus:border-amber-400'
+                                    }`} 
+                                  />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] text-amber-400 font-bold flex items-center justify-center gap-0.5">
+                                    <span>Coat Wt Lo</span>
+                                    <span className="text-[8px] text-slate-500 font-normal">(Key)</span>
+                                  </span>
+                                  <input 
+                                    type="number" step="0.01" 
+                                    placeholder="Key In" 
+                                    value={item.raLo || ''} 
+                                    onChange={(e) => handleItemChange(item.id, 'raLo', e.target.value)} 
+                                    className={`w-full text-center border rounded-lg px-1 py-1 font-bold text-xs ${
+                                      isCoatLoFail ? 'border-rose-500 bg-rose-950 text-rose-300' : 'bg-slate-950 border-amber-500/40 text-amber-300 focus:border-amber-400'
+                                    }`} 
+                                  />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] text-amber-300 font-bold flex items-center justify-center gap-0.5">
+                                    <span>Binder %</span>
+                                    <span className="text-[8px] text-amber-500/80 font-mono">(T-D)</span>
+                                  </span>
+                                  <input 
+                                    type="text" readOnly 
+                                    placeholder="Total-Dryer"
+                                    value={item.binderPercent ? `${item.binderPercent}` : '-'} 
+                                    className={`w-full text-center border rounded-lg px-1 py-1 font-bold text-xs ${
+                                      isBinderPctFail ? 'border-rose-500 bg-rose-950 text-rose-300' : 'bg-slate-950 border-slate-800 text-amber-400'
+                                    }`} 
+                                  />
+                                </div>
                               </div>
-                              <div className="flex flex-col">
-                                <span className="text-[9px] text-slate-500 font-bold">Coat Wt Lo</span>
-                                <input 
-                                  type="text" readOnly value={item.raLo || '-'} 
-                                  className={`w-full text-center border rounded-lg px-1 py-1 font-bold text-xs ${
-                                    isCoatLoFail ? 'border-rose-500 bg-rose-950 text-rose-300' : 'bg-slate-950 border-slate-800 text-emerald-400'
-                                  }`} 
-                                />
+                            </td>
+                          ) : (
+                            <td className="px-2 py-2.5 text-center bg-emerald-950/10 border-l border-slate-800" colSpan={4}>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] text-slate-500 font-bold">Coat Wt Up</span>
+                                  <input 
+                                    type="text" readOnly value={item.raUp || '-'} 
+                                    className={`w-full text-center border rounded-lg px-1 py-1 font-bold text-xs ${
+                                      isCoatUpFail ? 'border-rose-500 bg-rose-950 text-rose-300' : 'bg-slate-950 border-slate-800 text-emerald-400'
+                                    }`} 
+                                  />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] text-slate-500 font-bold">Coat Wt Lo</span>
+                                  <input 
+                                    type="text" readOnly value={item.raLo || '-'} 
+                                    className={`w-full text-center border rounded-lg px-1 py-1 font-bold text-xs ${
+                                      isCoatLoFail ? 'border-rose-500 bg-rose-950 text-rose-300' : 'bg-slate-950 border-slate-800 text-emerald-400'
+                                    }`} 
+                                  />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] text-slate-500 font-bold">Binder %</span>
+                                  <input 
+                                    type="text" readOnly value={item.binderPercent ? `${item.binderPercent}%` : '-'} 
+                                    className={`w-full text-center border rounded-lg px-1 py-1 font-bold text-xs ${
+                                      isBinderPctFail ? 'border-rose-500 bg-rose-950 text-rose-300' : 'bg-slate-950 border-slate-800 text-amber-400'
+                                    }`} 
+                                  />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] text-slate-500 font-bold">Amt Binder</span>
+                                  <input 
+                                    type="text" readOnly value={item.amountOfBinder || '-'} 
+                                    className={`w-full text-center border rounded-lg px-1 py-1 font-bold text-xs ${
+                                      isAmtBinderFail ? 'border-rose-500 bg-rose-950 text-rose-300' : 'bg-slate-950 border-slate-800 text-purple-400'
+                                    }`} 
+                                  />
+                                </div>
                               </div>
-                              <div className="flex flex-col">
-                                <span className="text-[9px] text-slate-500 font-bold">Binder %</span>
-                                <input 
-                                  type="text" readOnly value={item.binderPercent ? `${item.binderPercent}%` : '-'} 
-                                  className={`w-full text-center border rounded-lg px-1 py-1 font-bold text-xs ${
-                                    isBinderPctFail ? 'border-rose-500 bg-rose-950 text-rose-300' : 'bg-slate-950 border-slate-800 text-amber-400'
-                                  }`} 
-                                />
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="text-[9px] text-slate-500 font-bold">Amt Binder</span>
-                                <input 
-                                  type="text" readOnly value={item.amountOfBinder || '-'} 
-                                  className={`w-full text-center border rounded-lg px-1 py-1 font-bold text-xs ${
-                                    isAmtBinderFail ? 'border-rose-500 bg-rose-950 text-rose-300' : 'bg-slate-950 border-slate-800 text-purple-400'
-                                  }`} 
-                                />
-                              </div>
-                            </div>
-                          </td>
+                            </td>
+                          )}
 
                           {/* Hardness */}
                           <td className="px-2 py-2.5 text-center bg-purple-950/10 border-l border-slate-800" colSpan={2}>
@@ -1761,7 +1887,18 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                     }`}
                   >
                     <div>
-                      <div className="text-xs font-bold">{p.name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold">{p.name}</span>
+                        {p.calcMode === 'manual' ? (
+                          <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold">
+                            Manual
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-bold">
+                            Calculated
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                         Coat: {p.coatingWtMinUp}-{p.coatingWtMaxUp} | Binder: {p.binderMin}-{p.binderMax}% | Tape Max: ≤{p.scothMagicTapeMaxUp || p.scothMagicTapeMax || p.scothMagicTapeUp || p.scothMagicTape || '0.50'}
                       </div>
@@ -1794,6 +1931,82 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                   placeholder="e.g. Standard_Coating_01"
                   className="w-full bg-slate-950 border border-slate-800 text-indigo-300 font-bold rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500 uppercase"
                 />
+              </div>
+
+              {/* Calculation & Entry Mode Selector (Calculated vs Manual) */}
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                <label className="text-[10px] font-bold text-slate-400 uppercase block">
+                  {isTh ? 'โหมดการคำนวณและบันทึกค่า (Calculation & Entry Mode) *' : 'Calculation & Entry Mode *'}
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newHeader = { ...headerInfo, calcMode: 'calculated' as const };
+                      setHeaderInfo(newHeader);
+                      setBatchItems(prev => prev.map(item => ({ ...item, ...calculateAutoFields(item, newHeader) })));
+                    }}
+                    className={`p-3 rounded-xl border text-left transition flex items-start gap-3 ${
+                      (headerInfo.calcMode || 'calculated') === 'calculated'
+                        ? 'bg-emerald-950/70 border-emerald-500 ring-1 ring-emerald-500/50'
+                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    <div className={`mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                      (headerInfo.calcMode || 'calculated') === 'calculated'
+                        ? 'border-emerald-400 bg-emerald-500'
+                        : 'border-slate-600 bg-slate-950'
+                    }`}>
+                      {(headerInfo.calcMode || 'calculated') === 'calculated' && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
+                    </div>
+                    <div>
+                      <div className={`text-xs font-bold ${
+                        (headerInfo.calcMode || 'calculated') === 'calculated' ? 'text-emerald-300' : 'text-slate-300'
+                      }`}>
+                        Calculated Coating & Binder Metrics
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                        {isTh 
+                          ? 'คำนวณค่า Coat Wt Up/Lo, Binder % และ Amt Binder อัตโนมัติตามสูตรมาตรฐาน' 
+                          : 'Auto-calculate Coat Wt Up/Lo, Binder % and Amt Binder using standard formulas'}
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newHeader = { ...headerInfo, calcMode: 'manual' as const };
+                      setHeaderInfo(newHeader);
+                      setBatchItems(prev => prev.map(item => ({ ...item, ...calculateAutoFields(item, newHeader) })));
+                    }}
+                    className={`p-3 rounded-xl border text-left transition flex items-start gap-3 ${
+                      headerInfo.calcMode === 'manual'
+                        ? 'bg-amber-950/70 border-amber-500 ring-1 ring-amber-500/50'
+                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    <div className={`mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                      headerInfo.calcMode === 'manual'
+                        ? 'border-amber-400 bg-amber-500'
+                        : 'border-slate-600 bg-slate-950'
+                    }`}>
+                      {headerInfo.calcMode === 'manual' && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
+                    </div>
+                    <div>
+                      <div className={`text-xs font-bold ${
+                        headerInfo.calcMode === 'manual' ? 'text-amber-300' : 'text-slate-300'
+                      }`}>
+                        Coating Manual
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                        {isTh 
+                          ? 'แสดง Coating + Binder (M): Binder% = (Total Wt - Dryer Wt) และผู้ตรวจกรอก Coating wt up/lo เอง' 
+                          : 'Show Coating + Binder (M): Binder% = (Total Wt - Dryer Wt) and manual key-in for Coating wt up/lo'}
+                      </div>
+                    </div>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2530,6 +2743,34 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                   {isTh 
                     ? 'ปริมาณไบน์เดอร์ = (น้ำหนักรวม - น้ำหนักหลังอบแห้ง) ÷ ((Std Coating Width × Std Length ÷ 1,000,000) ÷ 2)' 
                     : 'Amount of binder = (Total Wt - Dryer Wt) ÷ ((Std Coating Width × Std Length / 1,000,000) / 2)'}
+                </p>
+              </div>
+
+              {/* Mode 2: Coating Manual (M) Explanation */}
+              <div className="bg-slate-950/80 p-4 rounded-2xl border border-amber-500/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-400 uppercase tracking-wider text-[11px]">
+                    ★ Coating Manual Mode [Coating + Binder (M)]
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold">
+                    Manual Mode Rules ✓
+                  </span>
+                </div>
+                <div className="space-y-2 p-3 bg-slate-900 rounded-xl font-mono border border-slate-800 text-xs">
+                  <div className="text-amber-300">
+                    <strong>1. Binder %</strong> = (Total Wt - Dryer Wt)
+                  </div>
+                  <div className="text-emerald-300">
+                    <strong>2. Coating wt up</strong> = Inspector Key Data (กรอกค่าเอง)
+                  </div>
+                  <div className="text-emerald-300">
+                    <strong>3. Coating wt lo</strong> = Inspector Key Data (กรอกค่าเอง)
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {isTh 
+                    ? 'ในโหมด Coating Manual ระบบจะซ่อนคอลัมน์คำนวณอัตโนมัติ 4 คอลัมน์ และแสดงคอลัมน์ Coating + Binder (M) โดยคำนวณ Binder% = Total Wt - Dryer Wt ส่วนค่า Coat Wt Up และ Lo ผู้ตรวจสอบเป็นผู้กรอกข้อมูลโดยตรง' 
+                    : 'In Coating Manual mode, standard auto metrics are replaced by Coating + Binder (M): Binder% = Total Wt - Dryer Wt, and Coating Wt Up/Lo are manually entered.'}
                 </p>
               </div>
 

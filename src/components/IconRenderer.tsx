@@ -13,7 +13,8 @@ import {
   Layers,
   FileCheck,
   Gauge,
-  Sliders
+  Sliders,
+  Scissors
 } from 'lucide-react';
 
 interface IconRendererProps {
@@ -47,6 +48,8 @@ export const IconRenderer: React.FC<IconRendererProps> = ({ name, className = 'w
       return <Gauge className={className} />;
     case 'Sliders':
       return <Sliders className={className} />;
+    case 'Scissors':
+      return <Scissors className={className} />;
     default:
       return <Package className={className} />;
   }
