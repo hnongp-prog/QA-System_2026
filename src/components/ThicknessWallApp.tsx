@@ -38,6 +38,8 @@ import {
 } from '../types';
 import { extractThicknessWallClient } from '../services/geminiClient';
 import { useCloudState } from '../services/firestoreSync';
+import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
+import { STANDARD_PROCESS_OPTIONS, STANDARD_MACHINE_OPTIONS } from '../constants/processOptions';
 
 interface ThicknessWallAppProps {
   onBackToPortal?: () => void;
@@ -483,10 +485,16 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
     }
   };
 
+  const isIgnoredValue = (valStr?: string | number): boolean => {
+    if (valStr === undefined || valStr === null) return true;
+    const s = String(valStr).trim();
+    return s === '' || s === '-' || s === '--' || s === '---' || s === 'N/A' || s === 'n/a' || s === 'none' || s === 'null' || s === 'undefined';
+  };
+
   // Validate Table Item Against Spec
   const getRowValidationStatus = (desc: string, totalStr: string) => {
+    if (isIgnoredValue(totalStr)) return { status: 'NONE', label: '-' };
     const cleanTotal = (totalStr || '').trim().replace(/,/g, '.');
-    if (!cleanTotal || cleanTotal === '-' || cleanTotal === 'N/A') return { status: 'NONE', label: '-' };
 
     const profName = profileInput.trim().toUpperCase();
     const specs = profileSpecs[profName];
@@ -749,7 +757,7 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
               </div>
               <h3 className="text-lg font-bold text-white uppercase tracking-wider">Admin Authorization</h3>
               <p className="text-xs text-slate-400">
-                {isTh ? 'กรุณากรอกรหัสผ่านเพื่อเข้าสู่โหมดปรับแต่ง Profile Spec (admin2026)' : 'Enter admin password for Spec Settings (admin2026)'}
+                {isTh ? 'กรุณากรอกรหัสผ่านผู้ดูแลระบบเพื่อเข้าสู่โหมดปรับแต่ง Profile Spec' : 'Enter admin password for Spec Settings'}
               </p>
             </div>
 
@@ -765,7 +773,7 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
                 />
                 {authError && (
                   <p className="text-xs text-rose-400 font-bold mt-1 text-center">
-                    {isTh ? 'รหัสผ่านไม่ถูกต้อง ( admin2026 )' : 'Incorrect password (admin2026)'}
+                    {isTh ? 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง' : 'Incorrect password. Please try again.'}
                   </p>
                 )}
               </div>
@@ -1020,12 +1028,11 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
                         </div>
 
                         <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Process</label>
-                          <input
-                            type="text"
+                          <ProcessSelector
+                            id="tw-extraction-process"
+                            label="Process"
                             value={processInput}
-                            onChange={(e) => setProcessInput(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                            onChange={(proc) => setProcessInput(proc)}
                           />
                         </div>
                       </div>
@@ -1566,7 +1573,7 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
                 ยืนยันรหัสผ่านเพื่อแก้ไขข้อมูล
               </h3>
               <p className="text-xs text-slate-400">
-                กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQA-07 (Password: admin2026)
+                กรอกรหัสผ่านผู้ดูแลระบบเพื่อแก้ไขรายการตรวจวัด IPQA-07
               </p>
             </div>
 
@@ -1576,14 +1583,14 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
                   type="password"
                   value={historyAuthPassword}
                   onChange={(e) => setHistoryAuthPassword(e.target.value)}
-                  placeholder="Password: admin2026"
+                  placeholder="รหัสผ่านผู้ดูแลระบบ"
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-center text-lg font-mono text-amber-300 focus:outline-none focus:border-amber-500"
                   autoFocus
                 />
                 {historyAuthError && (
                   <p className="text-xs text-rose-400 font-semibold text-center mt-2 flex items-center justify-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />
-                    <span>รหัสผ่านไม่ถูกต้อง! (กรุณาใช้ admin2026)</span>
+                    <span>รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง</span>
                   </p>
                 )}
               </div>
@@ -1657,15 +1664,12 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Process</label>
-                  <input
-                    type="text"
-                    value={editingHistoryItem.process || ''}
-                    onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, process: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
+                <ProcessSelector
+                  id="tw-edit-history-process"
+                  label="Process"
+                  value={editingHistoryItem.process || ''}
+                  onChange={(proc) => setEditingHistoryItem({ ...editingHistoryItem, process: proc })}
+                />
 
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Profile Spec</label>

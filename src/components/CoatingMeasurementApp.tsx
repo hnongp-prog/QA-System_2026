@@ -31,6 +31,8 @@ import {
   InspectionActivity 
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
+import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
+import { STANDARD_PROCESS_OPTIONS, STANDARD_MACHINE_OPTIONS } from '../constants/processOptions';
 
 interface CoatingMeasurementAppProps {
   onBackToPortal?: () => void;
@@ -243,6 +245,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
   const [headerInfo, setHeaderInfo] = useState({
     inspectorName: '',
     shift: '',
+    process: 'COT',
     machine: '',
     mixingLot: '',
     date: new Date().toISOString().split('T')[0],
@@ -434,7 +437,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       setActiveTab('settings');
     } else {
       setAdminAuthError(true);
-      showNotification(isTh ? 'รหัสผ่านไม่ถูกต้อง ( admin2026 )' : 'Incorrect password', 'error');
+      showNotification(isTh ? 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่' : 'Incorrect password', 'error');
     }
   };
 
@@ -784,13 +787,18 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     setDeleteConfirm(null);
   };
 
+  const isIgnoredValue = (valStr?: string | number): boolean => {
+    if (valStr === undefined || valStr === null) return true;
+    const s = String(valStr).trim();
+    return s === '' || s === '-' || s === '--' || s === '---' || s === 'N/A' || s === 'n/a' || s === 'none' || s === 'null' || s === 'undefined';
+  };
+
   const isScothTapeFail = (measuredStr?: string, maxLimitStr?: string) => {
-    if (!measuredStr || measuredStr.trim() === '') return false;
-    const s = measuredStr.trim().toLowerCase();
-    if (s === '-' || s === 'n/a' || s === 'none' || s === 'untested') return false;
+    if (isIgnoredValue(measuredStr)) return false;
+    const s = String(measuredStr).trim().toLowerCase();
     if (s === 'fail' || s === 'ng') return true;
     if (s === 'pass' || s === 'ok' || s === 'no peeling') return false;
-    const val = parseFloat(measuredStr);
+    const val = parseFloat(String(measuredStr));
     const max = parseFloat(maxLimitStr || '0.50');
     if (!isNaN(val) && !isNaN(max) && max > 0) {
       // Must be less than or equal to standard limit (ค่าน้อยกว่าหรือเท่ากับมาตรฐาน)
@@ -801,13 +809,14 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
 
   const judgeStatus = (item: typeof batchItems[0]): 'Pass' | 'Fail' | 'Pending' => {
     let pass = true;
+    let numericCount = 0;
 
     const checkMinMax = (valStr?: string, minStr?: string, maxStr?: string) => {
-      if (!valStr) return;
+      if (isIgnoredValue(valStr)) return;
       const s = String(valStr).trim();
-      if (s === '' || s === '-' || s === 'N/A') return; // Ignored if unmeasured
       const v = parseFloat(s);
       if (isNaN(v)) return;
+      numericCount++;
       const minVal = parseFloat(minStr || '0');
       const maxVal = parseFloat(maxStr || '0');
       if (minStr && minStr !== '' && minVal > 0 && v < minVal) pass = false;
@@ -830,6 +839,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     if (isScothTapeFail(item.scothMagicTapeLo, maxTapeLo)) pass = false;
     if (isScothTapeFail(item.scothMagicTape, maxTapeUp)) pass = false;
 
+    const hasTapeData = !isIgnoredValue(item.scothMagicTapeUp) || !isIgnoredValue(item.scothMagicTapeLo) || !isIgnoredValue(item.scothMagicTape);
+
+    if (numericCount === 0 && !hasTapeData) return 'Pending';
     if (!item.lotNumber && !item.totalWeight && !item.partId) return 'Pending';
 
     return pass ? 'Pass' : 'Fail';
@@ -1069,7 +1081,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
               </div>
               <h3 className="text-lg font-bold text-white">Admin Verification</h3>
               <p className="text-xs text-slate-400">
-                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อตั้งค่า Profile Spec (admin2026)' : 'Enter admin password to manage profile specifications'}
+                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อตั้งค่า Profile Spec' : 'Enter admin password to manage profile specifications'}
               </p>
             </div>
 
@@ -1342,19 +1354,19 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                 </datalist>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                  Machine No.
-                </label>
-                <input
-                  type="text"
-                  name="machine"
-                  value={headerInfo.machine}
-                  onChange={handleHeaderChange}
-                  placeholder={isTh ? 'เช่น COAT-LINE-01' : 'Machine No.'}
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 uppercase"
-                />
-              </div>
+              <ProcessSelector
+                id="coating-header-process"
+                label="Process"
+                value={headerInfo.process || 'COT'}
+                onChange={(proc) => setHeaderInfo(prev => ({ ...prev, process: proc }))}
+              />
+
+              <MachineSelector
+                id="coating-header-machine"
+                label="Machine No."
+                value={headerInfo.machine}
+                onChange={(mac) => setHeaderInfo(prev => ({ ...prev, machine: mac }))}
+              />
 
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
@@ -2157,8 +2169,8 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
               </h3>
               <p className="text-xs text-slate-400">
                 {isTh 
-                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQA-04 (Password: admin2026)' 
-                  : 'Enter password to edit IPQA-04 record (Password: admin2026)'}
+                  ? 'กรอกรหัสผ่านผู้ดูแลระบบเพื่อแก้ไขรายการตรวจวัด IPQA-04' 
+                  : 'Enter admin password to edit IPQA-04 record'}
               </p>
             </div>
 
@@ -2168,14 +2180,14 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                   type="password"
                   value={historyAuthPassword}
                   onChange={(e) => setHistoryAuthPassword(e.target.value)}
-                  placeholder="Password: admin2026"
+                  placeholder={isTh ? "รหัสผ่านผู้ดูแลระบบ" : "Admin Password"}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-center text-lg font-mono text-amber-300 focus:outline-none focus:border-amber-500"
                   autoFocus
                 />
                 {historyAuthError && (
                   <p className="text-xs text-rose-400 font-semibold text-center mt-2 flex items-center justify-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />
-                    <span>{isTh ? 'รหัสผ่านไม่ถูกต้อง! (กรุณาใช้ admin2026)' : 'Incorrect password! (Use admin2026)'}</span>
+                    <span>{isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง' : 'Incorrect password! Please try again'}</span>
                   </p>
                 )}
               </div>
@@ -2268,6 +2280,13 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
                   />
                 </div>
+
+                <MachineSelector
+                  id="edit-coating-machine"
+                  label="Machine No."
+                  value={editingHistoryItem.machine || ''}
+                  onChange={(mac) => setEditingHistoryItem({ ...editingHistoryItem, machine: mac })}
+                />
 
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift (กะ)</label>

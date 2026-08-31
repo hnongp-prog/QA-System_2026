@@ -32,6 +32,7 @@ import {
   InspectionActivity 
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
+import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
 
 interface MixingInspectionAppProps {
   onBackToPortal?: () => void;
@@ -196,6 +197,8 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
   const [headerInfo, setHeaderInfo] = useState({
     inspectorName: '',
     shift: '',
+    process: 'MIX',
+    machine: '',
     mixingLot: '',
     date: new Date().toISOString().split('T')[0],
     coatingType: ''
@@ -285,7 +288,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
       setActiveTab('settings');
     } else {
       setAdminAuthError(true);
-      showNotification(isTh ? 'รหัสผ่านไม่ถูกต้อง ( admin2026 )' : 'Incorrect password', 'error');
+      showNotification(isTh ? 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่' : 'Incorrect password', 'error');
     }
   };
 
@@ -322,11 +325,16 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
     }
   };
 
+  const isIgnoredValue = (v?: string | number): boolean => {
+    if (v === undefined || v === null) return true;
+    const s = String(v).trim();
+    return s === '' || s === '-' || s === '--' || s === '---' || s === 'N/A' || s === 'n/a' || s === 'none' || s === 'null' || s === 'undefined';
+  };
+
   // Logic for judging a value against spec string (e.g. "15.0 - 17.5", "< 25", "40.0 ± 2.0")
-  const checkPass = (value?: string, spec?: string): 'PASS' | 'FAIL' | 'PENDING' => {
-    if (!value || value === '') return 'PENDING';
-    const s = value.trim();
-    if (s === '-' || s === 'N/A' || s === 'none') return 'PASS'; // Untested/unmeasured point ignored from decision
+  const checkPass = (value?: string, spec?: string): 'PASS' | 'FAIL' | 'PENDING' | 'IGNORED' => {
+    if (isIgnoredValue(value)) return 'IGNORED';
+    const s = String(value).trim();
     if (!spec || spec === '') return 'PENDING';
     const num = parseFloat(s);
     if (isNaN(num)) return 'PENDING';
@@ -567,9 +575,11 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
         checkPass(updatedItem.viscosity, coatingTypeSpecs.viscoSpec)
       ];
 
+      const evaluated = results.filter(r => r === 'PASS' || r === 'FAIL');
+
       if (results.includes('FAIL')) {
         updatedItem.judgment = 'FAIL';
-      } else if (results.every(r => r === 'PASS')) {
+      } else if (evaluated.length > 0 && results.every(r => r === 'PASS' || r === 'IGNORED')) {
         updatedItem.judgment = 'PASS';
       } else {
         updatedItem.judgment = 'PENDING';
@@ -822,7 +832,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
               </div>
               <h3 className="text-lg font-bold text-white">Admin Verification</h3>
               <p className="text-xs text-slate-400">
-                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อตั้งค่า Coating Type Spec (admin2026)' : 'Enter admin password to manage coating specifications'}
+                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อตั้งค่า Coating Type Spec' : 'Enter admin password to manage coating specifications'}
               </p>
             </div>
 
@@ -1034,7 +1044,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
                   Coating Type *
@@ -1072,6 +1082,20 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 uppercase"
                 />
               </div>
+
+              <ProcessSelector
+                id="mixing-header-process"
+                label="Process"
+                value={headerInfo.process || 'MIX'}
+                onChange={(proc) => setHeaderInfo(prev => ({ ...prev, process: proc }))}
+              />
+
+              <MachineSelector
+                id="mixing-header-machine"
+                label="Machine No."
+                value={headerInfo.machine}
+                onChange={(mac) => setHeaderInfo(prev => ({ ...prev, machine: mac }))}
+              />
 
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
@@ -1716,8 +1740,8 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
               </h3>
               <p className="text-xs text-slate-400">
                 {isTh 
-                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQA-06 (Password: admin2026)' 
-                  : 'Enter password to edit IPQA-06 record (Password: admin2026)'}
+                  ? 'กรอกรหัสผ่านผู้ดูแลระบบเพื่อแก้ไขรายการตรวจวัด IPQA-06' 
+                  : 'Enter admin password to edit IPQA-06 record'}
               </p>
             </div>
 
@@ -1727,14 +1751,14 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                   type="password"
                   value={historyAuthPassword}
                   onChange={(e) => setHistoryAuthPassword(e.target.value)}
-                  placeholder="Password: admin2026"
+                  placeholder={isTh ? "รหัสผ่านผู้ดูแลระบบ" : "Admin Password"}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-center text-lg font-mono text-amber-300 focus:outline-none focus:border-amber-500"
                   autoFocus
                 />
                 {historyAuthError && (
                   <p className="text-xs text-rose-400 font-semibold text-center mt-2 flex items-center justify-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />
-                    <span>{isTh ? 'รหัสผ่านไม่ถูกต้อง! (กรุณาใช้ admin2026)' : 'Incorrect password! (Use admin2026)'}</span>
+                    <span>{isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง' : 'Incorrect password! Please try again'}</span>
                   </p>
                 )}
               </div>
@@ -1817,6 +1841,20 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
                   />
                 </div>
+
+                <ProcessSelector
+                  id="edit-mixing-process"
+                  label="Process"
+                  value={editingHistoryItem.process || 'MIX'}
+                  onChange={(proc) => setEditingHistoryItem({ ...editingHistoryItem, process: proc })}
+                />
+
+                <MachineSelector
+                  id="edit-mixing-machine"
+                  label="Machine No."
+                  value={editingHistoryItem.machine || ''}
+                  onChange={(mac) => setEditingHistoryItem({ ...editingHistoryItem, machine: mac })}
+                />
 
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Inspector Name</label>

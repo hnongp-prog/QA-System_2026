@@ -232,7 +232,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     setIsHistoryAuthOpen(true);
   };
 
-  // Delete history item with custom modal confirmation & admin2026 password
+  // Delete history item with custom modal confirmation & admin password
   const handleDeleteHistoryItem = (item: ChemicalInspectionEntry) => {
     setDeleteConfirmPassword("");
     setDeleteConfirmPasswordError(false);
@@ -240,8 +240,8 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
       isOpen: true,
       title: isTh ? 'ยืนยันการลบรายการประวัติ' : 'Confirm Delete Record',
       message: isTh 
-        ? `คุณต้องการลบประวัติการตรวจรับ Batch/Lot: ${item.batch_lot} (${item.chemical}) กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน` 
-        : `Are you sure you want to delete inspection record for Batch ${item.batch_lot}? Enter admin2026 to confirm.`,
+        ? `คุณต้องการลบประวัติการตรวจรับ Batch/Lot: ${item.batch_lot} (${item.chemical}) กรุณาใส่รหัสผ่านผู้ดูแลระบบเพื่อยืนยัน` 
+        : `Are you sure you want to delete inspection record for Batch ${item.batch_lot}? Enter admin password to confirm.`,
       confirmText: isTh ? 'ลบรายการ' : 'Delete',
       cancelText: isTh ? 'ยกเลิก' : 'Cancel',
       onConfirm: () => {
@@ -255,7 +255,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     });
   };
 
-  // Clear all history with custom modal confirmation & admin2026 password
+  // Clear all history with custom modal confirmation & admin password
   const handleClearAllHistory = () => {
     setDeleteConfirmPassword("");
     setDeleteConfirmPasswordError(false);
@@ -263,8 +263,8 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
       isOpen: true,
       title: isTh ? 'ยืนยันการลบประวัติทั้งหมด' : 'Confirm Clear All History',
       message: isTh 
-        ? 'คุณต้องการลบประวัติการตรวจรับเคมีทั้งหมดใช่หรือไม่? (การกระทำนี้ไม่สามารถยกเลิกได้) กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน' 
-        : 'Are you sure you want to clear all chemical inspection history? Enter admin2026 to confirm.',
+        ? 'คุณต้องการลบประวัติการตรวจรับเคมีทั้งหมดใช่หรือไม่? (การกระทำนี้ไม่สามารถยกเลิกได้) กรุณาใส่รหัสผ่านผู้ดูแลระบบเพื่อยืนยัน' 
+        : 'Are you sure you want to clear all chemical inspection history? Enter admin password to confirm.',
       confirmText: isTh ? 'ล้างประวัติทั้งหมด' : 'Clear All',
       cancelText: isTh ? 'ยกเลิก' : 'Cancel',
       onConfirm: () => {
@@ -654,8 +654,8 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
       isOpen: true,
       title: isTh ? 'ยืนยันการลบ Spec' : 'Confirm Delete Spec',
       message: isTh 
-        ? `คุณต้องการลบเกณฑ์ Spec ของรหัสเคมี ${keyToDelete} กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน` 
-        : `Are you sure you want to delete spec for chemical code ${keyToDelete}? Enter admin2026 to confirm.`,
+        ? `คุณต้องการลบเกณฑ์ Spec ของรหัสเคมี ${keyToDelete} กรุณาใส่รหัสผ่านผู้ดูแลระบบเพื่อยืนยัน` 
+        : `Are you sure you want to delete spec for chemical code ${keyToDelete}? Enter admin password to confirm.`,
       confirmText: isTh ? 'ลบ Spec' : 'Delete Spec',
       cancelText: isTh ? 'ยกเลิก' : 'Cancel',
       onConfirm: () => {
@@ -1345,7 +1345,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 />
                 {passwordError && (
                   <p className="text-rose-500 text-xs font-semibold text-center mt-2">
-                    {isTh ? 'รหัสผ่านไม่ถูกต้อง (ลอง admin2026)' : 'Incorrect password (try admin2026)'}
+                    {isTh ? 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง' : 'Incorrect password. Please try again.'}
                   </p>
                 )}
               </div>
@@ -2207,7 +2207,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                                   ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200' 
                                   : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30'
                               }`}
-                              title={isTh ? "แก้ไขข้อมูล (ใส่รหัส admin2026)" : "Edit Record (Password required)"}
+                              title={isTh ? "แก้ไขข้อมูล (ต้องใส่รหัสผ่านผู้ดูแลระบบ)" : "Edit Record (Admin password required)"}
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                               <span className="hidden sm:inline">{isTh ? 'แก้ไข' : 'Edit'}</span>
@@ -2463,7 +2463,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               <input
                 type="password"
                 autoFocus
-                placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
+                placeholder={isTh ? "ใส่รหัสผ่านผู้ดูแลระบบ" : "Enter admin password"}
                 value={historyAuthPassword}
                 onChange={(e) => setHistoryAuthPassword(e.target.value)}
                 className={`w-full border rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none ${
@@ -2474,7 +2474,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               />
               {historyAuthError && (
                 <p className="text-xs text-rose-500 font-semibold text-center">
-                  {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
+                  {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง' : 'Incorrect password! Please try again.'}
                 </p>
               )}
               <div className="flex gap-2 pt-2">
@@ -2739,7 +2739,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 <input
                   type="password"
                   autoFocus
-                  placeholder={isTh ? "ใส่รหัสผ่าน admin2026 เพื่อยืนยัน" : "Enter password (admin2026)"}
+                  placeholder={isTh ? "ใส่รหัสผ่านผู้ดูแลระบบเพื่อยืนยัน" : "Enter admin password to confirm"}
                   value={deleteConfirmPassword}
                   onChange={(e) => setDeleteConfirmPassword(e.target.value)}
                   className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
@@ -2750,7 +2750,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 />
                 {deleteConfirmPasswordError && (
                   <p className="text-xs text-rose-500 font-semibold text-center mt-1.5">
-                    {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
+                    {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง' : 'Incorrect password! Please try again.'}
                   </p>
                 )}
               </div>

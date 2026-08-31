@@ -176,9 +176,12 @@ export interface BilletInspectionItem {
   xrf: string;
   quantity_pcs: string | number;
   weight_kg: string | number;
-  cutting_surface_lt2?: string | boolean;
-  billet_slid_lt25?: string | boolean;
-  defect_2x50x100?: string | boolean;
+  cutting_surface_lt2?: boolean; // Checklist: true = Pass (< 2mm), false = NG (≥ 2mm)
+  billet_slid_lt25?: boolean;    // Checklist: true = Pass (≤ 2.5mm), false = NG (> 2.5mm)
+  defect_depth?: string | number;   // Defect Depth < 5mm
+  defect_width?: string | number;   // Defect Width < 50mm
+  defect_length?: string | number;  // Defect Length < 100mm
+  defect_2x50x100?: string | boolean; // For backward compatibility
   chemical_composition: ChemComposition;
   judgement?: 'PASS' | 'FAIL' | 'NO SPEC';
   timestamp?: string;
@@ -240,6 +243,7 @@ export interface ChemicalInspectionEntry {
 }
 
 // Tensile Measurement App Types (IPQA-01)
+export type TensileLimitMode = 'min' | 'max' | 'both';
 export type TensileElongMode = 'min' | 'max' | 'both';
 
 export interface TensileQualitySpec {
@@ -250,17 +254,22 @@ export interface TensileQualitySpec {
   max_w: number;
   min_h: number;
   max_h: number;
-  tensile: number;
-  yield: number;
+  tensile: number; // Min value (or single limit value)
+  tensile_max?: number; // Max value when mode is 'max' or 'both'
+  tensile_mode?: TensileLimitMode; // 'min' (≥ Min), 'max' (≤ Max), or 'both' (Min ~ Max)
+  yield: number; // Min value (or single limit value)
+  yield_max?: number; // Max value when mode is 'max' or 'both'
+  yield_mode?: TensileLimitMode; // 'min' (≥ Min), 'max' (≤ Max), or 'both' (Min ~ Max)
   elong: number; // Min value (or single limit value)
   elong_max?: number; // Max value when mode is 'max' or 'both'
-  elong_mode?: TensileElongMode; // 'min' (≥ Min), 'max' (≤ Max), or 'both' (Min ~ Max)
+  elong_mode?: TensileLimitMode; // 'min' (≥ Min), 'max' (≤ Max), or 'both' (Min ~ Max)
 }
 
 export interface TensileRecord {
   id: string;
   coil_no: string;
   heat_no: string;
+  work_order?: string;
   profile: string;
   process: string;
   machine: string;
@@ -364,14 +373,22 @@ export interface XRayInspectionRecord {
   process: string;
   raUp: string | string[]; // Zn weight Up (single string or array of points)
   raLo: string | string[]; // Zn weight Lo (single string or array of points)
-  rzUp: string; // Flux weight Up
-  rzLo: string; // Flux weight Lo
-  rtUp: string; // Coverage Up
-  rtLo: string; // Coverage Lo
+  rzUp: string | string[]; // Flux weight Up (single string or array of points)
+  rzLo: string | string[]; // Flux weight Lo (single string or array of points)
+  rtUp: string | string[]; // Coverage Up (single string or array of points)
+  rtLo: string | string[]; // Coverage Lo (single string or array of points)
   znAvgUp?: string;
   znAvgLo?: string;
   znAvgTotal?: string;
   znPointsCount?: number;
+  fluxAvgUp?: string;
+  fluxAvgLo?: string;
+  fluxAvgTotal?: string;
+  fluxPointsCount?: number;
+  coverageAvgUp?: string;
+  coverageAvgLo?: string;
+  coverageAvgTotal?: string;
+  coveragePointsCount?: number;
   status: 'Pass' | 'Fail' | 'Pending';
   remarks?: string;
   profileName: string;
@@ -449,6 +466,7 @@ export interface CoatingInspectionRecord {
 
 // Cutting Dimension Measurement App Types (IPQA-05)
 export type CuttingEvaluationType = 'target_tol' | 'max_only' | 'min_only' | 'min_max';
+export type MicroType = 'Blade' | 'Rod' | 'None';
 
 export interface CuttingCustomPointSpec {
   id: string;
@@ -461,6 +479,9 @@ export interface CuttingCustomPointSpec {
   maxLimit?: string;
   minLimit?: string;
   description?: string;
+  isSC?: boolean; // Special Characteristic (จุดควบคุมวิกฤต/สำคัญ)
+  microType?: MicroType; // ประเภทหัวไมโครมิเตอร์ (Blade, Rod, None)
+  order?: number; // ลำดับหัวข้อในการวัด / ตำแหน่ง Column
 }
 
 export interface CuttingProfileSpec {
@@ -471,23 +492,42 @@ export interface CuttingProfileSpec {
   widthTarget: string;
   widthTolPlus: string;
   widthTolMinus: string;
+  widthIsSC?: boolean;
+  widthMicroType?: MicroType;
+  widthOrder?: number;
   heightName?: string;
   heightLeftName?: string;
   heightRightName?: string;
   heightTarget: string;
   heightTolPlus: string;
   heightTolMinus: string;
+  heightIsSC?: boolean;
+  heightMicroType?: MicroType;
+  heightOrder?: number;
   lengthName?: string;
   lengthTarget: string;
   lengthTolPlus: string;
   lengthTolMinus: string;
+  lengthIsSC?: boolean;
+  lengthMicroType?: MicroType;
+  lengthOrder?: number;
   bendingName?: string;
   bendingMax: string;
+  bendingIsSC?: boolean;
+  bendingMicroType?: MicroType;
+  bendingOrder?: number;
   camberName?: string;
   camberMax: string;
+  camberIsSC?: boolean;
+  camberMicroType?: MicroType;
+  camberOrder?: number;
   twistName?: string;
   twistMax: string;
+  twistIsSC?: boolean;
+  twistMicroType?: MicroType;
+  twistOrder?: number;
   customControlPoints?: CuttingCustomPointSpec[];
+  pointOrderList?: string[]; // Optional custom point ordering IDs
 }
 
 export interface CuttingInspectionRecord {

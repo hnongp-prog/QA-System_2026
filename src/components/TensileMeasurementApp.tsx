@@ -50,10 +50,69 @@ import {
   TensileRecord, 
   Language, 
   InspectionActivity,
+  TensileLimitMode,
   TensileElongMode,
   ThemeMode
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
+import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
+import { STANDARD_PROCESS_OPTIONS, STANDARD_MACHINE_OPTIONS } from '../constants/processOptions';
+
+export const formatTensileSpec = (spec: TensileQualitySpec): string => {
+  const mode = spec.tensile_mode || 'min';
+  if (mode === 'max') {
+    const maxVal = spec.tensile_max !== undefined ? spec.tensile_max : spec.tensile;
+    return `≤ ${maxVal} MPa`;
+  }
+  if (mode === 'both') {
+    const minVal = spec.tensile;
+    const maxVal = spec.tensile_max !== undefined ? spec.tensile_max : spec.tensile;
+    return `${minVal} - ${maxVal} MPa`;
+  }
+  return `≥ ${spec.tensile} MPa`;
+};
+
+export const isTensilePass = (val: number, spec: TensileQualitySpec): boolean => {
+  const mode = spec.tensile_mode || 'min';
+  if (mode === 'max') {
+    const maxVal = spec.tensile_max !== undefined ? spec.tensile_max : spec.tensile;
+    return val <= maxVal;
+  }
+  if (mode === 'both') {
+    const minVal = spec.tensile;
+    const maxVal = spec.tensile_max !== undefined ? spec.tensile_max : spec.tensile;
+    return val >= minVal && val <= maxVal;
+  }
+  return val >= spec.tensile;
+};
+
+export const formatYieldSpec = (spec: TensileQualitySpec): string => {
+  const mode = spec.yield_mode || 'min';
+  if (mode === 'max') {
+    const maxVal = spec.yield_max !== undefined ? spec.yield_max : spec.yield;
+    return `≤ ${maxVal} MPa`;
+  }
+  if (mode === 'both') {
+    const minVal = spec.yield;
+    const maxVal = spec.yield_max !== undefined ? spec.yield_max : spec.yield;
+    return `${minVal} - ${maxVal} MPa`;
+  }
+  return `≥ ${spec.yield} MPa`;
+};
+
+export const isYieldPass = (val: number, spec: TensileQualitySpec): boolean => {
+  const mode = spec.yield_mode || 'min';
+  if (mode === 'max') {
+    const maxVal = spec.yield_max !== undefined ? spec.yield_max : spec.yield;
+    return val <= maxVal;
+  }
+  if (mode === 'both') {
+    const minVal = spec.yield;
+    const maxVal = spec.yield_max !== undefined ? spec.yield_max : spec.yield;
+    return val >= minVal && val <= maxVal;
+  }
+  return val >= spec.yield;
+};
 
 export const formatElongationSpec = (spec: TensileQualitySpec): string => {
   const mode = spec.elong_mode || 'min';
@@ -101,7 +160,9 @@ const DEFAULT_TENSILE_SPECS: TensileQualitySpec[] = [
     min_h: 3.0,
     max_h: 3.5,
     tensile: 400.0,
+    tensile_mode: 'min',
     yield: 250.0,
+    yield_mode: 'min',
     elong: 20.0,
     elong_mode: 'min'
   },
@@ -113,8 +174,11 @@ const DEFAULT_TENSILE_SPECS: TensileQualitySpec[] = [
     max_w: 20.5,
     min_h: 2.0,
     max_h: 2.5,
-    tensile: 450.0,
-    yield: 275.0,
+    tensile: 400.0,
+    tensile_max: 510.0,
+    tensile_mode: 'both',
+    yield: 245.0,
+    yield_mode: 'min',
     elong: 18.0,
     elong_max: 30.0,
     elong_mode: 'both'
@@ -128,7 +192,9 @@ const DEFAULT_TENSILE_SPECS: TensileQualitySpec[] = [
     min_h: 4.0,
     max_h: 4.8,
     tensile: 500.0,
+    tensile_mode: 'min',
     yield: 320.0,
+    yield_mode: 'min',
     elong: 15.0,
     elong_mode: 'min'
   }
@@ -139,6 +205,7 @@ const INITIAL_RECORDS: TensileRecord[] = [
     id: 'rec-001',
     coil_no: 'COIL-2026-A101',
     heat_no: 'HEAT-9812',
+    work_order: 'WO-2026-001',
     profile: 'HR-A36',
     process: 'HOT_ROLL',
     machine: 'TENSILE-M01',
@@ -158,6 +225,7 @@ const INITIAL_RECORDS: TensileRecord[] = [
     id: 'rec-002',
     coil_no: 'COIL-2026-A102',
     heat_no: 'HEAT-9813',
+    work_order: 'WO-2026-001',
     profile: 'HR-A36',
     process: 'HOT_ROLL',
     machine: 'TENSILE-M01',
@@ -177,6 +245,7 @@ const INITIAL_RECORDS: TensileRecord[] = [
     id: 'rec-003',
     coil_no: 'COIL-2026-B201',
     heat_no: 'HEAT-7710',
+    work_order: 'WO-2026-002',
     profile: 'CR-SS400',
     process: 'COLD_ROLL',
     machine: 'TENSILE-M02',
@@ -222,6 +291,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   const [topRow, setTopRow] = useState<{
     coil_no: string;
     heat_no: string;
+    work_order: string;
     sample_name: string;
     width: string;
     h_left: string;
@@ -232,6 +302,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   }>({
     coil_no: '',
     heat_no: '',
+    work_order: '',
     sample_name: '',
     width: '',
     h_left: '',
@@ -246,6 +317,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     id: string;
     coil_no: string;
     heat_no: string;
+    work_order: string;
     sample_name: string;
     width: string;
     h_left: string;
@@ -331,6 +403,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     setTopRow({
       coil_no: '',
       heat_no: '',
+      work_order: '',
       sample_name: '',
       width: '',
       h_left: '',
@@ -351,6 +424,13 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     setEnteredRows([]);
   };
 
+  // Helper to test if a field is ignored/unmeasured (like '-', 'N/A', empty)
+  const isIgnoredValue = (v?: string | number): boolean => {
+    if (v === undefined || v === null) return true;
+    const s = String(v).trim();
+    return s === '' || s === '-' || s === '--' || s === '---' || s === 'N/A' || s === 'n/a' || s === 'none' || s === 'null' || s === 'undefined';
+  };
+
   // Single Row Evaluator
   const evaluateRow = (row: {
     width: string;
@@ -362,10 +442,8 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   }): 'PASS' | 'FAIL' | 'PENDING' => {
     if (!matchedSpec) return 'PENDING';
     const parseVal = (v: string) => {
-      if (v === undefined || v === null) return null;
-      const s = String(v).trim();
-      if (s === '' || s === '-' || s === 'N/A') return null; // unmeasured / exempt
-      const num = parseFloat(s);
+      if (isIgnoredValue(v)) return null;
+      const num = parseFloat(String(v).trim());
       return isNaN(num) ? NaN : num;
     };
 
@@ -381,28 +459,28 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       return 'PENDING';
     }
 
-    // Check if at least one field has been measured
-    const hasAnyMeasured = [w, hl, hr, t, y, e].some(v => v !== null);
-    if (!hasAnyMeasured) return 'PENDING';
+    // Check if at least one field has been measured with a valid number
+    const numericFields = [w, hl, hr, t, y, e].filter((v): v is number => v !== null && !isNaN(v));
+    if (numericFields.length === 0) return 'PENDING';
 
     let pass = true;
 
-    if (w !== null) {
+    if (w !== null && !isNaN(w)) {
       if (w < matchedSpec.min_w || w > matchedSpec.max_w) pass = false;
     }
-    if (hl !== null) {
+    if (hl !== null && !isNaN(hl)) {
       if (hl < matchedSpec.min_h || hl > matchedSpec.max_h) pass = false;
     }
-    if (hr !== null) {
+    if (hr !== null && !isNaN(hr)) {
       if (hr < matchedSpec.min_h || hr > matchedSpec.max_h) pass = false;
     }
-    if (t !== null) {
-      if (t < matchedSpec.tensile) pass = false;
+    if (t !== null && !isNaN(t)) {
+      if (!isTensilePass(t, matchedSpec)) pass = false;
     }
-    if (y !== null) {
-      if (y < matchedSpec.yield) pass = false;
+    if (y !== null && !isNaN(y)) {
+      if (!isYieldPass(y, matchedSpec)) pass = false;
     }
-    if (e !== null) {
+    if (e !== null && !isNaN(e)) {
       if (!isElongPass(e, matchedSpec)) pass = false;
     }
 
@@ -414,7 +492,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     if (e) e.preventDefault();
 
     // Check if at least some key values are typed
-    const hasValues = topRow.tensile.trim() || topRow.width.trim() || topRow.h_left.trim() || topRow.h_right.trim() || topRow.yield_val.trim() || topRow.elong.trim() || topRow.coil_no.trim() || topRow.sample_name.trim();
+    const hasValues = topRow.tensile.trim() || topRow.width.trim() || topRow.h_left.trim() || topRow.h_right.trim() || topRow.yield_val.trim() || topRow.elong.trim() || topRow.coil_no.trim() || topRow.heat_no.trim() || topRow.work_order.trim() || topRow.sample_name.trim();
     if (!hasValues) {
       alert(isTh ? 'กรุณากรอกข้อมูลในฟิลด์แถวด้านบนก่อนกดเพิ่มรายการ' : 'Please enter measurement values in the top row before adding');
       return;
@@ -423,12 +501,14 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     const currentCount = enteredRows.length + 1;
     const cleanCoil = topRow.coil_no.trim().toUpperCase() || (enteredRows[0]?.coil_no || 'COIL-01');
     const cleanHeat = topRow.heat_no.trim().toUpperCase() || (enteredRows[0]?.heat_no || 'HEAT-01');
+    const cleanWorkOrder = topRow.work_order.trim().toUpperCase() || (enteredRows[0]?.work_order || '');
     const cleanSample = topRow.sample_name.trim().toUpperCase() || `SAMPLE-${String(currentCount).padStart(2, '0')}`;
 
     const newEntryItem = {
       id: `entry-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       coil_no: cleanCoil,
       heat_no: cleanHeat,
+      work_order: cleanWorkOrder,
       sample_name: cleanSample,
       width: topRow.width.trim() || '-',
       h_left: topRow.h_left.trim() || '-',
@@ -441,10 +521,11 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     // Prepend to enteredRows so previous rows shift downward
     setEnteredRows(prev => [newEntryItem, ...prev]);
 
-    // Keep coil_no and heat_no for continuous entry of same batch, clear numerical fields
+    // Keep coil_no, heat_no, and work_order for continuous entry of same batch, clear numerical fields
     setTopRow({
       coil_no: cleanCoil,
       heat_no: cleanHeat,
+      work_order: cleanWorkOrder,
       sample_name: '',
       width: '',
       h_left: '',
@@ -490,6 +571,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
         id: `entry-top-${Date.now()}`,
         coil_no: topRow.coil_no.trim().toUpperCase() || 'COIL-01',
         heat_no: topRow.heat_no.trim().toUpperCase() || 'HEAT-01',
+        work_order: topRow.work_order.trim().toUpperCase() || '',
         sample_name: topRow.sample_name.trim().toUpperCase() || `SAMPLE-${rowsToProcess.length + 1}`,
         width: topRow.width.trim() || '-',
         h_left: topRow.h_left.trim() || '-',
@@ -534,6 +616,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
         id: recId,
         coil_no: row.coil_no.trim().toUpperCase() || 'COIL-UNTITLED',
         heat_no: row.heat_no.trim().toUpperCase() || 'HEAT-00',
+        work_order: row.work_order?.trim().toUpperCase() || '',
         profile: matchedSpec.profile,
         process: matchedSpec.process,
         machine: mainMachine.trim().toUpperCase() || 'TENSILE-M01',
@@ -556,7 +639,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
 
       const inspectionResultText = decision === 'PASS' 
         ? `PASS (Tensile: ${t} MPa, Yield: ${y} MPa, Elong: ${e}%)` 
-        : `FAIL / Out of Spec: Tensile ${t} MPa (Spec Min: ${matchedSpec.tensile}), Yield ${y} MPa (Spec Min: ${matchedSpec.yield}), Elongation ${e}% (Spec: ${formatElongationSpec(matchedSpec)})`;
+        : `FAIL / Out of Spec: Tensile ${t} MPa (Spec: ${formatTensileSpec(matchedSpec)}), Yield ${y} MPa (Spec: ${formatYieldSpec(matchedSpec)}), Elongation ${e}% (Spec: ${formatElongationSpec(matchedSpec)})`;
 
       if (onLogNewActivity) {
         onLogNewActivity({
@@ -622,9 +705,13 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     max_w: string;
     min_h: string;
     max_h: string;
+    tensile_mode: TensileLimitMode;
     tensile: string;
+    tensile_max: string;
+    yield_mode: TensileLimitMode;
     yield: string;
-    elong_mode: TensileElongMode;
+    yield_max: string;
+    elong_mode: TensileLimitMode;
     elong: string;
     elong_max: string;
   }>({
@@ -634,8 +721,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     max_w: '',
     min_h: '',
     max_h: '',
+    tensile_mode: 'min',
     tensile: '',
+    tensile_max: '',
+    yield_mode: 'min',
     yield: '',
+    yield_max: '',
     elong_mode: 'min',
     elong: '',
     elong_max: ''
@@ -656,6 +747,10 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     const cleanProfile = newSpecForm.profile.trim().toUpperCase();
     const cleanProcess = newSpecForm.process.trim().toUpperCase() || 'HOT_ROLL';
 
+    const tensileVal = parseFloat(newSpecForm.tensile) || 0;
+    const tensileMaxVal = newSpecForm.tensile_max ? (parseFloat(newSpecForm.tensile_max) || 0) : undefined;
+    const yieldVal = parseFloat(newSpecForm.yield) || 0;
+    const yieldMaxVal = newSpecForm.yield_max ? (parseFloat(newSpecForm.yield_max) || 0) : undefined;
     const elongVal = parseFloat(newSpecForm.elong) || 0;
     const elongMaxVal = newSpecForm.elong_max ? (parseFloat(newSpecForm.elong_max) || 0) : undefined;
 
@@ -667,8 +762,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       max_w: parseFloat(newSpecForm.max_w) || 0,
       min_h: parseFloat(newSpecForm.min_h) || 0,
       max_h: parseFloat(newSpecForm.max_h) || 0,
-      tensile: parseFloat(newSpecForm.tensile) || 0,
-      yield: parseFloat(newSpecForm.yield) || 0,
+      tensile: tensileVal,
+      tensile_max: newSpecForm.tensile_mode === 'max' ? (tensileMaxVal !== undefined ? tensileMaxVal : tensileVal) : (newSpecForm.tensile_mode === 'both' ? (tensileMaxVal !== undefined ? tensileMaxVal : tensileVal) : undefined),
+      tensile_mode: newSpecForm.tensile_mode,
+      yield: yieldVal,
+      yield_max: newSpecForm.yield_mode === 'max' ? (yieldMaxVal !== undefined ? yieldMaxVal : yieldVal) : (newSpecForm.yield_mode === 'both' ? (yieldMaxVal !== undefined ? yieldMaxVal : yieldVal) : undefined),
+      yield_mode: newSpecForm.yield_mode,
       elong: elongVal,
       elong_max: newSpecForm.elong_mode === 'max' ? (elongMaxVal !== undefined ? elongMaxVal : elongVal) : (newSpecForm.elong_mode === 'both' ? (elongMaxVal !== undefined ? elongMaxVal : elongVal) : undefined),
       elong_mode: newSpecForm.elong_mode
@@ -695,8 +794,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       max_w: '',
       min_h: '',
       max_h: '',
+      tensile_mode: 'min',
       tensile: '',
+      tensile_max: '',
+      yield_mode: 'min',
       yield: '',
+      yield_max: '',
       elong_mode: 'min',
       elong: '',
       elong_max: ''
@@ -713,8 +816,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       max_w: '',
       min_h: '',
       max_h: '',
+      tensile_mode: 'min',
       tensile: '',
+      tensile_max: '',
+      yield_mode: 'min',
       yield: '',
+      yield_max: '',
       elong_mode: 'min',
       elong: '',
       elong_max: ''
@@ -792,8 +899,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
         tensile: typeof r.tensile === 'number' ? r.tensile : (parseFloat(String(r.tensile)) || null),
         yield: typeof r.yield === 'number' ? r.yield : (parseFloat(String(r.yield)) || null),
         elong: typeof r.elong === 'number' ? r.elong : (parseFloat(String(r.elong)) || null),
-        specTensile: recordSpec?.tensile || 400,
-        specYield: recordSpec?.yield || 250,
+        specTensileMin: recordSpec?.tensile ?? 400,
+        specTensileMax: recordSpec?.tensile_max,
+        tensileMode: recordSpec?.tensile_mode || 'min',
+        specYieldMin: recordSpec?.yield ?? 250,
+        specYieldMax: recordSpec?.yield_max,
+        yieldMode: recordSpec?.yield_mode || 'min',
         specElongMin: recordSpec?.elong ?? 20,
         specElongMax: recordSpec?.elong_max,
         elongMode: recordSpec?.elong_mode || 'min'
@@ -804,9 +915,9 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   // Export CSV
   const exportHistoryCSV = () => {
     if (records.length === 0) return;
-    let csv = "\uFEFFCoil No,Heat No,Profile,Process,Machine,Inspector,Sample,Width,H_Left,H_Right,Tensile(MPa),Yield(MPa),Elong(%),Decision,Timestamp\n";
+    let csv = "\uFEFFCoil No,Heat No,Work Order,Profile,Process,Machine,Inspector,Sample,Width,H_Left,H_Right,Tensile(MPa),Yield(MPa),Elong(%),Decision,Timestamp\n";
     records.forEach(r => {
-      csv += `"${r.coil_no}","${r.heat_no}","${r.profile}","${r.process}","${r.machine}","${r.inspector}","${r.sample_name}","${r.width}","${r.h_left}","${r.h_right}","${r.tensile}","${r.yield}","${r.elong}","${r.decision}","${r.timestamp}"\n`;
+      csv += `"${r.coil_no}","${r.heat_no}","${r.work_order || ''}","${r.profile}","${r.process}","${r.machine}","${r.inspector}","${r.sample_name}","${r.width}","${r.h_left}","${r.h_right}","${r.tensile}","${r.yield}","${r.elong}","${r.decision}","${r.timestamp}"\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -834,7 +945,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
               </div>
               <h3 className={`text-lg font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Admin Verification</h3>
               <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อเข้าสู่โหมดตั้งค่า Spec (admin2026)' : 'Please enter admin password to configure quality specs'}
+                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อเข้าสู่โหมดตั้งค่า Spec' : 'Please enter admin password to configure quality specs'}
               </p>
             </div>
 
@@ -1088,31 +1199,19 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 </select>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                  Process Name
-                </label>
-                <input
-                  type="text"
-                  value={mainProcess}
-                  onChange={(e) => setMainProcess(e.target.value.toUpperCase())}
-                  placeholder="HOT_ROLL / COLD_ROLL"
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500 uppercase"
-                />
-              </div>
+              <ProcessSelector
+                id="tensile-main-process"
+                label={isTh ? 'Process Name (กระบวนการ)' : 'Process Name'}
+                value={mainProcess}
+                onChange={(proc) => setMainProcess(proc)}
+              />
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                  Machine Code
-                </label>
-                <input
-                  type="text"
-                  value={mainMachine}
-                  onChange={(e) => setMainMachine(e.target.value.toUpperCase())}
-                  placeholder="เช่น TENSILE-M01"
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500 uppercase"
-                />
-              </div>
+              <MachineSelector
+                id="tensile-main-machine"
+                label={isTh ? 'Machine Code (เครื่องจักร)' : 'Machine Code'}
+                value={mainMachine}
+                onChange={(mac) => setMainMachine(mac)}
+              />
 
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
@@ -1153,8 +1252,8 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
               <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-300">
                 <div><span className="text-slate-500">Spec Width (W):</span> <strong className="text-cyan-300">{matchedSpec.min_w} - {matchedSpec.max_w} mm</strong></div>
                 <div><span className="text-slate-500">Spec Height (H):</span> <strong className="text-cyan-300">{matchedSpec.min_h} - {matchedSpec.max_h} mm</strong></div>
-                <div><span className="text-slate-500">Min Tensile:</span> <strong className="text-emerald-300">≥ {matchedSpec.tensile} MPa</strong></div>
-                <div><span className="text-slate-500">Yield / Elong:</span> <strong className="text-amber-300">≥ {matchedSpec.yield} MPa / {formatElongationSpec(matchedSpec)}</strong></div>
+                <div><span className="text-slate-500">{isTh ? 'เกณฑ์ Tensile:' : 'Tensile Spec:'}</span> <strong className="text-emerald-300">{formatTensileSpec(matchedSpec)}</strong></div>
+                <div><span className="text-slate-500">Yield / Elong:</span> <strong className="text-amber-300">{formatYieldSpec(matchedSpec)} / {formatElongationSpec(matchedSpec)}</strong></div>
               </div>
             )}
           </div>
@@ -1235,8 +1334,8 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 })()}
               </div>
 
-              {/* 9 Inputs Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-2.5">
+              {/* 10 Inputs Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-2.5">
                 <div>
                   <label className="text-[9px] font-bold text-cyan-300 block uppercase mb-1">Coil No. *</label>
                   <input
@@ -1257,6 +1356,18 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                     onChange={(e) => setTopRow(prev => ({ ...prev, heat_no: e.target.value }))}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
                     placeholder="HEAT-01"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">Work Order</label>
+                  <input
+                    type="text"
+                    value={topRow.work_order}
+                    onChange={(e) => setTopRow(prev => ({ ...prev, work_order: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                    placeholder="WO-01"
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
                   />
                 </div>
@@ -1424,7 +1535,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                               #{idx + 1}
                             </span>
                             <span className="font-bold text-white text-xs">{row.sample_name || `SAMPLE-${idx+1}`}</span>
-                            <span className="text-[10px] text-slate-400 font-mono">({row.coil_no} / {row.heat_no})</span>
+                            <span className="text-[10px] text-slate-400 font-mono">({row.coil_no} / {row.heat_no}{row.work_order ? ` / WO: ${row.work_order}` : ''})</span>
                           </div>
 
                           <div className="flex items-center gap-2">
@@ -1449,7 +1560,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         </div>
 
                         {/* Row Editable Fields */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-2">
                           <div>
                             <label className="text-[8px] font-bold text-slate-500 block uppercase">Coil No.</label>
                             <input
@@ -1466,6 +1577,16 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                               type="text"
                               value={row.heat_no}
                               onChange={(e) => handleUpdateEnteredRow(row.id, 'heat_no', e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500 uppercase"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[8px] font-bold text-slate-500 block uppercase">Work Order</label>
+                            <input
+                              type="text"
+                              value={row.work_order || ''}
+                              onChange={(e) => handleUpdateEnteredRow(row.id, 'work_order', e.target.value)}
                               className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500 uppercase"
                             />
                           </div>
@@ -1642,7 +1763,11 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                     <tr key={r.id} className="hover:bg-slate-950/40">
                       <td className="px-4 py-3 font-mono">
                         <strong className="text-cyan-300 text-xs block">{r.coil_no}</strong>
-                        <span className="text-[10px] text-slate-500">
+                        <div className="text-[10px] text-slate-400">
+                          <span>Heat: {r.heat_no || '-'}</span>
+                          {r.work_order && <span className="text-amber-400 ml-1.5 font-semibold">WO: {r.work_order}</span>}
+                        </div>
+                        <span className="text-[10px] text-slate-500 block mt-0.5">
                           {r.timestamp} • {r.inspector || 'IPQA'}{r.shift ? ` (${r.shift})` : ''}
                         </span>
                       </td>
@@ -1773,7 +1898,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                       <YAxis stroke="#64748b" fontSize={10} domain={['auto', 'auto']} />
                       <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', fontSize: '12px' }} />
                       <Line type="monotone" dataKey="tensile" stroke="#06b6d4" strokeWidth={3} dot={{ r: 4, fill: '#06b6d4' }} name="Tensile (MPa)" />
-                      <ReferenceLine y={chartData[0]?.specTensile || 400} stroke="#ef4444" strokeDasharray="4 4" label={{ value: 'Min Spec', fill: '#ef4444', fontSize: 10 }} />
+                      {(chartData[0]?.tensileMode === 'min' || chartData[0]?.tensileMode === 'both' || !chartData[0]?.tensileMode) && (
+                        <ReferenceLine y={chartData[0]?.specTensileMin || 400} stroke="#ef4444" strokeDasharray="4 4" label={{ value: 'Min Spec', fill: '#ef4444', fontSize: 10 }} />
+                      )}
+                      {(chartData[0]?.tensileMode === 'max' || (chartData[0]?.tensileMode === 'both' && chartData[0]?.specTensileMax)) && (
+                        <ReferenceLine y={chartData[0]?.specTensileMax || 550} stroke="#f97316" strokeDasharray="4 4" label={{ value: 'Max Spec', fill: '#f97316', fontSize: 10 }} />
+                      )}
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
@@ -1802,7 +1932,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                       <YAxis stroke="#64748b" fontSize={10} domain={['auto', 'auto']} />
                       <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', fontSize: '12px' }} />
                       <Line type="monotone" dataKey="yield" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} name="Yield (MPa)" />
-                      <ReferenceLine y={chartData[0]?.specYield || 250} stroke="#ef4444" strokeDasharray="4 4" label={{ value: 'Min Spec', fill: '#ef4444', fontSize: 10 }} />
+                      {(chartData[0]?.yieldMode === 'min' || chartData[0]?.yieldMode === 'both' || !chartData[0]?.yieldMode) && (
+                        <ReferenceLine y={chartData[0]?.specYieldMin || 250} stroke="#ef4444" strokeDasharray="4 4" label={{ value: 'Min Spec', fill: '#ef4444', fontSize: 10 }} />
+                      )}
+                      {(chartData[0]?.yieldMode === 'max' || (chartData[0]?.yieldMode === 'both' && chartData[0]?.specYieldMax)) && (
+                        <ReferenceLine y={chartData[0]?.specYieldMax || 350} stroke="#f97316" strokeDasharray="4 4" label={{ value: 'Max Spec', fill: '#f97316', fontSize: 10 }} />
+                      )}
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
@@ -1941,15 +2076,11 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 </div>
 
                 <div className="lg:col-span-6">
-                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">
-                    {isTh ? 'ชื่อ Process Name' : 'Process Name'}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={isTh ? 'เช่น HOT_ROLL, COLD_ROLL, FORMING, EXTRUSION' : 'e.g. HOT_ROLL, COLD_ROLL, FORMING'}
+                  <ProcessSelector
+                    id="new-spec-process"
+                    label={isTh ? 'ชื่อ Process Name' : 'Process Name'}
                     value={newSpecForm.process}
-                    onChange={(e) => setNewSpecForm({ ...newSpecForm, process: e.target.value.toUpperCase() })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-200 placeholder-slate-600 uppercase focus:outline-none focus:border-cyan-400"
+                    onChange={(proc) => setNewSpecForm({ ...newSpecForm, process: proc })}
                   />
                 </div>
               </div>
@@ -2007,35 +2138,229 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 </div>
               </div>
 
-              {/* Row 3: Mechanical Strength Limits & Elongation Condition Setting */}
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-slate-950/80 p-3.5 rounded-xl border border-cyan-900/50">
-                    <label className="text-[10px] font-bold text-cyan-400 uppercase block mb-1">Min Tensile Strength (MPa)</label>
-                    <input
-                      type="number"
-                      step="1"
-                      placeholder="เช่น 400"
-                      value={newSpecForm.tensile}
-                      onChange={(e) => setNewSpecForm({ ...newSpecForm, tensile: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-cyan-300 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
-                    />
+              {/* Row 3: Mechanical Strength Limits (Tensile, Yield, Elongation with Min / Max / Both Conditions) */}
+              <div className="space-y-4">
+                {/* 1. Tensile Strength Condition Selector & Fields */}
+                <div className="bg-slate-950/80 p-4 rounded-xl border border-cyan-900/50 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block">
+                        {isTh ? 'เกณฑ์ค่า Tensile Strength (MPa)' : 'Tensile Strength Specification'}
+                      </span>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {isTh 
+                          ? 'เลือกประเภทเกณฑ์: ค่าขั้นต่ำ (≥ Min), ค่าสูงสุด (≤ Max), หรือช่วง (Min ~ Max)' 
+                          : 'Select condition: Minimum only (≥ Min), Maximum only (≤ Max), or Range (Min ~ Max)'}
+                      </p>
+                    </div>
+
+                    {/* Tensile Condition Mode Selector Buttons */}
+                    <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setNewSpecForm(prev => ({ ...prev, tensile_mode: 'min' }))}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                          newSpecForm.tensile_mode === 'min'
+                            ? 'bg-cyan-500 text-slate-950 shadow'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{isTh ? 'ค่าขั้นต่ำ (≥ Min)' : 'Min Only (≥)'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setNewSpecForm(prev => ({ ...prev, tensile_mode: 'max' }))}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                          newSpecForm.tensile_mode === 'max'
+                            ? 'bg-cyan-500 text-slate-950 shadow'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{isTh ? 'ค่าสูงสุด (≤ Max)' : 'Max Only (≤)'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setNewSpecForm(prev => ({ ...prev, tensile_mode: 'both' }))}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                          newSpecForm.tensile_mode === 'both'
+                            ? 'bg-cyan-500 text-slate-950 shadow'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{isTh ? 'ทั้ง 2 ค่า (Min ~ Max)' : 'Both (Min ~ Max)'}</span>
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="bg-slate-950/80 p-3.5 rounded-xl border border-emerald-900/50">
-                    <label className="text-[10px] font-bold text-emerald-400 uppercase block mb-1">Min Yield Strength (MPa)</label>
-                    <input
-                      type="number"
-                      step="1"
-                      placeholder="เช่น 250"
-                      value={newSpecForm.yield}
-                      onChange={(e) => setNewSpecForm({ ...newSpecForm, yield: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-emerald-300 placeholder-slate-600 focus:outline-none focus:border-emerald-400"
-                    />
+                  {/* Tensile Input Fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {(newSpecForm.tensile_mode === 'min' || newSpecForm.tensile_mode === 'both') && (
+                      <div>
+                        <label className="text-[10px] font-bold text-cyan-300 uppercase block mb-1">
+                          {newSpecForm.tensile_mode === 'both' ? (isTh ? 'Min Tensile (MPa) [ค่าต่ำสุด]' : 'Min Tensile (MPa)') : (isTh ? 'Min Tensile (MPa) [เกณฑ์ขั้นต่ำ ≥]' : 'Min Tensile (MPa)')}
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          placeholder={isTh ? 'เช่น 400' : 'e.g. 400'}
+                          value={newSpecForm.tensile}
+                          onChange={(e) => setNewSpecForm({ ...newSpecForm, tensile: e.target.value })}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-cyan-300 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    )}
+
+                    {(newSpecForm.tensile_mode === 'max' || newSpecForm.tensile_mode === 'both') && (
+                      <div>
+                        <label className="text-[10px] font-bold text-cyan-300 uppercase block mb-1">
+                          {newSpecForm.tensile_mode === 'both' ? (isTh ? 'Max Tensile (MPa) [ค่าสูงสุด]' : 'Max Tensile (MPa)') : (isTh ? 'Max Tensile (MPa) [เกณฑ์สูงสุด ≤]' : 'Max Tensile (MPa)')}
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          placeholder={isTh ? 'เช่น 510' : 'e.g. 510'}
+                          value={newSpecForm.tensile_mode === 'max' ? (newSpecForm.tensile_max || newSpecForm.tensile) : newSpecForm.tensile_max}
+                          onChange={(e) => {
+                            if (newSpecForm.tensile_mode === 'max') {
+                              setNewSpecForm({ ...newSpecForm, tensile_max: e.target.value, tensile: e.target.value });
+                            } else {
+                              setNewSpecForm({ ...newSpecForm, tensile_max: e.target.value });
+                            }
+                          }}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-cyan-300 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Live Criteria Preview Banner for Tensile */}
+                  <div className="bg-slate-900/90 px-3 py-2 rounded-lg border border-slate-800 flex items-center justify-between text-xs">
+                    <span className="text-slate-400 text-[11px]">
+                      {isTh ? 'สรุปเกณฑ์ตัดสิน Tensile:' : 'Tensile Rule Preview:'}
+                    </span>
+                    <span className="font-mono font-bold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800">
+                      {newSpecForm.tensile_mode === 'max'
+                        ? `≤ ${(newSpecForm.tensile_max || newSpecForm.tensile || '0')} MPa`
+                        : newSpecForm.tensile_mode === 'both'
+                        ? `${newSpecForm.tensile || '0'} ~ ${newSpecForm.tensile_max || '0'} MPa`
+                        : `≥ ${newSpecForm.tensile || '0'} MPa`}
+                    </span>
                   </div>
                 </div>
 
-                {/* Elongation Condition Selector & Fields (Min / Max / Both) */}
+                {/* 2. Yield Strength Condition Selector & Fields */}
+                <div className="bg-slate-950/80 p-4 rounded-xl border border-emerald-900/50 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">
+                        {isTh ? 'เกณฑ์ค่า Yield Strength (MPa)' : 'Yield Strength Specification'}
+                      </span>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {isTh 
+                          ? 'เลือกประเภทเกณฑ์: ค่าขั้นต่ำ (≥ Min), ค่าสูงสุด (≤ Max), หรือช่วง (Min ~ Max)' 
+                          : 'Select condition: Minimum only (≥ Min), Maximum only (≤ Max), or Range (Min ~ Max)'}
+                      </p>
+                    </div>
+
+                    {/* Yield Condition Mode Selector Buttons */}
+                    <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setNewSpecForm(prev => ({ ...prev, yield_mode: 'min' }))}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                          newSpecForm.yield_mode === 'min'
+                            ? 'bg-emerald-500 text-slate-950 shadow'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{isTh ? 'ค่าขั้นต่ำ (≥ Min)' : 'Min Only (≥)'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setNewSpecForm(prev => ({ ...prev, yield_mode: 'max' }))}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                          newSpecForm.yield_mode === 'max'
+                            ? 'bg-emerald-500 text-slate-950 shadow'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{isTh ? 'ค่าสูงสุด (≤ Max)' : 'Max Only (≤)'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setNewSpecForm(prev => ({ ...prev, yield_mode: 'both' }))}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                          newSpecForm.yield_mode === 'both'
+                            ? 'bg-emerald-500 text-slate-950 shadow'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{isTh ? 'ทั้ง 2 ค่า (Min ~ Max)' : 'Both (Min ~ Max)'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Yield Input Fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {(newSpecForm.yield_mode === 'min' || newSpecForm.yield_mode === 'both') && (
+                      <div>
+                        <label className="text-[10px] font-bold text-emerald-300 uppercase block mb-1">
+                          {newSpecForm.yield_mode === 'both' ? (isTh ? 'Min Yield (MPa) [ค่าต่ำสุด]' : 'Min Yield (MPa)') : (isTh ? 'Min Yield (MPa) [เกณฑ์ขั้นต่ำ ≥]' : 'Min Yield (MPa)')}
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          placeholder={isTh ? 'เช่น 250' : 'e.g. 250'}
+                          value={newSpecForm.yield}
+                          onChange={(e) => setNewSpecForm({ ...newSpecForm, yield: e.target.value })}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-emerald-300 placeholder-slate-600 focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+                    )}
+
+                    {(newSpecForm.yield_mode === 'max' || newSpecForm.yield_mode === 'both') && (
+                      <div>
+                        <label className="text-[10px] font-bold text-emerald-300 uppercase block mb-1">
+                          {newSpecForm.yield_mode === 'both' ? (isTh ? 'Max Yield (MPa) [ค่าสูงสุด]' : 'Max Yield (MPa)') : (isTh ? 'Max Yield (MPa) [เกณฑ์สูงสุด ≤]' : 'Max Yield (MPa)')}
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          placeholder={isTh ? 'เช่น 350' : 'e.g. 350'}
+                          value={newSpecForm.yield_mode === 'max' ? (newSpecForm.yield_max || newSpecForm.yield) : newSpecForm.yield_max}
+                          onChange={(e) => {
+                            if (newSpecForm.yield_mode === 'max') {
+                              setNewSpecForm({ ...newSpecForm, yield_max: e.target.value, yield: e.target.value });
+                            } else {
+                              setNewSpecForm({ ...newSpecForm, yield_max: e.target.value });
+                            }
+                          }}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono font-bold text-emerald-300 placeholder-slate-600 focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Live Criteria Preview Banner for Yield */}
+                  <div className="bg-slate-900/90 px-3 py-2 rounded-lg border border-slate-800 flex items-center justify-between text-xs">
+                    <span className="text-slate-400 text-[11px]">
+                      {isTh ? 'สรุปเกณฑ์ตัดสิน Yield:' : 'Yield Rule Preview:'}
+                    </span>
+                    <span className="font-mono font-bold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">
+                      {newSpecForm.yield_mode === 'max'
+                        ? `≤ ${(newSpecForm.yield_max || newSpecForm.yield || '0')} MPa`
+                        : newSpecForm.yield_mode === 'both'
+                        ? `${newSpecForm.yield || '0'} ~ ${newSpecForm.yield_max || '0'} MPa`
+                        : `≥ ${newSpecForm.yield || '0'} MPa`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Elongation Condition Selector & Fields (Min / Max / Both) */}
                 <div className="bg-slate-950/80 p-4 rounded-xl border border-amber-900/50 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
@@ -2217,9 +2542,27 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                             {spec.profile}
                           </span>
                         </div>
-                        <div className="mt-1 flex items-center gap-1.5">
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
                           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
                             {spec.process || 'HOT_ROLL'}
+                          </span>
+                          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                            spec.tensile_mode === 'max'
+                              ? 'bg-cyan-950 text-cyan-400 border-cyan-800'
+                              : spec.tensile_mode === 'both'
+                              ? 'bg-blue-950 text-blue-300 border-blue-800'
+                              : 'bg-cyan-950 text-cyan-300 border-cyan-800'
+                          }`}>
+                            {spec.tensile_mode === 'max' ? 'Ten: ≤Max' : spec.tensile_mode === 'both' ? 'Ten: Range' : 'Ten: ≥Min'}
+                          </span>
+                          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                            spec.yield_mode === 'max'
+                              ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
+                              : spec.yield_mode === 'both'
+                              ? 'bg-teal-950 text-teal-300 border-teal-800'
+                              : 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                          }`}>
+                            {spec.yield_mode === 'max' ? 'Yld: ≤Max' : spec.yield_mode === 'both' ? 'Yld: Range' : 'Yld: ≥Min'}
                           </span>
                           <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
                             spec.elong_mode === 'max'
@@ -2255,15 +2598,15 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                     {/* Compact Spec summary badges */}
                     <div className="bg-slate-900/70 p-2 rounded-lg border border-slate-850 grid grid-cols-3 gap-1.5 text-center text-[10px] font-mono">
                       <div>
-                        <span className="text-slate-500 block text-[9px]">Tensile</span>
-                        <span className="font-bold text-cyan-400">≥ {spec.tensile}</span>
+                        <span className="text-slate-500 block text-[9px]">Tensile (MPa)</span>
+                        <span className="font-bold text-cyan-400">{formatTensileSpec(spec)}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block text-[9px]">Yield</span>
-                        <span className="font-bold text-emerald-400">≥ {spec.yield}</span>
+                        <span className="text-slate-500 block text-[9px]">Yield (MPa)</span>
+                        <span className="font-bold text-emerald-400">{formatYieldSpec(spec)}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block text-[9px]">Elong</span>
+                        <span className="text-slate-500 block text-[9px]">Elong (%)</span>
                         <span className="font-bold text-amber-400">{formatElongationSpec(spec)}</span>
                       </div>
                     </div>
@@ -2313,15 +2656,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Process Name</label>
-                  <input
-                    type="text"
-                    value={editingSpec.process}
-                    onChange={(e) => setEditingSpec({ ...editingSpec, process: e.target.value.toUpperCase() })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500 uppercase"
-                  />
-                </div>
+                <ProcessSelector
+                  id="edit-spec-process"
+                  label={isTh ? 'Process Name (กระบวนการ)' : 'Process Name'}
+                  value={editingSpec.process}
+                  onChange={(proc) => setEditingSpec({ ...editingSpec, process: proc })}
+                />
               </div>
 
               {/* Dimensions */}
@@ -2373,33 +2713,183 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 </div>
               </div>
 
-              {/* Strength values & Elongation condition in Edit Modal */}
+              {/* Strength values & Conditions in Edit Modal (Tensile, Yield, Elongation) */}
               <div className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-slate-950 p-3 rounded-xl border border-cyan-900/40">
-                    <label className="text-[9px] font-bold text-cyan-400 uppercase block mb-1">Min Tensile (MPa)</label>
-                    <input
-                      type="number"
-                      step="1"
-                      value={editingSpec.tensile}
-                      onChange={(e) => setEditingSpec({ ...editingSpec, tensile: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-500"
-                    />
+                {/* 1. Edit Tensile Condition */}
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-cyan-900/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-bold text-cyan-400 uppercase">
+                      {isTh ? 'เงื่อนไข Tensile Strength (MPa)' : 'Tensile Condition (MPa)'}
+                    </label>
+                    <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setEditingSpec({ ...editingSpec, tensile_mode: 'min' })}
+                        className={`px-2 py-1 rounded text-[10px] font-bold transition ${
+                          (!editingSpec.tensile_mode || editingSpec.tensile_mode === 'min')
+                            ? 'bg-cyan-500 text-slate-950'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {isTh ? '≥ Min' : '≥ Min'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingSpec({ ...editingSpec, tensile_mode: 'max', tensile_max: editingSpec.tensile_max ?? editingSpec.tensile })}
+                        className={`px-2 py-1 rounded text-[10px] font-bold transition ${
+                          editingSpec.tensile_mode === 'max'
+                            ? 'bg-cyan-500 text-slate-950'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {isTh ? '≤ Max' : '≤ Max'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingSpec({ ...editingSpec, tensile_mode: 'both', tensile_max: editingSpec.tensile_max ?? (editingSpec.tensile + 100) })}
+                        className={`px-2 py-1 rounded text-[10px] font-bold transition ${
+                          editingSpec.tensile_mode === 'both'
+                            ? 'bg-cyan-500 text-slate-950'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {isTh ? 'Min ~ Max' : 'Min ~ Max'}
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="bg-slate-950 p-3 rounded-xl border border-emerald-900/40">
-                    <label className="text-[9px] font-bold text-emerald-400 uppercase block mb-1">Min Yield (MPa)</label>
-                    <input
-                      type="number"
-                      step="1"
-                      value={editingSpec.yield}
-                      onChange={(e) => setEditingSpec({ ...editingSpec, yield: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {(!editingSpec.tensile_mode || editingSpec.tensile_mode === 'min' || editingSpec.tensile_mode === 'both') && (
+                      <div>
+                        <label className="text-[9px] text-cyan-300 block mb-1">
+                          {editingSpec.tensile_mode === 'both' ? (isTh ? 'Min Tensile (MPa)' : 'Min Tensile (MPa)') : (isTh ? 'Min Tensile (MPa) [≥]' : 'Min Tensile (MPa) [≥]')}
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          value={editingSpec.tensile}
+                          onChange={(e) => setEditingSpec({ ...editingSpec, tensile: parseFloat(e.target.value) || 0 })}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-500"
+                        />
+                      </div>
+                    )}
+
+                    {(editingSpec.tensile_mode === 'max' || editingSpec.tensile_mode === 'both') && (
+                      <div>
+                        <label className="text-[9px] text-cyan-300 block mb-1">
+                          {editingSpec.tensile_mode === 'both' ? (isTh ? 'Max Tensile (MPa)' : 'Max Tensile (MPa)') : (isTh ? 'Max Tensile (MPa) [≤]' : 'Max Tensile (MPa) [≤]')}
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          value={editingSpec.tensile_mode === 'max' ? (editingSpec.tensile_max ?? editingSpec.tensile) : (editingSpec.tensile_max ?? editingSpec.tensile)}
+                          onChange={(e) => {
+                            const val罕 = parseFloat(e.target.value) || 0;
+                            if (editingSpec.tensile_mode === 'max') {
+                              setEditingSpec({ ...editingSpec, tensile_max: val罕, tensile: val罕 });
+                            } else {
+                              setEditingSpec({ ...editingSpec, tensile_max: val罕 });
+                            }
+                          }}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-[10px] text-right font-mono text-cyan-300">
+                    {isTh ? 'เกณฑ์ที่ตั้ง:' : 'Rule:'} {formatTensileSpec(editingSpec)}
                   </div>
                 </div>
 
-                {/* Edit Elongation Condition */}
+                {/* 2. Edit Yield Condition */}
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-emerald-900/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-bold text-emerald-400 uppercase">
+                      {isTh ? 'เงื่อนไข Yield Strength (MPa)' : 'Yield Condition (MPa)'}
+                    </label>
+                    <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setEditingSpec({ ...editingSpec, yield_mode: 'min' })}
+                        className={`px-2 py-1 rounded text-[10px] font-bold transition ${
+                          (!editingSpec.yield_mode || editingSpec.yield_mode === 'min')
+                            ? 'bg-emerald-500 text-slate-950'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {isTh ? '≥ Min' : '≥ Min'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingSpec({ ...editingSpec, yield_mode: 'max', yield_max: editingSpec.yield_max ?? editingSpec.yield })}
+                        className={`px-2 py-1 rounded text-[10px] font-bold transition ${
+                          editingSpec.yield_mode === 'max'
+                            ? 'bg-emerald-500 text-slate-950'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {isTh ? '≤ Max' : '≤ Max'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingSpec({ ...editingSpec, yield_mode: 'both', yield_max: editingSpec.yield_max ?? (editingSpec.yield + 50) })}
+                        className={`px-2 py-1 rounded text-[10px] font-bold transition ${
+                          editingSpec.yield_mode === 'both'
+                            ? 'bg-emerald-500 text-slate-950'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {isTh ? 'Min ~ Max' : 'Min ~ Max'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {(!editingSpec.yield_mode || editingSpec.yield_mode === 'min' || editingSpec.yield_mode === 'both') && (
+                      <div>
+                        <label className="text-[9px] text-emerald-300 block mb-1">
+                          {editingSpec.yield_mode === 'both' ? (isTh ? 'Min Yield (MPa)' : 'Min Yield (MPa)') : (isTh ? 'Min Yield (MPa) [≥]' : 'Min Yield (MPa) [≥]')}
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          value={editingSpec.yield}
+                          onChange={(e) => setEditingSpec({ ...editingSpec, yield: parseFloat(e.target.value) || 0 })}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    )}
+
+                    {(editingSpec.yield_mode === 'max' || editingSpec.yield_mode === 'both') && (
+                      <div>
+                        <label className="text-[9px] text-emerald-300 block mb-1">
+                          {editingSpec.yield_mode === 'both' ? (isTh ? 'Max Yield (MPa)' : 'Max Yield (MPa)') : (isTh ? 'Max Yield (MPa) [≤]' : 'Max Yield (MPa) [≤]')}
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          value={editingSpec.yield_mode === 'max' ? (editingSpec.yield_max ?? editingSpec.yield) : (editingSpec.yield_max ?? editingSpec.yield)}
+                          onChange={(e) => {
+                            const valY = parseFloat(e.target.value) || 0;
+                            if (editingSpec.yield_mode === 'max') {
+                              setEditingSpec({ ...editingSpec, yield_max: valY, yield: valY });
+                            } else {
+                              setEditingSpec({ ...editingSpec, yield_max: valY });
+                            }
+                          }}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-[10px] text-right font-mono text-emerald-300">
+                    {isTh ? 'เกณฑ์ที่ตั้ง:' : 'Rule:'} {formatYieldSpec(editingSpec)}
+                  </div>
+                </div>
+
+                {/* 3. Edit Elongation Condition */}
                 <div className="bg-slate-950 p-3.5 rounded-xl border border-amber-900/40 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <label className="text-[9px] font-bold text-amber-400 uppercase">
@@ -2528,8 +3018,8 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
               </h3>
               <p className="text-xs text-slate-400">
                 {isTh 
-                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจรับ IPQA-01 (Password: admin2026)' 
-                  : 'Enter password to edit IPQA-01 record (Password: admin2026)'}
+                  ? 'กรอกรหัสผ่านผู้ดูแลระบบเพื่อแก้ไขรายการตรวจรับ IPQA-01' 
+                  : 'Enter admin password to edit IPQA-01 record'}
               </p>
             </div>
 
@@ -2539,14 +3029,14 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                   type="password"
                   value={historyAuthPassword}
                   onChange={(e) => setHistoryAuthPassword(e.target.value)}
-                  placeholder="Password: admin2026"
+                  placeholder={isTh ? "รหัสผ่านผู้ดูแลระบบ" : "Admin Password"}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-center text-lg font-mono text-amber-300 focus:outline-none focus:border-amber-500"
                   autoFocus
                 />
                 {historyAuthError && (
                   <p className="text-xs text-rose-400 font-semibold text-center mt-2 flex items-center justify-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />
-                    <span>{isTh ? 'รหัสผ่านไม่ถูกต้อง! (กรุณาใช้ admin2026)' : 'Incorrect password! (Use admin2026)'}</span>
+                    <span>{isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง' : 'Incorrect password! Please try again'}</span>
                   </p>
                 )}
               </div>
@@ -2616,6 +3106,16 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                     type="text"
                     value={editingHistoryItem.heat_no || ''}
                     onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, heat_no: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500 uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Work Order</label>
+                  <input
+                    type="text"
+                    value={editingHistoryItem.work_order || ''}
+                    onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, work_order: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500 uppercase"
                   />
                 </div>

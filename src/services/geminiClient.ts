@@ -336,7 +336,9 @@ IMPORTANT INSTRUCTIONS:
       "weight_kg": 3600,
       "cutting_surface_lt2": true,
       "billet_slid_lt25": true,
-      "defect_2x50x100": false,
+      "defect_depth": "0",
+      "defect_width": "0",
+      "defect_length": "0",
       "chemical_composition": {
         "Si": 0.45,
         "Fe": 0.20,
@@ -402,9 +404,11 @@ IMPORTANT INSTRUCTIONS:
       xrf: String(item.xrf || "").trim(),
       quantity_pcs: Number(item.quantity_pcs || item.quantity || item.qty || 0),
       weight_kg: Number(item.weight_kg || item.weight || 0),
-      cutting_surface_lt2: item.cutting_surface_lt2 ? String(item.cutting_surface_lt2).trim() : "",
-      billet_slid_lt25: item.billet_slid_lt25 ? String(item.billet_slid_lt25).trim() : "",
-      defect_2x50x100: item.defect_2x50x100 ? String(item.defect_2x50x100).trim() : "",
+      cutting_surface_lt2: item.cutting_surface_lt2 !== undefined ? (item.cutting_surface_lt2 === true || item.cutting_surface_lt2 === 'true' || item.cutting_surface_lt2 === 'Pass' || item.cutting_surface_lt2 === 'OK') : true,
+      billet_slid_lt25: item.billet_slid_lt25 !== undefined ? (item.billet_slid_lt25 === true || item.billet_slid_lt25 === 'true' || item.billet_slid_lt25 === 'Pass' || item.billet_slid_lt25 === 'OK') : true,
+      defect_depth: item.defect_depth !== undefined ? String(item.defect_depth).trim() : (item.defect_2x50x100 ? '5' : '0'),
+      defect_width: item.defect_width !== undefined ? String(item.defect_width).trim() : '0',
+      defect_length: item.defect_length !== undefined ? String(item.defect_length).trim() : '0',
       chemical_composition: cleanChem
     };
   }).filter(Boolean);

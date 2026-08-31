@@ -248,7 +248,7 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
     } else {
       setStatusMsg({
         type: 'error',
-        message: isTh ? 'รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง (admin2026)' : 'Incorrect Admin Password (admin2026)'
+        message: isTh ? 'รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง' : 'Incorrect Admin Password'
       });
       setAdminPasswordInput('');
     }
@@ -839,7 +839,7 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
               </div>
               <h3 className="text-lg font-bold text-white uppercase tracking-wider">Admin Access Verification</h3>
               <p className="text-xs text-slate-400">
-                {isTh ? 'กรุณากรอกรหัสผ่านผู้ดูแลระบบเพื่อแก้ไข Master Spec (admin2026)' : 'Enter admin password for Spec Settings (admin2026)'}
+                {isTh ? 'กรุณากรอกรหัสผ่านผู้ดูแลระบบเพื่อแก้ไข Master Spec' : 'Enter admin password for Spec Settings'}
               </p>
             </div>
 

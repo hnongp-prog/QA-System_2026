@@ -43,7 +43,8 @@ import {
   Sun,
   Moon,
   Copy,
-  ExternalLink
+  ExternalLink,
+  Building2
 } from 'lucide-react';
 import { useCloudState } from '../services/firestoreSync';
 
@@ -152,9 +153,11 @@ const INITIAL_HISTORY: BilletInspectionItem[] = [
     xrf: "Verified Pass",
     quantity_pcs: 140,
     weight_kg: 4200,
-    cutting_surface_lt2: "0.8 mm",
-    billet_slid_lt25: "1.2 mm",
-    defect_2x50x100: "None / OK",
+    cutting_surface_lt2: true,
+    billet_slid_lt25: true,
+    defect_depth: "-",
+    defect_width: "-",
+    defect_length: "-",
     chemical_composition: {
       Si: 0.42, Fe: 0.18, Cu: 0.02, Mn: 0.03, Mg: 0.52, Cr: 0.01, Zn: 0.02, Ti: 0.01, Pb: 0.00, Cd: 0.00, Al: 98.79
     },
@@ -180,9 +183,11 @@ const INITIAL_HISTORY: BilletInspectionItem[] = [
     xrf: "Verified Pass",
     quantity_pcs: 95,
     weight_kg: 3800,
-    cutting_surface_lt2: "1.1 mm",
-    billet_slid_lt25: "1.8 mm",
-    defect_2x50x100: "None / OK",
+    cutting_surface_lt2: true,
+    billet_slid_lt25: true,
+    defect_depth: "-",
+    defect_width: "-",
+    defect_length: "-",
     chemical_composition: {
       Si: 0.65, Fe: 0.32, Cu: 0.24, Mn: 0.08, Mg: 0.95, Cr: 0.12, Zn: 0.05, Ti: 0.03, Pb: 0.00, Cd: 0.00, Al: 97.56
     },
@@ -208,9 +213,11 @@ const INITIAL_HISTORY: BilletInspectionItem[] = [
     xrf: "Mg Out of Spec",
     quantity_pcs: 60,
     weight_kg: 1800,
-    cutting_surface_lt2: "2.4 mm (Over)",
-    billet_slid_lt25: "3.1 mm (Over)",
-    defect_2x50x100: "2.5x60x120 Surface Dent",
+    cutting_surface_lt2: false,
+    billet_slid_lt25: false,
+    defect_depth: "2.5",
+    defect_width: "60",
+    defect_length: "120",
     chemical_composition: {
       Si: 0.15, Fe: 0.45, Cu: 0.12, Mn: 0.15, Mg: 0.30, Cr: 0.15, Zn: 0.18, Ti: 0.12, Pb: 0.06, Cd: 0.02, Al: 98.30
     },
@@ -272,7 +279,15 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
     return keys.length > 0 ? keys : ["6063", "6061", "6005", "6082"];
   }, [gradeSpecs]);
 
-  // Supplier list derived from history and common suppliers
+  // Distinct suppliers extracted directly from previous inspection history
+  const historySuppliers = useMemo(() => {
+    const fromHistory = (history || [])
+      .map(h => (h.supplier_name || "").trim())
+      .filter(s => s.length > 0);
+    return Array.from(new Set(fromHistory)).sort((a, b) => a.localeCompare(b));
+  }, [history]);
+
+  // Combined supplier list with history suppliers on top
   const availableSuppliers = useMemo(() => {
     const defaults = [
       "Siam Aluminum Industry",
@@ -286,8 +301,18 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
     const fromHistory = (history || [])
       .map(h => (h.supplier_name || "").trim())
       .filter(s => s.length > 0);
-    return Array.from(new Set([...defaults, ...fromHistory])).sort();
+    return Array.from(new Set([...fromHistory, ...defaults])).filter(Boolean).sort((a, b) => a.localeCompare(b));
   }, [history]);
+
+  // Quick helper to apply selected supplier to all scanned items
+  const applySupplierToAll = (supplierName: string) => {
+    if (!supplierName) return;
+    setExtractedItems(prev => prev.map(item => ({ ...item, supplier_name: supplierName })));
+    setStatus({
+      type: 'info',
+      message: isTh ? `กำหนด Supplier: "${supplierName}" ให้ทุกรายการเรียบร้อยแล้ว` : `Applied Supplier: "${supplierName}" to all items`
+    });
+  };
 
   // Ensure an active grade is selected when gradeSpecs change
   useEffect(() => {
@@ -349,31 +374,62 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
     return matchingKey ? gradeSpecs[matchingKey] : null;
   };
 
+  // Ignored value helper for unmeasured/dash fields
+  const isIgnoredValue = (val: any): boolean => {
+    if (val === undefined || val === null) return true;
+    const s = String(val).trim().toLowerCase();
+    return s === '' || s === '-' || s === 'n/a' || s === 'na' || s === 'none' || s === 'null' || s === 'nil' || s === 'unmeasured' || s === 'ไม่ระบุ' || s === 'no defect';
+  };
+
   // Judgement Calculator
   const performJudgement = (item: BilletInspectionItem): 'PASS' | 'FAIL' | 'NO SPEC' => {
     const spec = findMatchingSpec(item.grade);
     if (!spec) return "NO SPEC";
     let isOk = true;
+
     chemElements.forEach(el => {
       const raw = item.chemical_composition?.[el];
-      if (raw === undefined || raw === null) return;
-      const s = String(raw).trim();
-      if (s === '' || s === '-' || s === 'N/A' || s === 'none') return;
+      if (isIgnoredValue(raw)) return;
+      const s = String(raw).trim().replace(/,/g, '.');
       const val = parseFloat(s);
       const elementSpec = spec.elements[el];
       if (!isNaN(val) && elementSpec) {
         if (val < elementSpec.min || val > elementSpec.max) isOk = false;
       }
     });
-    // Check visual defects
+
+    // Check visual checklist: cutting surface < 2 mm & billet slid <= 2.5 mm
+    if (item.cutting_surface_lt2 === false) {
+      isOk = false;
+    }
+    if (item.billet_slid_lt25 === false) {
+      isOk = false;
+    }
+
+    // Check Defect fields: Depth < 5mm, Width < 50mm, Length < 100mm
+    if (!isIgnoredValue(item.defect_depth)) {
+      const d = parseFloat(String(item.defect_depth).trim().replace(/,/g, '.'));
+      if (!isNaN(d) && d >= 5) isOk = false;
+    }
+    if (!isIgnoredValue(item.defect_width)) {
+      const w = parseFloat(String(item.defect_width).trim().replace(/,/g, '.'));
+      if (!isNaN(w) && w >= 50) isOk = false;
+    }
+    if (!isIgnoredValue(item.defect_length)) {
+      const l = parseFloat(String(item.defect_length).trim().replace(/,/g, '.'));
+      if (!isNaN(l) && l >= 100) isOk = false;
+    }
+
+    // Backward compatibility for defect_2x50x100
     if (typeof item.defect_2x50x100 === 'boolean' && item.defect_2x50x100) {
       isOk = false;
-    } else if (typeof item.defect_2x50x100 === 'string') {
+    } else if (typeof item.defect_2x50x100 === 'string' && !isIgnoredValue(item.defect_2x50x100)) {
       const defStr = item.defect_2x50x100.trim().toLowerCase();
-      if (defStr && !['none', 'no', 'pass', 'passed', 'ok', 'nil', '-', '0', 'none / ok', 'none / pass', 'none/ok', 'none/pass'].includes(defStr)) {
+      if (!['none', 'no', 'pass', 'passed', 'ok', 'nil', '-', '0', 'none / ok', 'none / pass', 'none/ok', 'none/pass', 'true'].includes(defStr)) {
         isOk = false;
       }
     }
+
     return isOk ? "PASS" : "FAIL";
   };
 
@@ -426,9 +482,11 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
         xrf: 'Pass',
         quantity_pcs: 120,
         weight_kg: 3600,
-        cutting_surface_lt2: '',
-        billet_slid_lt25: '',
-        defect_2x50x100: '',
+        cutting_surface_lt2: true,
+        billet_slid_lt25: true,
+        defect_depth: '0',
+        defect_width: '0',
+        defect_length: '0',
         chemical_composition: {
           Si: 0.45, Fe: 0.20, Cu: 0.02, Mn: 0.03, Mg: 0.55, Cr: 0.01, Zn: 0.02, Ti: 0.01, Pb: 0.00, Cd: 0.00, Al: 98.71
         }
@@ -448,9 +506,11 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
         xrf: 'Pass',
         quantity_pcs: 90,
         weight_kg: 3600,
-        cutting_surface_lt2: '',
-        billet_slid_lt25: '',
-        defect_2x50x100: '',
+        cutting_surface_lt2: true,
+        billet_slid_lt25: true,
+        defect_depth: '0',
+        defect_width: '0',
+        defect_length: '0',
         chemical_composition: {
           Si: 0.62, Fe: 0.28, Cu: 0.22, Mn: 0.08, Mg: 0.92, Cr: 0.10, Zn: 0.04, Ti: 0.02, Pb: 0.00, Cd: 0.00, Al: 97.72
         }
@@ -795,7 +855,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
     const headers = [
       "Heat No.", "Size", "Grade", "Judgement", "Batch", "Invoice", "Supplier", 
       "Quantity (pcs)", "Weight (kg)", "Diameter", "Length", "Bending", 
-      "Cutting < 2mm", "Slid <= 2.5mm", "Defect OK", "Appearance", "XRF", "Inspector",
+      "Cutting < 2mm", "Slid <= 2.5mm", "Defect Depth (<5mm)", "Defect Width (<50mm)", "Defect Length (<100mm)", "Appearance", "XRF", "Inspector",
       ...chemElements, "Timestamp"
     ];
 
@@ -803,7 +863,11 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
       e.heat_number, e.billet_size, e.grade, e.judgement,
       e.batch_no, e.invoice_no, e.supplier_name, e.quantity_pcs, e.weight_kg,
       e.diameter, e.length, e.bending,
-      e.cutting_surface_lt2 ? 'YES' : 'NO', e.billet_slid_lt25 ? 'YES' : 'NO', e.defect_2x50x100 ? 'NO DEFECT' : 'DEFECT',
+      e.cutting_surface_lt2 === false ? 'FAIL' : 'PASS', 
+      e.billet_slid_lt25 === false ? 'FAIL' : 'PASS', 
+      e.defect_depth ?? '-', 
+      e.defect_width ?? '-', 
+      e.defect_length ?? '-',
       e.appearance, e.xrf, e.inspector_name,
       ...chemElements.map(el => e.chemical_composition?.[el] ?? ''),
       e.timestamp
@@ -1336,6 +1400,64 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               )}
             </div>
 
+            {/* Quick Batch Supplier Toolbar */}
+            {extractedItems.length > 0 && (
+              <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs ${
+                isLight ? 'bg-blue-50/70 border-blue-200 text-slate-700' : 'bg-slate-900/90 border-cyan-900/50 text-slate-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Building2 className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
+                  <div>
+                    <span className="font-bold text-xs block">
+                      {isTh ? 'กำหนด Supplier ให้ทุกรายการในชุดนี้' : 'Batch Assign Supplier'}
+                    </span>
+                    <span className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {isTh ? `ดึงข้อมูลจากประวัติ (${historySuppliers.length} รายชื่อ)` : `Pulled from inspection history (${historySuppliers.length} suppliers)`}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-1 sm:flex-initial min-w-[240px]">
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        applySupplierToAll(e.target.value);
+                        e.target.value = '';
+                      }
+                    }}
+                    defaultValue=""
+                    className={`w-full sm:w-auto rounded-xl px-3 py-1.5 text-xs font-medium border cursor-pointer ${
+                      isLight
+                        ? 'bg-white border-slate-300 text-slate-800 focus:border-blue-500'
+                        : 'bg-slate-950 border-slate-700 text-slate-200 focus:border-cyan-500'
+                    }`}
+                  >
+                    <option value="" disabled>
+                      {isTh ? '⚡ เลือก Supplier จากประวัติเพื่อใส่ทั้งหมด...' : '⚡ Select History Supplier to apply all...'}
+                    </option>
+                    {historySuppliers.length > 0 && (
+                      <optgroup label={isTh ? "📋 ซัพพลายเออร์ที่เคยมีประวัติบันทึก" : "📋 Recorded Suppliers from History"}>
+                        {historySuppliers.map(s => (
+                          <option key={`batch-hist-${s}`} value={s}>
+                            ⭐ {s}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label={isTh ? "🏢 ซัพพลายเออร์มาตรฐานอื่นๆ" : "🏢 Other Suppliers"}>
+                      {availableSuppliers
+                        .filter(s => !historySuppliers.includes(s))
+                        .map(s => (
+                          <option key={`batch-std-${s}`} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                    </optgroup>
+                  </select>
+                </div>
+              </div>
+            )}
+
             {extractedItems.length === 0 && !isProcessing && (
               <div className={`border rounded-2xl p-16 text-center space-y-3 ${
                 isLight ? 'bg-white border-slate-200 text-slate-500 shadow-xs' : 'bg-slate-900 border-slate-800 text-slate-500'
@@ -1524,24 +1646,84 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                           : 'bg-slate-950/60 border-slate-800/80'
                       }`}>
                         <div>
-                          <label className={`text-[10px] block ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Supplier</label>
-                          <input
-                            list={`supplier-list-${idx}`}
-                            type="text"
-                            placeholder="Supplier..."
-                            value={item.supplier_name || ''}
-                            onChange={(e) => updateItemField(idx, 'supplier_name', e.target.value)}
-                            className={`w-full rounded px-2 py-1 mt-0.5 border ${
-                              isLight
-                                ? 'bg-white border-slate-300 text-slate-800 focus:border-blue-500'
-                                : 'bg-slate-900 border-slate-800 text-slate-200 focus:border-cyan-500'
-                            }`}
-                          />
-                          <datalist id={`supplier-list-${idx}`}>
-                            {availableSuppliers.map(sup => (
-                              <option key={sup} value={sup} />
-                            ))}
-                          </datalist>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <label className={`text-[10px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                              Supplier
+                            </label>
+                            {item.supplier_name && historySuppliers.includes(item.supplier_name.trim()) && (
+                              <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
+                                ✓ ในประวัติ
+                              </span>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <select
+                              value={
+                                availableSuppliers.includes(item.supplier_name || '')
+                                  ? item.supplier_name
+                                  : item.supplier_name
+                                  ? '__CUSTOM__'
+                                  : ''
+                              }
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val !== '__CUSTOM__') {
+                                  updateItemField(idx, 'supplier_name', val);
+                                }
+                              }}
+                              className={`w-full rounded px-2 py-1 text-xs font-medium focus:outline-none border cursor-pointer ${
+                                isLight
+                                  ? 'bg-white border-slate-300 text-slate-800 focus:border-blue-500'
+                                  : 'bg-slate-900 border-slate-800 text-slate-200 focus:border-cyan-500'
+                              }`}
+                            >
+                              <option value="">-- {isTh ? 'เลือก Supplier จากประวัติ' : 'Select Supplier'} ({historySuppliers.length}) --</option>
+                              {historySuppliers.length > 0 && (
+                                <optgroup label={isTh ? "📋 ซัพพลายเออร์ที่เคยมีประวัติบันทึก" : "📋 Recorded Suppliers from History"}>
+                                  {historySuppliers.map(sup => (
+                                    <option key={`card-hist-${sup}`} value={sup}>
+                                      ⭐ {sup}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              <optgroup label={isTh ? "🏢 ซัพพลายเออร์มาตรฐานอื่นๆ" : "🏢 Other Standard Suppliers"}>
+                                {availableSuppliers
+                                  .filter(sup => !historySuppliers.includes(sup))
+                                  .map(sup => (
+                                    <option key={`card-std-${sup}`} value={sup}>
+                                      {sup}
+                                    </option>
+                                  ))}
+                              </optgroup>
+                              <option value="__CUSTOM__">✏️ {isTh ? 'พิมพ์ชื่อ Supplier อื่น...' : 'Custom Supplier...'}</option>
+                            </select>
+
+                            {(!availableSuppliers.includes(item.supplier_name || '') || item.supplier_name === '__CUSTOM__') && (
+                              <input
+                                list={`supplier-list-${idx}`}
+                                type="text"
+                                placeholder={isTh ? 'ระบุชื่อ Supplier...' : 'Enter supplier name...'}
+                                value={item.supplier_name === '__CUSTOM__' ? '' : (item.supplier_name || '')}
+                                onChange={(e) => updateItemField(idx, 'supplier_name', e.target.value)}
+                                className={`w-full rounded px-2 py-1 text-xs border ${
+                                  isLight
+                                    ? 'bg-white border-blue-400 text-slate-800 focus:border-blue-500'
+                                    : 'bg-slate-900 border-cyan-500 text-cyan-200 focus:border-cyan-500'
+                                }`}
+                              />
+                            )}
+                            <datalist id={`supplier-list-${idx}`}>
+                              {historySuppliers.map(sup => (
+                                <option key={`dl-hist-${sup}`} value={sup} />
+                              ))}
+                              {availableSuppliers
+                                .filter(s => !historySuppliers.includes(s))
+                                .map(sup => (
+                                  <option key={`dl-std-${sup}`} value={sup} />
+                                ))}
+                            </datalist>
+                          </div>
                         </div>
 
                         <div>
@@ -1710,60 +1892,143 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                                 VISUAL CHECK
                               </h4>
                               <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 font-medium">
-                                {isTh ? 'เจ้าหน้าที่ลงผลเอง' : 'Manual Entry'}
+                                {isTh ? 'เกณฑ์มาตรฐาน & ตรวจสอบ' : 'Criteria & Check'}
                               </span>
                             </div>
                             
                             <div className="space-y-2.5">
-                              <div>
-                                <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                                  Cutting Surface &lt; 2mm
+                              {/* Checklist Items: Cutting Surface & Billet Slid */}
+                              <div className="space-y-1.5">
+                                <label className={`text-[10px] font-semibold block ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                                  {isTh ? 'รายการตรวจสอบ (Checklist)' : 'Checklist Items'}
                                 </label>
-                                <input
-                                  type="text"
-                                  placeholder={isTh ? 'ระบุค่าที่วัดได้ (เช่น 0.8 mm)' : 'e.g. 0.8 mm'}
-                                  value={typeof item.cutting_surface_lt2 === 'boolean' ? (item.cutting_surface_lt2 ? '< 2 mm (Pass)' : '≥ 2 mm (Fail)') : (item.cutting_surface_lt2 || '')}
-                                  onChange={(e) => updateItemField(idx, 'cutting_surface_lt2', e.target.value)}
-                                  className={`w-full rounded-lg px-2.5 py-1.5 text-xs focus:outline-none border ${
-                                    isLight
-                                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
-                                      : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
-                                  }`}
-                                />
+                                
+                                {/* Checklist 1: Cutting Surface < 2mm */}
+                                <label className={`flex items-center justify-between p-2 rounded-xl border cursor-pointer transition-all ${
+                                  item.cutting_surface_lt2 !== false
+                                    ? isLight
+                                      ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+                                      : 'bg-emerald-950/30 border-emerald-800/80 text-emerald-200'
+                                    : isLight
+                                      ? 'bg-rose-50/70 border-rose-300 text-rose-950'
+                                      : 'bg-rose-950/30 border-rose-800/80 text-rose-200'
+                                }`}>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.cutting_surface_lt2 !== false}
+                                      onChange={(e) => updateItemField(idx, 'cutting_surface_lt2', e.target.checked)}
+                                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 accent-emerald-600 cursor-pointer"
+                                    />
+                                    <span className="text-xs font-semibold">Cutting Surface &lt; 2 mm</span>
+                                  </div>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                    item.cutting_surface_lt2 !== false
+                                      ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                      : 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+                                  }`}>
+                                    {item.cutting_surface_lt2 !== false ? (isTh ? 'ผ่าน' : 'PASS') : (isTh ? 'ไม่ผ่าน' : 'FAIL')}
+                                  </span>
+                                </label>
+
+                                {/* Checklist 2: Billet Slid <= 2.5mm */}
+                                <label className={`flex items-center justify-between p-2 rounded-xl border cursor-pointer transition-all ${
+                                  item.billet_slid_lt25 !== false
+                                    ? isLight
+                                      ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+                                      : 'bg-emerald-950/30 border-emerald-800/80 text-emerald-200'
+                                    : isLight
+                                      ? 'bg-rose-50/70 border-rose-300 text-rose-950'
+                                      : 'bg-rose-950/30 border-rose-800/80 text-rose-200'
+                                }`}>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.billet_slid_lt25 !== false}
+                                      onChange={(e) => updateItemField(idx, 'billet_slid_lt25', e.target.checked)}
+                                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 accent-emerald-600 cursor-pointer"
+                                    />
+                                    <span className="text-xs font-semibold">Billet Slid ≤ 2.5 mm</span>
+                                  </div>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                    item.billet_slid_lt25 !== false
+                                      ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                      : 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+                                  }`}>
+                                    {item.billet_slid_lt25 !== false ? (isTh ? 'ผ่าน' : 'PASS') : (isTh ? 'ไม่ผ่าน' : 'FAIL')}
+                                  </span>
+                                </label>
                               </div>
 
-                              <div>
+                              {/* Separated Defect Fields: Depth < 5mm, Width < 50mm, Length < 100mm */}
+                              <div className="pt-1">
                                 <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                                  Billet Slid ≤ 2.5mm
+                                  {isTh ? 'ขนาดตำหนิ (Defect Measurements)' : 'Defect Dimensions'}
                                 </label>
-                                <input
-                                  type="text"
-                                  placeholder={isTh ? 'ระบุค่าที่วัดได้ (เช่น 1.2 mm)' : 'e.g. 1.2 mm'}
-                                  value={typeof item.billet_slid_lt25 === 'boolean' ? (item.billet_slid_lt25 ? '≤ 2.5 mm (Pass)' : '> 2.5 mm (Fail)') : (item.billet_slid_lt25 || '')}
-                                  onChange={(e) => updateItemField(idx, 'billet_slid_lt25', e.target.value)}
-                                  className={`w-full rounded-lg px-2.5 py-1.5 text-xs focus:outline-none border ${
-                                    isLight
-                                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
-                                      : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
-                                  }`}
-                                />
-                              </div>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  {/* Depth < 5mm */}
+                                  <div>
+                                    <div className="flex items-center justify-between mb-0.5">
+                                      <span className={`text-[9px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Depth</span>
+                                      <span className="text-[8px] text-slate-400">&lt;5mm</span>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      placeholder="0 / -"
+                                      value={item.defect_depth ?? ''}
+                                      onChange={(e) => updateItemField(idx, 'defect_depth', e.target.value)}
+                                      className={`w-full rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none border ${
+                                        !isIgnoredValue(item.defect_depth) && parseFloat(String(item.defect_depth).replace(/,/g, '.')) >= 5
+                                          ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 text-rose-600 font-bold'
+                                          : isLight
+                                            ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                            : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                      }`}
+                                    />
+                                  </div>
 
-                              <div>
-                                <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                                  Defect 2x50x100
-                                </label>
-                                <input
-                                  type="text"
-                                  placeholder={isTh ? 'ระบุผลตรวจ (เช่น ไม่มีตำหนิ / OK)' : 'e.g. None / OK'}
-                                  value={typeof item.defect_2x50x100 === 'boolean' ? (item.defect_2x50x100 ? 'Found Defect' : 'None / Pass') : (item.defect_2x50x100 || '')}
-                                  onChange={(e) => updateItemField(idx, 'defect_2x50x100', e.target.value)}
-                                  className={`w-full rounded-lg px-2.5 py-1.5 text-xs focus:outline-none border ${
-                                    isLight
-                                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
-                                      : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
-                                  }`}
-                                />
+                                  {/* Width < 50mm */}
+                                  <div>
+                                    <div className="flex items-center justify-between mb-0.5">
+                                      <span className={`text-[9px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Width</span>
+                                      <span className="text-[8px] text-slate-400">&lt;50mm</span>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      placeholder="0 / -"
+                                      value={item.defect_width ?? ''}
+                                      onChange={(e) => updateItemField(idx, 'defect_width', e.target.value)}
+                                      className={`w-full rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none border ${
+                                        !isIgnoredValue(item.defect_width) && parseFloat(String(item.defect_width).replace(/,/g, '.')) >= 50
+                                          ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 text-rose-600 font-bold'
+                                          : isLight
+                                            ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                            : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                      }`}
+                                    />
+                                  </div>
+
+                                  {/* Length < 100mm */}
+                                  <div>
+                                    <div className="flex items-center justify-between mb-0.5">
+                                      <span className={`text-[9px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Length</span>
+                                      <span className="text-[8px] text-slate-400">&lt;100mm</span>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      placeholder="0 / -"
+                                      value={item.defect_length ?? ''}
+                                      onChange={(e) => updateItemField(idx, 'defect_length', e.target.value)}
+                                      className={`w-full rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none border ${
+                                        !isIgnoredValue(item.defect_length) && parseFloat(String(item.defect_length).replace(/,/g, '.')) >= 100
+                                          ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 text-rose-600 font-bold'
+                                          : isLight
+                                            ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-500'
+                                            : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
+                                      }`}
+                                    />
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -2202,7 +2467,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                                   ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-300'
                                   : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30'
                               }`}
-                              title={isTh ? "แก้ไขข้อมูล (ใส่รหัส admin2026)" : "Edit Record (Password required)"}
+                              title={isTh ? "แก้ไขข้อมูล (ต้องใส่รหัสผ่านผู้ดูแลระบบ)" : "Edit Record (Admin password required)"}
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                               <span className="hidden sm:inline">{isTh ? 'แก้ไข' : 'Edit'}</span>
@@ -2225,7 +2490,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                                   ? 'bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-300'
                                   : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30'
                               }`}
-                              title={isTh ? "ลบรายการ (ต้องใส่รหัส admin2026)" : "Delete Record (Password required)"}
+                              title={isTh ? "ลบรายการ (ต้องใส่รหัสผ่านผู้ดูแลระบบ)" : "Delete Record (Admin password required)"}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -2288,7 +2553,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               <form onSubmit={handleAdminAuth} className="space-y-3">
                 <input
                   type="password"
-                  placeholder={isTh ? "รหัสผ่าน (admin2026)" : "Password (admin2026)"}
+                  placeholder={isTh ? "รหัสผ่านผู้ดูแลระบบ" : "Admin Password"}
                   value={adminPasswordInput}
                   onChange={(e) => setAdminPasswordInput(e.target.value)}
                   className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
@@ -2299,7 +2564,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                 />
                 {passwordError && (
                   <p className="text-xs text-rose-500 font-semibold">
-                    {isTh ? 'รหัสผ่านไม่ถูกต้อง (ลองใส่ admin2026)' : 'Invalid password (try admin2026)'}
+                    {isTh ? 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง' : 'Invalid password. Please try again.'}
                   </p>
                 )}
                 <button
@@ -2570,12 +2835,12 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {targetDeleteHistoryItem ? (
                   isTh 
-                    ? `ต้องการลบประวัติ Heat No. ${targetDeleteHistoryItem.heat_number} กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน` 
-                    : `Enter admin password admin2026 to delete Heat No. ${targetDeleteHistoryItem.heat_number}`
+                    ? `ต้องการลบประวัติ Heat No. ${targetDeleteHistoryItem.heat_number} กรุณาใส่รหัสผ่านผู้ดูแลระบบเพื่อยืนยัน` 
+                    : `Enter admin password to delete Heat No. ${targetDeleteHistoryItem.heat_number}`
                 ) : (
                   isTh 
-                    ? `คุณต้องการลบเกณฑ์มาตรฐานเกรด ${targetDeleteGrade} หรือไม่? ${isAdminAuthenticated ? 'สามารถกดยืนยันลบได้ทันทีหรือใส่รหัสผ่าน admin2026' : 'กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน'}` 
-                    : `Are you sure you want to delete Grade Spec ${targetDeleteGrade}? ${isAdminAuthenticated ? 'Click confirm to proceed or enter password admin2026.' : 'Enter password admin2026 to confirm.'}`
+                    ? `คุณต้องการลบเกณฑ์มาตรฐานเกรด ${targetDeleteGrade} หรือไม่? ${isAdminAuthenticated ? 'สามารถกดยืนยันลบได้ทันทีหรือใส่รหัสผ่านผู้ดูแลระบบ' : 'กรุณาใส่รหัสผ่านผู้ดูแลระบบเพื่อยืนยัน'}` 
+                    : `Are you sure you want to delete Grade Spec ${targetDeleteGrade}? ${isAdminAuthenticated ? 'Click confirm to proceed or enter admin password.' : 'Enter admin password to confirm.'}`
                 )}
               </p>
             </div>
@@ -2585,7 +2850,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                 <input
                   type="password"
                   autoFocus
-                  placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
+                  placeholder={isTh ? "ใส่รหัสผ่านผู้ดูแลระบบ" : "Enter admin password"}
                   value={deleteAuthPassword}
                   onChange={(e) => setDeleteAuthPassword(e.target.value)}
                   className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
@@ -2604,7 +2869,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
               {deleteAuthError && (
                 <p className="text-xs text-rose-500 font-semibold text-center">
-                  {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
+                  {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง' : 'Incorrect password! Please try again.'}
                 </p>
               )}
               <div className="flex gap-2 pt-2">
@@ -2673,7 +2938,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               <input
                 type="password"
                 autoFocus
-                placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
+                placeholder={isTh ? "ใส่รหัสผ่านผู้ดูแลระบบ" : "Enter admin password"}
                 value={historyAuthPassword}
                 onChange={(e) => setHistoryAuthPassword(e.target.value)}
                 className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
@@ -2684,7 +2949,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               />
               {historyAuthError && (
                 <p className="text-xs text-rose-500 font-semibold text-center">
-                  {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
+                  {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง' : 'Incorrect password! Please try again.'}
                 </p>
               )}
               <div className="flex gap-2 pt-2">
@@ -2826,24 +3091,82 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               </div>
 
               <div>
-                <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Supplier Name</label>
-                <div className="relative">
-                  <input
-                    list="edit-supplier-options"
-                    type="text"
-                    placeholder="Select or enter supplier..."
-                    value={editingHistoryItem.supplier_name || ''}
-                    onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, supplier_name: e.target.value } : null)}
-                    className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
+                <div className="flex items-center justify-between mb-1">
+                  <label className={`text-[10px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Supplier Name
+                  </label>
+                  {editingHistoryItem.supplier_name && historySuppliers.includes(editingHistoryItem.supplier_name.trim()) && (
+                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
+                      ✓ ในประวัติ
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <select
+                    value={
+                      availableSuppliers.includes(editingHistoryItem.supplier_name || '')
+                        ? editingHistoryItem.supplier_name
+                        : editingHistoryItem.supplier_name
+                        ? '__CUSTOM__'
+                        : ''
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val !== '__CUSTOM__') {
+                        setEditingHistoryItem(prev => prev ? { ...prev, supplier_name: val } : null);
+                      }
+                    }}
+                    className={`w-full rounded-xl px-3 py-2 font-medium text-xs focus:outline-none border cursor-pointer ${
                       isLight
                         ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-500'
                         : 'bg-slate-950 border-slate-800 text-white focus:border-amber-500'
                     }`}
-                  />
+                  >
+                    <option value="">-- {isTh ? 'เลือก Supplier จากประวัติ' : 'Select Supplier from History'} ({historySuppliers.length}) --</option>
+                    {historySuppliers.length > 0 && (
+                      <optgroup label={isTh ? "📋 ซัพพลายเออร์ที่เคยมีประวัติบันทึก" : "📋 Recorded Suppliers from History"}>
+                        {historySuppliers.map(sup => (
+                          <option key={`edit-hist-${sup}`} value={sup}>
+                            ⭐ {sup}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label={isTh ? "🏢 ซัพพลายเออร์มาตรฐานอื่นๆ" : "🏢 Other Standard Suppliers"}>
+                      {availableSuppliers
+                        .filter(sup => !historySuppliers.includes(sup))
+                        .map(sup => (
+                          <option key={`edit-std-${sup}`} value={sup}>
+                            {sup}
+                          </option>
+                        ))}
+                    </optgroup>
+                    <option value="__CUSTOM__">✏️ {isTh ? 'พิมพ์ชื่อ Supplier อื่น...' : 'Custom Supplier...'}</option>
+                  </select>
+
+                  {(!availableSuppliers.includes(editingHistoryItem.supplier_name || '') || editingHistoryItem.supplier_name === '__CUSTOM__') && (
+                    <input
+                      list="edit-supplier-options"
+                      type="text"
+                      placeholder="Select or enter supplier..."
+                      value={editingHistoryItem.supplier_name === '__CUSTOM__' ? '' : (editingHistoryItem.supplier_name || '')}
+                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, supplier_name: e.target.value } : null)}
+                      className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none border ${
+                        isLight
+                          ? 'bg-white border-amber-400 text-slate-900 focus:border-amber-500'
+                          : 'bg-slate-900 border-amber-500 text-amber-200 focus:border-amber-500'
+                      }`}
+                    />
+                  )}
                   <datalist id="edit-supplier-options">
-                    {availableSuppliers.map(sup => (
-                      <option key={sup} value={sup} />
+                    {historySuppliers.map(sup => (
+                      <option key={`dl-eh-${sup}`} value={sup} />
                     ))}
+                    {availableSuppliers
+                      .filter(s => !historySuppliers.includes(s))
+                      .map(sup => (
+                        <option key={`dl-es-${sup}`} value={sup} />
+                      ))}
                   </datalist>
                 </div>
               </div>
@@ -3002,59 +3325,137 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
             <div className={`p-4 rounded-xl border space-y-3 text-xs ${
               isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
             }`}>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">
-                Visual Inspection Measurements
+              <div className="flex items-center justify-between">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">
+                  Visual Inspection Checklist &amp; Measurements
+                </div>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 font-medium">
+                  {isTh ? 'รายการตรวจสอบ & ขนาดตำหนิ' : 'Checklist & Defect Sizes'}
+                </span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                    Cutting Surface &lt; 2mm
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 0.8 mm"
-                    value={typeof editingHistoryItem.cutting_surface_lt2 === 'boolean' ? (editingHistoryItem.cutting_surface_lt2 ? '< 2 mm (Pass)' : '≥ 2 mm (Fail)') : (editingHistoryItem.cutting_surface_lt2 || '')}
-                    onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, cutting_surface_lt2: e.target.value } : null)}
-                    className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
-                      isLight
-                        ? 'bg-white border-slate-300 text-slate-900 focus:border-amber-500'
-                        : 'bg-slate-900 border-slate-800 text-white focus:border-amber-500'
-                    }`}
-                  />
-                </div>
 
-                <div>
-                  <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                    Billet Slid ≤ 2.5mm
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 1.2 mm"
-                    value={typeof editingHistoryItem.billet_slid_lt25 === 'boolean' ? (editingHistoryItem.billet_slid_lt25 ? '≤ 2.5 mm (Pass)' : '> 2.5 mm (Fail)') : (editingHistoryItem.billet_slid_lt25 || '')}
-                    onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, billet_slid_lt25: e.target.value } : null)}
-                    className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
-                      isLight
-                        ? 'bg-white border-slate-300 text-slate-900 focus:border-amber-500'
-                        : 'bg-slate-900 border-slate-800 text-white focus:border-amber-500'
-                    }`}
-                  />
-                </div>
+              {/* Checklist items */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
+                  editingHistoryItem.cutting_surface_lt2 !== false
+                    ? isLight
+                      ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+                      : 'bg-emerald-950/30 border-emerald-800/80 text-emerald-200'
+                    : isLight
+                      ? 'bg-rose-50/70 border-rose-300 text-rose-950'
+                      : 'bg-rose-950/30 border-rose-800/80 text-rose-200'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={editingHistoryItem.cutting_surface_lt2 !== false}
+                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, cutting_surface_lt2: e.target.checked } : null)}
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 accent-emerald-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-semibold">Cutting Surface &lt; 2 mm</span>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    editingHistoryItem.cutting_surface_lt2 !== false
+                      ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+                  }`}>
+                    {editingHistoryItem.cutting_surface_lt2 !== false ? (isTh ? 'ผ่าน' : 'PASS') : (isTh ? 'ไม่ผ่าน' : 'FAIL')}
+                  </span>
+                </label>
 
-                <div>
-                  <label className={`text-[10px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                    Defect 2x50x100
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. None / OK"
-                    value={typeof editingHistoryItem.defect_2x50x100 === 'boolean' ? (editingHistoryItem.defect_2x50x100 ? 'Found Defect' : 'None / Pass') : (editingHistoryItem.defect_2x50x100 || '')}
-                    onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, defect_2x50x100: e.target.value } : null)}
-                    className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
-                      isLight
-                        ? 'bg-white border-slate-300 text-slate-900 focus:border-amber-500'
-                        : 'bg-slate-900 border-slate-800 text-white focus:border-amber-500'
-                    }`}
-                  />
+                <label className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
+                  editingHistoryItem.billet_slid_lt25 !== false
+                    ? isLight
+                      ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+                      : 'bg-emerald-950/30 border-emerald-800/80 text-emerald-200'
+                    : isLight
+                      ? 'bg-rose-50/70 border-rose-300 text-rose-950'
+                      : 'bg-rose-950/30 border-rose-800/80 text-rose-200'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={editingHistoryItem.billet_slid_lt25 !== false}
+                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, billet_slid_lt25: e.target.checked } : null)}
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 accent-emerald-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-semibold">Billet Slid ≤ 2.5 mm</span>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    editingHistoryItem.billet_slid_lt25 !== false
+                      ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+                  }`}>
+                    {editingHistoryItem.billet_slid_lt25 !== false ? (isTh ? 'ผ่าน' : 'PASS') : (isTh ? 'ไม่ผ่าน' : 'FAIL')}
+                  </span>
+                </label>
+              </div>
+
+              {/* Separated Defect fields */}
+              <div>
+                <label className={`text-[10px] font-bold block mb-1 text-slate-500`}>
+                  {isTh ? 'ขนาดตำหนิ (Defect Measurements)' : 'Defect Measurements'}
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-[10px] font-semibold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Depth</span>
+                      <span className="text-[9px] text-slate-400">&lt;5mm</span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="0 / -"
+                      value={editingHistoryItem.defect_depth ?? ''}
+                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, defect_depth: e.target.value } : null)}
+                      className={`w-full rounded-xl px-3 py-2 text-center text-xs focus:outline-none border ${
+                        !isIgnoredValue(editingHistoryItem.defect_depth) && parseFloat(String(editingHistoryItem.defect_depth).replace(/,/g, '.')) >= 5
+                          ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 text-rose-600 font-bold'
+                          : isLight
+                            ? 'bg-white border-slate-300 text-slate-900 focus:border-amber-500'
+                            : 'bg-slate-900 border-slate-800 text-white focus:border-amber-500'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-[10px] font-semibold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Width</span>
+                      <span className="text-[9px] text-slate-400">&lt;50mm</span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="0 / -"
+                      value={editingHistoryItem.defect_width ?? ''}
+                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, defect_width: e.target.value } : null)}
+                      className={`w-full rounded-xl px-3 py-2 text-center text-xs focus:outline-none border ${
+                        !isIgnoredValue(editingHistoryItem.defect_width) && parseFloat(String(editingHistoryItem.defect_width).replace(/,/g, '.')) >= 50
+                          ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 text-rose-600 font-bold'
+                          : isLight
+                            ? 'bg-white border-slate-300 text-slate-900 focus:border-amber-500'
+                            : 'bg-slate-900 border-slate-800 text-white focus:border-amber-500'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-[10px] font-semibold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Length</span>
+                      <span className="text-[9px] text-slate-400">&lt;100mm</span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="0 / -"
+                      value={editingHistoryItem.defect_length ?? ''}
+                      onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, defect_length: e.target.value } : null)}
+                      className={`w-full rounded-xl px-3 py-2 text-center text-xs focus:outline-none border ${
+                        !isIgnoredValue(editingHistoryItem.defect_length) && parseFloat(String(editingHistoryItem.defect_length).replace(/,/g, '.')) >= 100
+                          ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 text-rose-600 font-bold'
+                          : isLight
+                            ? 'bg-white border-slate-300 text-slate-900 focus:border-amber-500'
+                            : 'bg-slate-900 border-slate-800 text-white focus:border-amber-500'
+                      }`}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

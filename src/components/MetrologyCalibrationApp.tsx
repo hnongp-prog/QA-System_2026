@@ -313,7 +313,7 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
     } else {
       setStatusMsg({
         type: 'error',
-        message: isTh ? 'รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง (admin2026)' : 'Incorrect Admin Password (admin2026)'
+        message: isTh ? 'รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง' : 'Incorrect Admin Password'
       });
       setSecurityModal(prev => ({ ...prev, password: '' }));
     }
@@ -758,7 +758,7 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
               </div>
               <h3 className="text-lg font-bold text-white">Admin Verification</h3>
               <p className="text-xs text-slate-400">
-                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อดำเนินการสิทธิ์ผู้ดูแลระบบ (admin2026)' : 'Enter admin password for protected operation'}
+                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อดำเนินการสิทธิ์ผู้ดูแลระบบ' : 'Enter admin password for protected operation'}
               </p>
             </div>
 

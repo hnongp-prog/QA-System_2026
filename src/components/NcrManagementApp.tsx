@@ -833,7 +833,7 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                             <button
                               onClick={() => handleRequestDeleteNcr(item.id)}
                               className="p-1.5 bg-rose-950/40 hover:bg-rose-900 text-rose-400 hover:text-rose-200 rounded-lg border border-rose-900/60 transition"
-                              title={isTh ? "ลบ NCR (ต้องใส่รหัส admin2026)" : "Delete NCR (Password required)"}
+                              title={isTh ? "ลบ NCR (ต้องใส่รหัสผ่านผู้ดูแลระบบ)" : "Delete NCR (Admin password required)"}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -1403,8 +1403,8 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
               </h4>
               <p className="text-xs text-slate-400">
                 {isTh 
-                  ? `ต้องการลบรายการ NCR ${deleteTargetNcrId || ''} กรุณาใส่รหัสผ่าน admin2026 เพื่อยืนยัน` 
-                  : `Enter admin password admin2026 to delete NCR ${deleteTargetNcrId || ''}`}
+                  ? `ต้องการลบรายการ NCR ${deleteTargetNcrId || ''} กรุณาใส่รหัสผ่านผู้ดูแลระบบเพื่อยืนยัน` 
+                  : `Enter admin password to delete NCR ${deleteTargetNcrId || ''}`}
               </p>
             </div>
 
@@ -1412,14 +1412,14 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
               <input
                 type="password"
                 autoFocus
-                placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
+                placeholder={isTh ? "ใส่รหัสผ่านผู้ดูแลระบบ" : "Enter admin password"}
                 value={deleteNcrPassword}
                 onChange={(e) => setDeleteNcrPassword(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none focus:border-rose-500"
               />
               {deleteNcrError && (
                 <p className="text-xs text-rose-500 font-semibold text-center">
-                  {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
+                  {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง' : 'Incorrect password! Please try again'}
                 </p>
               )}
               <div className="flex gap-2 pt-2">

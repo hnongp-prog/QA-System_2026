@@ -40,6 +40,8 @@ import {
   ThemeMode
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
+import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
+import { STANDARD_PROCESS_OPTIONS, STANDARD_MACHINE_OPTIONS } from '../constants/processOptions';
 
 interface RoughnessMeasurementAppProps {
   onBackToPortal?: () => void;
@@ -120,10 +122,10 @@ const Sparkline = ({ data, color, label }: { data: number[]; color: string; labe
 };
 
 const STANDARD_PROCESSES = [
-  'EXTRUSION',
-  'ANODIZE',
+  ...STANDARD_PROCESS_OPTIONS,
   'COLD_ROLL',
   'HOT_ROLL',
+  'ANODIZE',
   'DRAWING',
   'SLITTING',
   'MILL_FINISH',
@@ -826,6 +828,12 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
 
   // Process-Aware & Profile-Aware Status Judgment:
   // Evaluates against specific process roughness specs, and checks Un Zn Spray when profile ends with Z or H
+  const isIgnoredValue = (v?: string | number): boolean => {
+    if (v === undefined || v === null) return true;
+    const s = String(v).trim();
+    return s === '' || s === '-' || s === '--' || s === '---' || s === 'N/A' || s === 'n/a' || s === 'none' || s === 'null' || s === 'undefined';
+  };
+
   const judgeStatus = (item: typeof batchItems[0]): 'Pass' | 'Fail' | 'Pending' => {
     const specs = getRowEffectiveSpec(item);
 
@@ -836,47 +844,37 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
 
     // A field is considered filled if it has a number OR is explicitly marked as '-' (unmeasured)
     const hasValue = (arr?: string[]) => Array.isArray(arr) && arr.some(v => {
-      const s = String(v || '').trim();
-      return s === '-' || (s !== '' && !isNaN(parseFloat(s)));
+      if (isIgnoredValue(v)) return false;
+      const num = parseFloat(String(v).trim());
+      return !isNaN(num);
     });
 
     // Check if at least one actual number has been measured across the row
-    const hasAnyNumericMeasurement = [
+    const allRowPoints = [
       ...(item.raUp || []), ...(item.raLo || []),
       ...(item.rzUp || []), ...(item.rzLo || []),
       ...(item.rtUp || []), ...(item.rtLo || []),
       ...(item.ryUp || []), ...(item.ryLo || []),
       ...(item.unZnSprayRaUp || []), ...(item.unZnSprayRaLo || []),
       ...(item.unZnSprayRzUp || []), ...(item.unZnSprayRzLo || [])
-    ].some(v => {
-      const s = String(v || '').trim();
-      return s !== '' && s !== '-' && !isNaN(parseFloat(s));
+    ];
+
+    const numericMeasurements = allRowPoints.filter(v => {
+      if (isIgnoredValue(v)) return false;
+      const s = String(v).trim();
+      const n = parseFloat(s);
+      return !isNaN(n);
     });
 
-    if (!hasAnyNumericMeasurement) return 'Pending';
-
-    if (isRaReq && (!hasValue(item.raUp) || !hasValue(item.raLo))) return 'Pending';
-    if (isRzReq && (!hasValue(item.rzUp) || !hasValue(item.rzLo))) return 'Pending';
-    if (isRtReq && (!hasValue(item.rtUp) || !hasValue(item.rtLo))) return 'Pending';
-    if (isRyReq && (!hasValue(item.ryUp) || !hasValue(item.ryLo))) return 'Pending';
-
-    // Check Un Zn Spray requirement for Profiles ending with Z or H
-    const isZnOrH = specs.isZnOrH || isProfileZnOrH(headerInfo.profileName);
-    const isUnZnReq = isZnOrH || specs.unZnSprayRaUp > 0 || specs.unZnSprayRzUp > 0;
-    if (isUnZnReq) {
-      if (!hasValue(item.unZnSprayRaUp) && !hasValue(item.unZnSprayRzUp)) {
-        return 'Pending';
-      }
-    }
+    if (numericMeasurements.length === 0) return 'Pending';
 
     let pass = true;
 
     const checkArrayAgainstLimit = (arr: string[] | undefined, limit: number) => {
       if (!arr || limit <= 0) return true;
       return !arr.some(v => {
-        const s = String(v || '').trim();
-        if (s === '' || s === '-' || s === 'N/A') return false; // unmeasured / ignored in decision
-        const num = parseFloat(s);
+        if (isIgnoredValue(v)) return false; // unmeasured / ignored in decision
+        const num = parseFloat(String(v).trim());
         return !isNaN(num) && num > limit;
       });
     };
@@ -1190,7 +1188,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
               </div>
               <h3 className={`text-lg font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Admin Verification</h3>
               <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อตั้งค่า Profile Spec (admin2026)' : 'Enter admin password to manage profile specifications'}
+                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อตั้งค่า Profile Spec' : 'Enter admin password to manage profile specifications'}
               </p>
             </div>
 
@@ -1504,37 +1502,21 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                 </select>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 flex items-center justify-between">
-                  <span>Process *</span>
-                  <span className="text-[9px] text-cyan-400 lowercase">{isTh ? 'กระบวนการ' : 'process'}</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    name="process"
-                    list="roughness-header-processes"
-                    value={headerInfo.process}
-                    onChange={(e) => {
-                      const proc = e.target.value;
-                      setHeaderInfo(prev => ({ ...prev, process: proc }));
-                      if (proc) {
-                        setBatchItems(prev => prev.map(item => ({
-                          ...item,
-                          process: item.process || proc
-                        })));
-                      }
-                    }}
-                    placeholder="e.g. COLD_ROLL"
-                    className="w-full bg-slate-950 border border-slate-800 text-cyan-300 font-bold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500 uppercase font-mono"
-                  />
-                  <datalist id="roughness-header-processes">
-                    {STANDARD_PROCESSES.map(p => (
-                      <option key={p} value={p} />
-                    ))}
-                  </datalist>
-                </div>
-              </div>
+              <ProcessSelector
+                id="roughness-header-process"
+                label={isTh ? 'Process (กระบวนการ)' : 'Process'}
+                value={headerInfo.process}
+                onChange={(proc) => {
+                  setHeaderInfo(prev => ({ ...prev, process: proc }));
+                  if (proc) {
+                    setBatchItems(prev => prev.map(item => ({
+                      ...item,
+                      process: item.process || proc
+                    })));
+                  }
+                }}
+                required
+              />
 
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
@@ -1572,19 +1554,12 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                 </datalist>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                  Machine Name
-                </label>
-                <input
-                  type="text"
-                  name="machineName"
-                  value={headerInfo.machineName}
-                  onChange={handleHeaderChange}
-                  placeholder={isTh ? 'เช่น SURFTEST-M01' : 'Machine name'}
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500 uppercase"
-                />
-              </div>
+              <MachineSelector
+                id="roughness-header-machine"
+                label={isTh ? 'Machine (เครื่องจักร)' : 'Machine Name'}
+                value={headerInfo.machineName}
+                onChange={(mac) => setHeaderInfo(prev => ({ ...prev, machineName: mac }))}
+              />
 
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
@@ -2145,25 +2120,13 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                   )}
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                    Process Name / Operation *
-                  </label>
-                  <input
-                    type="text"
-                    name="process"
-                    list="spec-processes-list"
-                    value={headerInfo.process}
-                    onChange={handleHeaderChange}
-                    placeholder="e.g. COLD_ROLL, EXTRUSION, ZN_SPRAY"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-cyan-300 focus:outline-none focus:border-cyan-500 uppercase"
-                  />
-                  <datalist id="spec-processes-list">
-                    {STANDARD_PROCESSES.map(p => (
-                      <option key={p} value={p} />
-                    ))}
-                  </datalist>
-                </div>
+                <ProcessSelector
+                  id="spec-process-selector"
+                  label={isTh ? 'Process Name / Operation *' : 'Process Name / Operation *'}
+                  value={headerInfo.process}
+                  onChange={(proc) => setHeaderInfo(prev => ({ ...prev, process: proc }))}
+                  required
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -2705,8 +2668,8 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
               </h3>
               <p className="text-xs text-slate-400">
                 {isTh 
-                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการตรวจวัด IPQA-02 (Password: admin2026)' 
-                  : 'Enter password to edit IPQA-02 record (Password: admin2026)'}
+                  ? 'กรอกรหัสผ่านผู้ดูแลระบบเพื่อแก้ไขรายการตรวจวัด IPQA-02' 
+                  : 'Enter admin password to edit IPQA-02 record'}
               </p>
             </div>
 
@@ -2716,14 +2679,14 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                   type="password"
                   value={historyAuthPassword}
                   onChange={(e) => setHistoryAuthPassword(e.target.value)}
-                  placeholder="Password: admin2026"
+                  placeholder={isTh ? "รหัสผ่านผู้ดูแลระบบ" : "Admin Password"}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-center text-lg font-mono text-amber-300 focus:outline-none focus:border-amber-500"
                   autoFocus
                 />
                 {historyAuthError && (
                   <p className="text-xs text-rose-400 font-semibold text-center mt-2 flex items-center justify-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />
-                    <span>{isTh ? 'รหัสผ่านไม่ถูกต้อง! (กรุณาใช้ admin2026)' : 'Incorrect password! (Use admin2026)'}</span>
+                    <span>{isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง' : 'Incorrect password! Please try again'}</span>
                   </p>
                 )}
               </div>
@@ -2807,15 +2770,19 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                   />
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Process</label>
-                  <input
-                    type="text"
-                    value={editingHistoryItem.process || ''}
-                    onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, process: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
+                <ProcessSelector
+                  id="edit-roughness-process"
+                  label="Process"
+                  value={editingHistoryItem.process || ''}
+                  onChange={(proc) => setEditingHistoryItem({ ...editingHistoryItem, process: proc })}
+                />
+
+                <MachineSelector
+                  id="edit-roughness-machine"
+                  label="Machine"
+                  value={editingHistoryItem.machineName || ''}
+                  onChange={(mac) => setEditingHistoryItem({ ...editingHistoryItem, machineName: mac })}
+                />
 
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Inspector Name</label>

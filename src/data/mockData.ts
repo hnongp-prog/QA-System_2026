@@ -110,14 +110,14 @@ export const INITIAL_MODULES: QAModule[] = [
         'สกัดข้อมูล Heat Number, Grade, ส่วนผสมเคมี และสมบัติเชิงกลด้วย AI Gemini-2.5-Flash',
         'ตรวจสอบผลการผ่านเกณฑ์ (PASS / FAIL) เทียบกับ Grade Spec (Pb, Fe, Cd, Sn, Cu, Zn, Tensile, Elongation)',
         'พิมพ์ QR Code Identification Tag สำหรับติด Drum / ลอตลวดสังกะสี',
-        'ระบบบริหารจัดการ Grade Spec สำหรับ Admin ป้องกันด้วยรหัสผ่าน (admin2026)',
+        'ระบบบริหารจัดการ Grade Spec สำหรับ Admin ป้องกันด้วยรหัสผ่าน (Admin Password)',
         'ส่งออกข้อมูลรายงานสรุปผล CSV/Excel พร้อมระบบค้นหาย้อนหลัง'
       ],
       keyFeaturesEn: [
         'AI Gemini-2.5-Flash extraction for Heat No, Grade, Chemical & Mechanical properties',
         'Automatic PASS/FAIL evaluation against loaded Grade Specs (Pb, Fe, Cd, Sn, Cu, Zn, Tensile, Elongation)',
         'Print QR Code Identification Tags for Drum / Zn Wire Lots',
-        'Admin password-protected Grade Spec Manager (admin2026)',
+        'Admin password-protected Grade Spec Manager (Admin Password Protected)',
         'CSV/Excel report export with search & filter capabilities'
       ]
     }
@@ -277,7 +277,7 @@ export const INITIAL_MODULES: QAModule[] = [
         'ตรวจสอบค่าตาม Min/Max Specification Limits และประเมิน PASS/FAIL อัตโนมัติ',
         'กราฟ Sparkline Trend วิเคราะห์แนวโน้ม Coating Weight, Binder % และ Amount of Binder',
         'ส่งออกรายงานรูปแบบ CSV/Excel พร้อมข้อมูล Mixing Lot, Inspector และ Machine',
-        'ระบบบริหารจัดการ Profile Spec สำหรับ Admin ป้องกันด้วยรหัสผ่าน (admin2026)'
+        'ระบบบริหารจัดการ Profile Spec สำหรับ Admin ป้องกันด้วยรหัสผ่าน (Admin Password)'
       ],
       keyFeaturesEn: [
         'Automatic calculation of Coating Area, Binder Wt, Coating Wt Up/Lo, Binder % & Amount of Binder',
@@ -319,7 +319,7 @@ export const INITIAL_MODULES: QAModule[] = [
         'ตรวจสอบค่าตาม Target Limits และ Tolerance Range ประเมิน PASS/FAIL อัตโนมัติ',
         'กราฟ Sparkline Trend วิเคราะห์แนวโน้มขนาดชิ้นงานและค่าเบี่ยงเบน',
         'ส่งออกรายงานรูปแบบ CSV/Excel พร้อมข้อมูล Work Order, Coil No, Inspector และ Machine',
-        'ระบบบริหารจัดการ Profile Spec สำหรับ Admin ป้องกันด้วยรหัสผ่าน (admin2026)'
+        'ระบบบริหารจัดการ Profile Spec สำหรับ Admin ป้องกันด้วยรหัสผ่าน (Admin Password)'
       ],
       keyFeaturesEn: [
         'Cutting dimension measurement for Width, Height, Length, Bending, Camber, Twist & custom points',
@@ -359,14 +359,14 @@ export const INITIAL_MODULES: QAModule[] = [
       keyFeaturesTh: [
         'คำนวณน้ำหนักสารเคลือบ Binder Wt, Total Coating Wt, Binder % และ Solid % อัตโนมัติ',
         'ตรวจสอบค่า Binder%, Solid%, Grindometer และ Viscosity เทียบกับ Coating Spec ประเมิน PASS/FAIL',
-        'ระบบบริหารจัดการประเภทสารเคลือบและ Spec สำหรับ Admin ด้วยรหัสผ่าน (admin2026)',
+        'ระบบบริหารจัดการประเภทสารเคลือบและ Spec สำหรับ Admin ด้วยรหัสผ่าน (Admin Password)',
         'ส่งออกรายงานกลุ่มงาน CSV/Excel พร้อมข้อมูล Cup No, Mixing Lot, Inspector',
         'บันทึกประวัติการตรวจสอบ ค้นหาย้อนหลัง และทำงานบน Cloud Storage'
       ],
       keyFeaturesEn: [
         'Automatic calculation for Binder Wt, Total Coating Wt, Binder % & Solid %',
         'Real-time PASS/FAIL judgment against Coating Specs for Binder%, Solid%, Grindometer & Viscosity',
-        'Admin password-protected Coating Type & Specification manager (admin2026)',
+        'Admin password-protected Coating Type & Specification manager (Admin Password Protected)',
         'CSV/Excel report export with Cup No, Mixing Lot, Inspector and timestamp',
         'Cloud-synced historical inspection records & search filters'
       ]
@@ -401,14 +401,14 @@ export const INITIAL_MODULES: QAModule[] = [
       keyFeaturesTh: [
         'สกัดข้อมูลจากไฟล์ PDF/รูปถ่ายมือถือด้วย AI (Gemini 2.5) ตรวจวัดมิติ T1-T5, OR, IR, IHR, OHW, IHW, RA, IOR',
         'เปรียบเทียบค่าความหนาเทียบกับ Profile Spec ประเมิน PASS/FAIL แต่ละแถวและภาพรวมอัตโนมัติ',
-        'ระบบบริหารจัดการ Profile Spec สำหรับ Admin ป้องกันด้วยรหัสผ่าน (admin2026)',
+        'ระบบบริหารจัดการ Profile Spec สำหรับ Admin ป้องกันด้วยรหัสผ่าน (Admin Password)',
         'Dashboard แสดงผลสรุปจำนวนตัวอย่าง และกราฟเปรียบเทียบมิติชิ้นงาน',
         'ส่งออกรายงานไฟล์ Excel/CSV พร้อมข้อมูล Coil No, Inspector, Sample, Process และเวลา'
       ],
       keyFeaturesEn: [
         'AI document & photo data extraction for T1-T5, OR, IR, IHR, OHW, IHW, RA, IOR measurements',
         'Automatic PASS/FAIL judgment against loaded Profile Spec for line items & overall sample',
-        'Admin password-protected Profile Specification manager (admin2026)',
+        'Admin password-protected Profile Specification manager (Admin Password Protected)',
         'Dashboard metrics & visual comparison charts for sample trends',
         'CSV/Excel inspection log export with Coil No, Inspector, Sample, Process and timestamp'
       ]
@@ -443,14 +443,14 @@ export const INITIAL_MODULES: QAModule[] = [
       keyFeaturesTh: [
         'วิเคราะห์รูปถ่ายป้าย Tag 2 ขั้นตอน (Step 1: Auto-Fill Extraction, Step 2: Reference vs Test Image Comparison)',
         'ตรวจสอบความถูกต้องของ Part No, Drawing No, Destination TO, Box No, Dimension W/H/L และรายการ Coil',
-        'ระบบบริหารจัดการ Master Spec (Profile Spec) ป้องกันด้วยรหัสผ่านผู้ดูแลระบบ (admin2026)',
+        'ระบบบริหารจัดการ Master Spec (Profile Spec) ป้องกันด้วยรหัสผ่านผู้ดูแลระบบ (Admin Password)',
         'Dashboard สรุปผลการตรวจสอบ อัตรา Reject Rate แยกตาม Profile/เดือน/ปี',
         'ส่งออกข้อมูลประวัติการตรวจเข้าระบบไฟล์ Excel / CSV ได้ทันที'
       ],
       keyFeaturesEn: [
         '2-Step AI Tag Label Analysis (Step 1: Auto-fill extraction, Step 2: Reference vs Test image comparison)',
         'Validation of Part No, Drawing No, Destination TO, Box No, Dimension W/H/L & Coil details',
-        'Admin password-protected Master Spec Profile Manager (admin2026)',
+        'Admin password-protected Master Spec Profile Manager (Admin Password Protected)',
         'Dashboard metrics & reject rate breakdown filtered by profile/month/year',
         'Instant Excel / CSV inspection history log export'
       ]

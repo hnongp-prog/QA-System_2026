@@ -555,7 +555,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
     } else {
       setStatus({
         type: 'error',
-        message: isTh ? 'รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง (admin2026)' : 'Incorrect Admin Password (admin2026)'
+        message: isTh ? 'รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง' : 'Incorrect Admin Password'
       });
       setSecurityModal(prev => ({ ...prev, password: '' }));
     }
@@ -933,7 +933,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
               </div>
               <h3 className={`text-lg font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Admin Verification</h3>
               <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อตั้งค่า Grade Spec (admin2026)' : 'Enter admin password to manage grade specifications'}
+                {isTh ? 'กรุณาระบุรหัสผ่านผู้ดูแลระบบเพื่อตั้งค่า Grade Spec' : 'Enter admin password to manage grade specifications'}
               </p>
             </div>
 
@@ -994,8 +994,8 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
               </h3>
               <p className={`text-xs mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh 
-                  ? 'กรุณากรอกรหัสผ่าน admin2026 เพื่อยืนยันการลบข้อมูลนี้อย่างถาวร' 
-                  : 'Please enter admin password admin2026 to confirm permanent deletion.'}
+                  ? 'กรุณากรอกรหัสผ่านผู้ดูแลระบบเพื่อยืนยันการลบข้อมูลนี้อย่างถาวร' 
+                  : 'Please enter admin password to confirm permanent deletion.'}
               </p>
             </div>
 
@@ -1021,7 +1021,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                 <input
                   type="password"
                   autoFocus
-                  placeholder={isTh ? "ใส่รหัสผ่าน (admin2026)" : "Enter password (admin2026)"}
+                  placeholder={isTh ? "ใส่รหัสผ่านผู้ดูแลระบบ" : "Enter admin password"}
                   value={deleteConfirmPassword}
                   onChange={(e) => setDeleteConfirmPassword(e.target.value)}
                   className={`w-full rounded-xl px-4 py-2.5 text-center font-mono text-sm focus:outline-none border ${
@@ -1032,7 +1032,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                 />
                 {deleteConfirmError && (
                   <p className="text-xs text-rose-500 font-semibold text-center mt-1.5">
-                    {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาใส่ admin2026' : 'Incorrect password! Please enter admin2026'}
+                    {isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง' : 'Incorrect password! Please try again'}
                   </p>
                 )}
               </div>
@@ -1740,7 +1740,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                                   setDeleteConfirm({ show: true, id: item.id || null, type: 'history' });
                                 }}
                                 className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400 transition"
-                                title={isTh ? "ลบรายการ (ต้องใส่รหัส admin2026)" : "Delete Record (Password required)"}
+                                title={isTh ? "ลบรายการ (ต้องใส่รหัสผ่านผู้ดูแลระบบ)" : "Delete Record (Admin password required)"}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1835,7 +1835,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                       className="text-xs text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      <span>{isTh ? 'ลบเกรดนี้ (ต้องใส่รหัส admin2026)' : 'Delete Grade (Password required)'}</span>
+                      <span>{isTh ? 'ลบเกรดนี้ (ต้องใส่รหัสผ่านผู้ดูแลระบบ)' : 'Delete Grade (Admin password required)'}</span>
                     </button>
                   </div>
 
@@ -1948,8 +1948,8 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
               </h3>
               <p className="text-xs text-slate-400">
                 {isTh 
-                  ? 'กรอกรหัสผ่านเพื่อแก้ไขรายการประวัติการตรวจรับที่เลือก (Password: admin2026)' 
-                  : 'Enter password to edit this inspection record (Password: admin2026)'}
+                  ? 'กรอกรหัสผ่านผู้ดูแลระบบเพื่อแก้ไขรายการประวัติการตรวจรับที่เลือก' 
+                  : 'Enter admin password to edit this inspection record'}
               </p>
             </div>
 
@@ -1959,14 +1959,14 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                   type="password"
                   value={historyAuthPassword}
                   onChange={(e) => setHistoryAuthPassword(e.target.value)}
-                  placeholder="Password: admin2026"
+                  placeholder={isTh ? "รหัสผ่านผู้ดูแลระบบ" : "Admin Password"}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-center text-lg font-mono text-amber-300 focus:outline-none focus:border-amber-500"
                   autoFocus
                 />
                 {historyAuthError && (
                   <p className="text-xs text-rose-400 font-semibold text-center mt-2 flex items-center justify-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />
-                    <span>{isTh ? 'รหัสผ่านไม่ถูกต้อง! (กรุณาใช้ admin2026)' : 'Incorrect password! (Use admin2026)'}</span>
+                    <span>{isTh ? 'รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่อีกครั้ง' : 'Incorrect password! Please try again'}</span>
                   </p>
                 )}
               </div>
