@@ -8,28 +8,30 @@ import {
   CheckCircle2, 
   Activity, 
   X, 
-  Save,
-  BarChart3,
+  Save, 
+  BarChart3, 
   PieChart, 
   TrendingUp, 
   Target, 
-  Filter,
-  Settings,
-  Cpu,
-  Lock,
-  ChevronRight,
-  ArrowLeft,
-  Download,
-  Plus,
-  Minus,
-  Layers,
-  Search,
-  Sliders,
-  FileSpreadsheet,
-  Edit3,
-  RotateCcw,
-  Sun,
-  Moon
+  Filter, 
+  Settings, 
+  Cpu, 
+  Lock, 
+  ChevronRight, 
+  ArrowLeft, 
+  Download, 
+  Plus, 
+  Minus, 
+  Layers, 
+  Search, 
+  Sliders, 
+  FileSpreadsheet, 
+  Edit3, 
+  RotateCcw, 
+  Sun, 
+  Moon, 
+  Factory, 
+  Copy 
 } from 'lucide-react';
 
 import { 
@@ -181,7 +183,12 @@ const DEFAULT_PROFILES: XRayProfileSpec[] = [
     rzUp: '1.20', rzLo: '1.20', 
     fluxMinUp: '1.00', fluxMinLo: '1.00',
     fluxMaxUp: '2.00', fluxMaxLo: '2.00',
-    coverageLimitUp: '95.0', coverageLimitLo: '95.0'
+    coverageLimitUp: '95.0', coverageLimitLo: '95.0',
+    settingRaUp: '0.75', settingRaLo: '0.75',
+    settingRzUp: '1.25', settingRzLo: '1.25',
+    settingFluxMinUp: '0.90', settingFluxMinLo: '0.90',
+    settingFluxMaxUp: '2.10', settingFluxMaxLo: '2.10',
+    settingCoverageLimitUp: '93.0', settingCoverageLimitLo: '93.0'
   },
   {
     name: 'HEAVY-ZN-GALV',
@@ -189,7 +196,12 @@ const DEFAULT_PROFILES: XRayProfileSpec[] = [
     rzUp: '1.80', rzLo: '1.80',
     fluxMinUp: '1.50', fluxMinLo: '1.50',
     fluxMaxUp: '2.80', fluxMaxLo: '2.80',
-    coverageLimitUp: '98.0', coverageLimitLo: '98.0'
+    coverageLimitUp: '98.0', coverageLimitLo: '98.0',
+    settingRaUp: '1.15', settingRaLo: '1.15',
+    settingRzUp: '1.85', settingRzLo: '1.85',
+    settingFluxMinUp: '1.40', settingFluxMinLo: '1.40',
+    settingFluxMaxUp: '2.90', settingFluxMaxLo: '2.90',
+    settingCoverageLimitUp: '96.0', settingCoverageLimitLo: '96.0'
   },
   {
     name: 'LIGHT-PRECOAT-01',
@@ -197,13 +209,19 @@ const DEFAULT_PROFILES: XRayProfileSpec[] = [
     rzUp: '0.70', rzLo: '0.70',
     fluxMinUp: '0.50', fluxMinLo: '0.50',
     fluxMaxUp: '1.20', fluxMaxLo: '1.20',
-    coverageLimitUp: '90.0', coverageLimitLo: '90.0'
+    coverageLimitUp: '90.0', coverageLimitLo: '90.0',
+    settingRaUp: '0.35', settingRaLo: '0.35',
+    settingRzUp: '0.75', settingRzLo: '0.75',
+    settingFluxMinUp: '0.45', settingFluxMinLo: '0.45',
+    settingFluxMaxUp: '1.25', settingFluxMaxLo: '1.25',
+    settingCoverageLimitUp: '88.0', settingCoverageLimitLo: '88.0'
   }
 ];
 
 const INITIAL_INSPECTIONS: XRayInspectionRecord[] = [
   {
     id: 'rec-xray-001',
+    stage: 'MASS',
     lotNumber: 'COIL-2026-X101',
     partId: 'UP-SIDE',
     process: 'GALVANIZING',
@@ -219,6 +237,7 @@ const INITIAL_INSPECTIONS: XRayInspectionRecord[] = [
   },
   {
     id: 'rec-xray-002',
+    stage: 'SETTING',
     lotNumber: 'COIL-2026-X102',
     partId: 'LO-SIDE',
     process: 'GALVANIZING',
@@ -226,7 +245,7 @@ const INITIAL_INSPECTIONS: XRayInspectionRecord[] = [
     rzUp: '1.85', rzLo: '1.80',
     rtUp: '92.0', rtLo: '91.5',
     status: 'Fail',
-    remarks: 'Zn weight below spec min (0.80 g/m²)',
+    remarks: 'Zn weight below setting spec min (0.75 g/m²)',
     profileName: 'Standard_ZnCoating',
     inspectorName: 'Somchai P. (X-Ray)',
     machine: 'XRAY-SURF-01',
@@ -257,7 +276,10 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminAuthError, setAdminAuthError] = useState(false);
 
-  // Header Info State (Clean initial state)
+  // Tab inside Profile Settings: Setting vs Mass specs
+  const [specEditTab, setSpecEditTab] = useState<'setting' | 'mass'>('setting');
+
+  // Header Info State (Clean initial state with both Mass and Setting Specs)
   const [headerInfo, setHeaderInfo] = useState({
     inspectorName: '',
     shift: '',
@@ -265,11 +287,18 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
     machine: '',
     date: new Date().toISOString().split('T')[0],
     profileName: '',
+    // Mass Specs
     requirementRaUp: '', requirementRaLo: '', 
     requirementRzUp: '', requirementRzLo: '', 
     requirementFluxMinUp: '', requirementFluxMinLo: '',
     requirementFluxMaxUp: '', requirementFluxMaxLo: '',
-    requirementCoverageLimitUp: '', requirementCoverageLimitLo: ''
+    requirementCoverageLimitUp: '', requirementCoverageLimitLo: '',
+    // Setting Specs
+    requirementSettingRaUp: '', requirementSettingRaLo: '',
+    requirementSettingRzUp: '', requirementSettingRzLo: '',
+    requirementSettingFluxMinUp: '', requirementSettingFluxMinLo: '',
+    requirementSettingFluxMaxUp: '', requirementSettingFluxMaxLo: '',
+    requirementSettingCoverageLimitUp: '', requirementSettingCoverageLimitLo: ''
   });
 
   const [profileStatus, setProfileStatus] = useState<'found' | 'not-found'>('not-found');
@@ -279,10 +308,14 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
   const [fluxPointCount, setFluxPointCount] = useState<number>(1);
   const [coveragePointCount, setCoveragePointCount] = useState<number>(1);
 
-  // Batch Data Entry Items State (Clean initial state)
+  // Profile Spec Editor active stage tab ('SETTING' | 'MASS')
+  const [specEditStage, setSpecEditStage] = useState<'SETTING' | 'MASS'>('MASS');
+
+  // Batch Data Entry Items State (Clean initial state, default to SETTING stage)
   const [batchItems, setBatchItems] = useState([
     { 
       id: Date.now(), 
+      stage: 'SETTING' as 'SETTING' | 'MASS',
       partId: '', 
       lotNumber: '', 
       process: '', 
@@ -536,6 +569,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
     setHeaderInfo(prev => ({
       ...prev,
       profileName: profile.name,
+      // Mass Specs
       requirementRaUp: formatSpecValue(profile.raUp),
       requirementRaLo: formatSpecValue(profile.raLo),
       requirementRzUp: formatSpecValue(profile.rzUp),
@@ -545,7 +579,18 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       requirementFluxMaxUp: formatSpecValue(profile.fluxMaxUp),
       requirementFluxMaxLo: formatSpecValue(profile.fluxMaxLo),
       requirementCoverageLimitUp: formatSpecValue(profile.coverageLimitUp),
-      requirementCoverageLimitLo: formatSpecValue(profile.coverageLimitLo)
+      requirementCoverageLimitLo: formatSpecValue(profile.coverageLimitLo),
+      // Setting Specs (fallback to mass spec if not specified)
+      requirementSettingRaUp: formatSpecValue(profile.settingRaUp || profile.raUp),
+      requirementSettingRaLo: formatSpecValue(profile.settingRaLo || profile.raLo),
+      requirementSettingRzUp: formatSpecValue(profile.settingRzUp || profile.rzUp),
+      requirementSettingRzLo: formatSpecValue(profile.settingRzLo || profile.rzLo),
+      requirementSettingFluxMinUp: formatSpecValue(profile.settingFluxMinUp || profile.fluxMinUp),
+      requirementSettingFluxMinLo: formatSpecValue(profile.settingFluxMinLo || profile.fluxMinLo),
+      requirementSettingFluxMaxUp: formatSpecValue(profile.settingFluxMaxUp || profile.fluxMaxUp),
+      requirementSettingFluxMaxLo: formatSpecValue(profile.settingFluxMaxLo || profile.fluxMaxLo),
+      requirementSettingCoverageLimitUp: formatSpecValue(profile.settingCoverageLimitUp || profile.coverageLimitUp),
+      requirementSettingCoverageLimitLo: formatSpecValue(profile.settingCoverageLimitLo || profile.coverageLimitLo)
     }));
     setProfileStatus('found');
   };
@@ -565,7 +610,17 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
           requirementFluxMaxUp: formatSpecValue(match.fluxMaxUp),
           requirementFluxMaxLo: formatSpecValue(match.fluxMaxLo),
           requirementCoverageLimitUp: formatSpecValue(match.coverageLimitUp),
-          requirementCoverageLimitLo: formatSpecValue(match.coverageLimitLo)
+          requirementCoverageLimitLo: formatSpecValue(match.coverageLimitLo),
+          requirementSettingRaUp: formatSpecValue(match.settingRaUp || match.raUp),
+          requirementSettingRaLo: formatSpecValue(match.settingRaLo || match.raLo),
+          requirementSettingRzUp: formatSpecValue(match.settingRzUp || match.rzUp),
+          requirementSettingRzLo: formatSpecValue(match.settingRzLo || match.rzLo),
+          requirementSettingFluxMinUp: formatSpecValue(match.settingFluxMinUp || match.fluxMinUp),
+          requirementSettingFluxMinLo: formatSpecValue(match.settingFluxMinLo || match.fluxMinLo),
+          requirementSettingFluxMaxUp: formatSpecValue(match.settingFluxMaxUp || match.fluxMaxUp),
+          requirementSettingFluxMaxLo: formatSpecValue(match.settingFluxMaxLo || match.fluxMaxLo),
+          requirementSettingCoverageLimitUp: formatSpecValue(match.settingCoverageLimitUp || match.coverageLimitUp),
+          requirementSettingCoverageLimitLo: formatSpecValue(match.settingCoverageLimitLo || match.coverageLimitLo)
         }));
         setProfileStatus('found');
       } else {
@@ -582,12 +637,24 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
 
     const newProfile: XRayProfileSpec = {
       name: headerInfo.profileName.trim(),
+      // Mass specs
       raUp: headerInfo.requirementRaUp, raLo: headerInfo.requirementRaLo,
       rzUp: headerInfo.requirementRzUp, rzLo: headerInfo.requirementRzLo,
       fluxMinUp: headerInfo.requirementFluxMinUp, fluxMinLo: headerInfo.requirementFluxMinLo,
       fluxMaxUp: headerInfo.requirementFluxMaxUp, fluxMaxLo: headerInfo.requirementFluxMaxLo,
       coverageLimitUp: headerInfo.requirementCoverageLimitUp,
       coverageLimitLo: headerInfo.requirementCoverageLimitLo,
+      // Setting specs
+      settingRaUp: headerInfo.requirementSettingRaUp || headerInfo.requirementRaUp,
+      settingRaLo: headerInfo.requirementSettingRaLo || headerInfo.requirementRaLo,
+      settingRzUp: headerInfo.requirementSettingRzUp || headerInfo.requirementRzUp,
+      settingRzLo: headerInfo.requirementSettingRzLo || headerInfo.requirementRzLo,
+      settingFluxMinUp: headerInfo.requirementSettingFluxMinUp || headerInfo.requirementFluxMinUp,
+      settingFluxMinLo: headerInfo.requirementSettingFluxMinLo || headerInfo.requirementFluxMinLo,
+      settingFluxMaxUp: headerInfo.requirementSettingFluxMaxUp || headerInfo.requirementFluxMaxUp,
+      settingFluxMaxLo: headerInfo.requirementSettingFluxMaxLo || headerInfo.requirementFluxMaxLo,
+      settingCoverageLimitUp: headerInfo.requirementSettingCoverageLimitUp || headerInfo.requirementCoverageLimitUp,
+      settingCoverageLimitLo: headerInfo.requirementSettingCoverageLimitLo || headerInfo.requirementCoverageLimitLo,
     };
 
     setSavedProfiles(prev => {
@@ -600,7 +667,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       return [...prev, newProfile];
     });
 
-    showNotification(isTh ? `บันทึก Profile "${newProfile.name}" เรียบร้อยแล้ว` : `Saved Profile "${newProfile.name}"`);
+    showNotification(isTh ? `บันทึก Profile "${newProfile.name}" (พร้อม Setting & Mass Spec) เรียบร้อยแล้ว` : `Saved Profile "${newProfile.name}" (Setting & Mass Specs)`);
   };
 
   const handleDeleteProfile = (profileName: string) => {
@@ -619,12 +686,21 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
     setDeleteConfirm(null);
   };
 
-  const reqZnUp = !headerInfo.profileName || parseFloat(headerInfo.requirementRaUp) > 0 || parseFloat(headerInfo.requirementRzUp) > 0;
-  const reqZnLo = !headerInfo.profileName || parseFloat(headerInfo.requirementRaLo) > 0 || parseFloat(headerInfo.requirementRzLo) > 0;
-  const reqFluxUp = !headerInfo.profileName || parseFloat(headerInfo.requirementFluxMinUp) > 0 || parseFloat(headerInfo.requirementFluxMaxUp) > 0;
-  const reqFluxLo = !headerInfo.profileName || parseFloat(headerInfo.requirementFluxMinLo) > 0 || parseFloat(headerInfo.requirementFluxMaxLo) > 0;
-  const reqCoverageUp = !headerInfo.profileName || parseFloat(headerInfo.requirementCoverageLimitUp) > 0;
-  const reqCoverageLo = !headerInfo.profileName || parseFloat(headerInfo.requirementCoverageLimitLo) > 0;
+  const getItemActiveSpecs = (stage: 'SETTING' | 'MASS' = 'SETTING') => {
+    const isSetting = stage === 'SETTING';
+    return {
+      znMinUp: isSetting ? (headerInfo.requirementSettingRaUp || headerInfo.requirementRaUp) : headerInfo.requirementRaUp,
+      znMaxUp: isSetting ? (headerInfo.requirementSettingRzUp || headerInfo.requirementRzUp) : headerInfo.requirementRzUp,
+      znMinLo: isSetting ? (headerInfo.requirementSettingRaLo || headerInfo.requirementRaLo) : headerInfo.requirementRaLo,
+      znMaxLo: isSetting ? (headerInfo.requirementSettingRzLo || headerInfo.requirementRzLo) : headerInfo.requirementRzLo,
+      fluxMinUp: isSetting ? (headerInfo.requirementSettingFluxMinUp || headerInfo.requirementFluxMinUp) : headerInfo.requirementFluxMinUp,
+      fluxMaxUp: isSetting ? (headerInfo.requirementSettingFluxMaxUp || headerInfo.requirementFluxMaxUp) : headerInfo.requirementFluxMaxUp,
+      fluxMinLo: isSetting ? (headerInfo.requirementSettingFluxMinLo || headerInfo.requirementFluxMinLo) : headerInfo.requirementFluxMinLo,
+      fluxMaxLo: isSetting ? (headerInfo.requirementSettingFluxMaxLo || headerInfo.requirementFluxMaxLo) : headerInfo.requirementFluxMaxLo,
+      coverageUp: isSetting ? (headerInfo.requirementSettingCoverageLimitUp || headerInfo.requirementCoverageLimitUp) : headerInfo.requirementCoverageLimitUp,
+      coverageLo: isSetting ? (headerInfo.requirementSettingCoverageLimitLo || headerInfo.requirementCoverageLimitLo) : headerInfo.requirementCoverageLimitLo,
+    };
+  };
 
   const isIgnoredValue = (v?: string | number): boolean => {
     if (v === undefined || v === null) return true;
@@ -633,18 +709,26 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
   };
 
   const judgeStatus = (item: typeof batchItems[0]): 'Pass' | 'Fail' | 'Pending' => {
+    const activeSpec = getItemActiveSpecs(item.stage || 'SETTING');
     const specs = {
-      znMinUp: parseFloat(headerInfo.requirementRaUp) || 0,
-      znMaxUp: parseFloat(headerInfo.requirementRzUp) || 0,
-      znMinLo: parseFloat(headerInfo.requirementRaLo) || 0,
-      znMaxLo: parseFloat(headerInfo.requirementRzLo) || 0,
-      fluxMinUp: parseFloat(headerInfo.requirementFluxMinUp) || 0,
-      fluxMaxUp: parseFloat(headerInfo.requirementFluxMaxUp) || 0,
-      fluxMinLo: parseFloat(headerInfo.requirementFluxMinLo) || 0,
-      fluxMaxLo: parseFloat(headerInfo.requirementFluxMaxLo) || 0,
-      coverageUp: parseFloat(headerInfo.requirementCoverageLimitUp) || 0,
-      coverageLo: parseFloat(headerInfo.requirementCoverageLimitLo) || 0
+      znMinUp: parseFloat(activeSpec.znMinUp) || 0,
+      znMaxUp: parseFloat(activeSpec.znMaxUp) || 0,
+      znMinLo: parseFloat(activeSpec.znMinLo) || 0,
+      znMaxLo: parseFloat(activeSpec.znMaxLo) || 0,
+      fluxMinUp: parseFloat(activeSpec.fluxMinUp) || 0,
+      fluxMaxUp: parseFloat(activeSpec.fluxMaxUp) || 0,
+      fluxMinLo: parseFloat(activeSpec.fluxMinLo) || 0,
+      fluxMaxLo: parseFloat(activeSpec.fluxMaxLo) || 0,
+      coverageUp: parseFloat(activeSpec.coverageUp) || 0,
+      coverageLo: parseFloat(activeSpec.coverageLo) || 0
     };
+
+    const hasZnReqUp = !headerInfo.profileName || specs.znMinUp > 0 || specs.znMaxUp > 0;
+    const hasZnReqLo = !headerInfo.profileName || specs.znMinLo > 0 || specs.znMaxLo > 0;
+    const hasFluxReqUp = !headerInfo.profileName || specs.fluxMinUp > 0 || specs.fluxMaxUp > 0;
+    const hasFluxReqLo = !headerInfo.profileName || specs.fluxMinLo > 0 || specs.fluxMaxLo > 0;
+    const hasCoverageReqUp = !headerInfo.profileName || specs.coverageUp > 0;
+    const hasCoverageReqLo = !headerInfo.profileName || specs.coverageLo > 0;
 
     const allValues = [
       ...(item.raUp || []),
@@ -665,7 +749,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
 
     let pass = true;
 
-    if (reqZnUp) {
+    if (hasZnReqUp) {
       for (const val of item.raUp) {
         if (!isIgnoredValue(val)) {
           const znUp = parseFloat(String(val).trim());
@@ -677,7 +761,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       }
     }
 
-    if (reqZnLo) {
+    if (hasZnReqLo) {
       for (const val of item.raLo) {
         if (!isIgnoredValue(val)) {
           const znLo = parseFloat(String(val).trim());
@@ -689,7 +773,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       }
     }
 
-    if (reqFluxUp) {
+    if (hasFluxReqUp) {
       for (const val of item.rzUp) {
         if (!isIgnoredValue(val)) {
           const fluxUp = parseFloat(String(val).trim());
@@ -701,7 +785,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       }
     }
 
-    if (reqFluxLo) {
+    if (hasFluxReqLo) {
       for (const val of item.rzLo) {
         if (!isIgnoredValue(val)) {
           const fluxLo = parseFloat(String(val).trim());
@@ -713,7 +797,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       }
     }
 
-    if (reqCoverageUp) {
+    if (hasCoverageReqUp) {
       for (const val of item.rtUp) {
         if (!isIgnoredValue(val)) {
           const covUp = parseFloat(String(val).trim());
@@ -722,7 +806,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       }
     }
 
-    if (reqCoverageLo) {
+    if (hasCoverageReqLo) {
       for (const val of item.rtLo) {
         if (!isIgnoredValue(val)) {
           const covLo = parseFloat(String(val).trim());
@@ -834,11 +918,17 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       requirementRzUp: '', requirementRzLo: '', 
       requirementFluxMinUp: '', requirementFluxMinLo: '',
       requirementFluxMaxUp: '', requirementFluxMaxLo: '',
-      requirementCoverageLimitUp: '', requirementCoverageLimitLo: ''
+      requirementCoverageLimitUp: '', requirementCoverageLimitLo: '',
+      requirementSettingRaUp: '', requirementSettingRaLo: '',
+      requirementSettingRzUp: '', requirementSettingRzLo: '',
+      requirementSettingFluxMinUp: '', requirementSettingFluxMinLo: '',
+      requirementSettingFluxMaxUp: '', requirementSettingFluxMaxLo: '',
+      requirementSettingCoverageLimitUp: '', requirementSettingCoverageLimitLo: ''
     });
     setProfileStatus('not-found');
     setBatchItems([{ 
       id: Date.now(), 
+      stage: 'SETTING' as 'SETTING' | 'MASS',
       partId: '', 
       lotNumber: '', 
       process: '', 
@@ -857,6 +947,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
     const lastItem = batchItems[batchItems.length - 1];
     setBatchItems(prev => [...prev, { 
       id: Date.now() + Math.random(), 
+      stage: (lastItem?.stage || 'SETTING') as 'SETTING' | 'MASS',
       partId: lastItem ? lastItem.partId : '', 
       lotNumber: lastItem ? lastItem.lotNumber : '', 
       process: lastItem ? lastItem.process : '', 
@@ -940,15 +1031,16 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
           moduleTitleEn: 'X-Ray Coating Weight & Coverage Measurement System',
           inspector: headerInfo.inspectorName || 'X-Ray Technician',
           shift: headerInfo.shift || '',
-          batchLot: `${headerInfo.profileName} - ${item.lotNumber}`,
+          batchLot: `[${item.stage || 'SETTING'}] ${headerInfo.profileName} - ${item.lotNumber}`,
           result: decision === 'Pass' ? 'PASS' : 'REJECT',
           defectCount: decision === 'Fail' ? 1 : 0,
-          remarks: `Zn: [${znUpStr}]/[${znLoStr}] (Avg: ${znAvgTotalVal}), Flux: [${fluxUpStr}]/[${fluxLoStr}] (Avg: ${fluxAvgTotalVal}), Coverage: [${covUpStr}]/[${covLoStr}]% (Avg: ${covAvgTotalVal}%)`
+          remarks: `Stage: ${item.stage || 'SETTING'}, Zn: [${znUpStr}]/[${znLoStr}] (Avg: ${znAvgTotalVal}), Flux: [${fluxUpStr}]/[${fluxLoStr}] (Avg: ${fluxAvgTotalVal}), Coverage: [${covUpStr}]/[${covLoStr}]% (Avg: ${covAvgTotalVal}%)`
         });
       }
 
       return {
         id: recId,
+        stage: (item.stage || 'SETTING') as 'SETTING' | 'MASS',
         lotNumber: item.lotNumber.trim().toUpperCase() || 'COIL-UNTITLED',
         partId: item.partId.trim().toUpperCase() || 'UP-SIDE',
         process: item.process.trim().toUpperCase() || 'GALVANIZING',
@@ -987,6 +1079,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
 
     setBatchItems([{ 
       id: Date.now(), 
+      stage: 'SETTING' as 'SETTING' | 'MASS',
       partId: '', lotNumber: '', process: '', 
       raUp: createEmptyPointArray(znPointCount), 
       raLo: createEmptyPointArray(znPointCount), 
@@ -994,7 +1087,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       rzLo: createEmptyPointArray(fluxPointCount), 
       rtUp: createEmptyPointArray(coveragePointCount), 
       rtLo: createEmptyPointArray(coveragePointCount), 
-      status: 'Pending', remarks: '' 
+      status: 'Pending', 
+      remarks: '' 
     }]);
 
     setActiveTab('history');
@@ -1017,7 +1111,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
     }
 
     const headers = [
-      'Timestamp', 'Inspector', 'Machine', 'Profile Name', 'Coil No', 'Side', 'Process', 
+      'Timestamp', 'Inspector', 'Machine', 'Profile Name', 'Stage', 'Coil No', 'Side', 'Process', 
       'Zn Up Points', 'Zn Lo Points', 'Zn Avg Up', 'Zn Avg Lo', 'Zn Avg Overall', 
       'Flux Up Points', 'Flux Lo Points', 'Flux Avg Up', 'Flux Avg Lo', 'Flux Avg Overall',
       'Coverage Up Points', 'Coverage Lo Points', 'Coverage Avg Up', 'Coverage Avg Lo', 'Coverage Avg Overall',
@@ -1029,6 +1123,7 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       `"${ins.inspectorName}"`,
       `"${ins.machine || '-'}"`,
       `"${ins.profileName}"`,
+      `"${ins.stage || 'SETTING'}"`,
       `"${ins.lotNumber}"`,
       `"${ins.partId}"`,
       `"${ins.process}"`,
@@ -1378,7 +1473,12 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                         requirementRzUp: '', requirementRzLo: '', 
                         requirementFluxMinUp: '', requirementFluxMinLo: '',
                         requirementFluxMaxUp: '', requirementFluxMaxLo: '',
-                        requirementCoverageLimitUp: '', requirementCoverageLimitLo: ''
+                        requirementCoverageLimitUp: '', requirementCoverageLimitLo: '',
+                        requirementSettingRaUp: '', requirementSettingRaLo: '',
+                        requirementSettingRzUp: '', requirementSettingRzLo: '',
+                        requirementSettingFluxMinUp: '', requirementSettingFluxMinLo: '',
+                        requirementSettingFluxMaxUp: '', requirementSettingFluxMaxLo: '',
+                        requirementSettingCoverageLimitUp: '', requirementSettingCoverageLimitLo: ''
                       }));
                       setProfileStatus('not-found');
                     } else {
@@ -1459,136 +1559,55 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
               </div>
             </div>
 
-            {/* Spec summary row */}
-            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs grid grid-cols-1 sm:grid-cols-3 gap-2 text-slate-300">
-              <div><span className="text-slate-500">Zn Weight Limit:</span> <strong className="text-indigo-300">{headerInfo.requirementRaUp ? `${headerInfo.requirementRaUp} - ${headerInfo.requirementRzUp} g/m²` : '-'}</strong></div>
-              <div><span className="text-slate-500">Flux Weight Limit:</span> <strong className="text-emerald-300">{headerInfo.requirementFluxMinUp ? `${headerInfo.requirementFluxMinUp} - ${headerInfo.requirementFluxMaxUp} g/m²` : '-'}</strong></div>
-              <div><span className="text-slate-500">Coverage % Limit:</span> <strong className="text-amber-300">{headerInfo.requirementCoverageLimitUp ? `≥ ${headerInfo.requirementCoverageLimitUp}%` : '-'}</strong></div>
+            {/* Dual Spec Summary: Setting vs Mass Production */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              <div className="bg-amber-950/20 p-3 rounded-xl border border-amber-800/40 text-xs text-slate-300">
+                <div className="flex items-center justify-between font-bold text-amber-400 mb-1.5 pb-1 border-b border-amber-800/30">
+                  <span className="flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5" />
+                    <span>⚙️ 1.1 {isTh ? 'สเปกช่วงปรับตั้ง (Setting Spec)' : 'Setting Spec [SET]'}</span>
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
+                    {isTh ? 'สำหรับ Coil ช่วงทดลอง/ตั้งเครื่อง' : 'For setup / trial coils'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-[11px]">
+                  <div><span className="text-slate-400 block text-[10px]">Zn Limit:</span> <strong className="text-amber-200">{headerInfo.requirementSettingRaUp ? `${headerInfo.requirementSettingRaUp} - ${headerInfo.requirementSettingRzUp} g/m²` : (headerInfo.requirementRaUp ? `${headerInfo.requirementRaUp} - ${headerInfo.requirementRzUp} g/m²` : '-')}</strong></div>
+                  <div><span className="text-slate-400 block text-[10px]">Flux Limit:</span> <strong className="text-amber-200">{headerInfo.requirementSettingFluxMinUp ? `${headerInfo.requirementSettingFluxMinUp} - ${headerInfo.requirementSettingFluxMaxUp} g/m²` : (headerInfo.requirementFluxMinUp ? `${headerInfo.requirementFluxMinUp} - ${headerInfo.requirementFluxMaxUp} g/m²` : '-')}</strong></div>
+                  <div><span className="text-slate-400 block text-[10px]">Coverage Limit:</span> <strong className="text-amber-200">{headerInfo.requirementSettingCoverageLimitUp ? `≥ ${headerInfo.requirementSettingCoverageLimitUp}%` : (headerInfo.requirementCoverageLimitUp ? `≥ ${headerInfo.requirementCoverageLimitUp}%` : '-')}</strong></div>
+                </div>
+              </div>
+
+              <div className="bg-cyan-950/20 p-3 rounded-xl border border-cyan-800/40 text-xs text-slate-300">
+                <div className="flex items-center justify-between font-bold text-cyan-400 mb-1.5 pb-1 border-b border-cyan-800/30">
+                  <span className="flex items-center gap-1.5">
+                    <Factory className="w-3.5 h-3.5" />
+                    <span>🏭 1.2 {isTh ? 'สเปกช่วงผลิตจริง (Mass Production Spec)' : 'Mass Spec [MASS]'}</span>
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-semibold">
+                    {isTh ? 'สำหรับ Coil ช่วงผลิตต่อเนื่อง' : 'For mass production coils'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-[11px]">
+                  <div><span className="text-slate-400 block text-[10px]">Zn Limit:</span> <strong className="text-cyan-200">{headerInfo.requirementRaUp ? `${headerInfo.requirementRaUp} - ${headerInfo.requirementRzUp} g/m²` : '-'}</strong></div>
+                  <div><span className="text-slate-400 block text-[10px]">Flux Limit:</span> <strong className="text-cyan-200">{headerInfo.requirementFluxMinUp ? `${headerInfo.requirementFluxMinUp} - ${headerInfo.requirementFluxMaxUp} g/m²` : '-'}</strong></div>
+                  <div><span className="text-slate-400 block text-[10px]">Coverage Limit:</span> <strong className="text-cyan-200">{headerInfo.requirementCoverageLimitUp ? `≥ ${headerInfo.requirementCoverageLimitUp}%` : '-'}</strong></div>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Measurement Table */}
           <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 shadow-md overflow-hidden" ref={tableRef}>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
                 <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
                   <Activity className="w-4 h-4 text-emerald-400" />
                   {isTh ? '2. ตารางบันทึกค่ารังสีเอกซ์ (X-Ray Measurements Entry)' : '2. X-Ray Entry Table'}
                 </h3>
-
-                {/* Zn Point Count Control */}
-                <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800 text-xs">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">
-                    {isTh ? 'จุดวัด Zn:' : 'Zn Pts:'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={removeZnPoint}
-                    disabled={znPointCount <= 1}
-                    className="p-1 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 transition rounded hover:bg-slate-800"
-                    title={isTh ? "ลดจุดวัด Zn weight" : "Decrease Zn Points"}
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="px-2 py-0.5 bg-indigo-950 text-indigo-300 font-mono font-bold text-xs rounded border border-indigo-800">
-                    {znPointCount} {isTh ? 'จุด' : 'pts'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={addZnPoint}
-                    className="p-1 text-indigo-400 hover:text-indigo-200 transition rounded hover:bg-indigo-950/60"
-                    title={isTh ? "+ เพิ่มจุดวัด Zn weight (Up/Lo)" : "Add Zn weight point (Up/Lo)"}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Flux Point Count Control */}
-                <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800 text-xs">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">
-                    {isTh ? 'จุดวัด Flux:' : 'Flux Pts:'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={removeFluxPoint}
-                    disabled={fluxPointCount <= 1}
-                    className="p-1 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 transition rounded hover:bg-slate-800"
-                    title={isTh ? "ลดจุดวัด Flux weight" : "Decrease Flux Points"}
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="px-2 py-0.5 bg-emerald-950 text-emerald-300 font-mono font-bold text-xs rounded border border-emerald-800">
-                    {fluxPointCount} {isTh ? 'จุด' : 'pts'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={addFluxPoint}
-                    className="p-1 text-emerald-400 hover:text-emerald-200 transition rounded hover:bg-emerald-950/60"
-                    title={isTh ? "+ เพิ่มจุดวัด Flux weight (Up/Lo)" : "Add Flux weight point (Up/Lo)"}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Coverage Point Count Control */}
-                <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800 text-xs">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">
-                    {isTh ? 'จุดวัด Coverage:' : 'Cov Pts:'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={removeCoveragePoint}
-                    disabled={coveragePointCount <= 1}
-                    className="p-1 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 transition rounded hover:bg-slate-800"
-                    title={isTh ? "ลดจุดวัด Coverage %" : "Decrease Coverage Points"}
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="px-2 py-0.5 bg-amber-950 text-amber-300 font-mono font-bold text-xs rounded border border-amber-800">
-                    {coveragePointCount} {isTh ? 'จุด' : 'pts'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={addCoveragePoint}
-                    className="p-1 text-amber-400 hover:text-amber-200 transition rounded hover:bg-amber-950/60"
-                    title={isTh ? "+ เพิ่มจุดวัด Coverage % (Up/Lo)" : "Add Coverage point (Up/Lo)"}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={addZnPoint}
-                  className="bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 font-bold text-xs px-2.5 py-2 rounded-xl border border-indigo-800/80 flex items-center gap-1 transition"
-                  title={isTh ? '+ เพิ่มจุดวัด Zn weight (Up/Lo)' : '+ Add Zn Point (Up/Lo)'}
-                >
-                  <Plus className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>{isTh ? '+ จุด Zn' : '+ Zn'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={addFluxPoint}
-                  className="bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-bold text-xs px-2.5 py-2 rounded-xl border border-emerald-800/80 flex items-center gap-1 transition"
-                  title={isTh ? '+ เพิ่มจุดวัด Flux weight (Up/Lo)' : '+ Add Flux Point (Up/Lo)'}
-                >
-                  <Plus className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>{isTh ? '+ จุด Flux' : '+ Flux'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={addCoveragePoint}
-                  className="bg-amber-950/80 hover:bg-amber-900 text-amber-300 font-bold text-xs px-2.5 py-2 rounded-xl border border-amber-800/80 flex items-center gap-1 transition"
-                  title={isTh ? '+ เพิ่มจุดวัด Coverage % (Up/Lo)' : '+ Add Coverage Point (Up/Lo)'}
-                >
-                  <Plus className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{isTh ? '+ จุด Cov' : '+ Cov'}</span>
-                </button>
-
                 <button
                   type="button"
                   onClick={handleResetForm}
@@ -1624,7 +1643,29 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase font-bold text-[10px]">
                     <tr>
-                      <th className="px-3 py-3 w-64">Coil Info (Side / Process)</th>
+                      <th className="px-3 py-2.5 min-w-[280px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{isTh ? 'Checklist Stage / ข้อมูล Coil' : 'Stage / Coil Info'}</span>
+                          <div className="flex items-center gap-1 font-mono">
+                            <button
+                              type="button"
+                              onClick={() => setBatchItems(prev => prev.map(it => ({ ...it, stage: 'SETTING' })))}
+                              className="px-1.5 py-0.5 text-[8.5px] rounded bg-amber-950/70 hover:bg-amber-900 text-amber-300 border border-amber-800/70 transition"
+                              title={isTh ? 'เปลี่ยนทุกแถวเป็นช่วงตั้งเครื่อง (SETTING)' : 'Set all rows to SETTING'}
+                            >
+                              SET ทั้งหมด
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setBatchItems(prev => prev.map(it => ({ ...it, stage: 'MASS' })))}
+                              className="px-1.5 py-0.5 text-[8.5px] rounded bg-cyan-950/70 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/70 transition"
+                              title={isTh ? 'เปลี่ยนทุกแถวเป็นช่วงผลิตจริง (MASS)' : 'Set all rows to MASS'}
+                            >
+                              MASS ทั้งหมด
+                            </button>
+                          </div>
+                        </div>
+                      </th>
                       
                       {/* Zn Weight Header */}
                       <th 
@@ -1633,27 +1674,11 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       >
                         <div className="flex items-center justify-center gap-1.5">
                           <span>Zn weight (Up / Lo)</span>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-200 border border-indigo-700/50">
-                            {znPointCount} {isTh ? 'จุด' : 'Pts'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={addZnPoint}
-                            className="p-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition shadow flex items-center gap-0.5 text-[9px] font-bold px-1.5"
-                            title={isTh ? "+ เพิ่มจุดวัด Zn weight (Up/Lo)" : "+ Add Zn point"}
-                          >
-                            <Plus className="w-3 h-3" />
-                            <span>+</span>
-                          </button>
+                          <span className="text-[9px] text-indigo-400/80 font-normal">(g/m²)</span>
                           {znPointCount > 1 && (
-                            <button
-                              type="button"
-                              onClick={removeZnPoint}
-                              className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md transition border border-slate-700 flex items-center text-[9px]"
-                              title={isTh ? "ลดจุดวัด Zn weight" : "Remove Zn point"}
-                            >
-                              <Minus className="w-3 h-3" />
-                            </button>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-200 border border-indigo-700/50">
+                              {znPointCount} {isTh ? 'จุด' : 'Pts'}
+                            </span>
                           )}
                         </div>
                       </th>
@@ -1665,27 +1690,11 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       >
                         <div className="flex items-center justify-center gap-1.5">
                           <span>Flux weight (Up / Lo)</span>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-900/60 text-emerald-200 border border-emerald-700/50">
-                            {fluxPointCount} {isTh ? 'จุด' : 'Pts'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={addFluxPoint}
-                            className="p-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md transition shadow flex items-center gap-0.5 text-[9px] font-bold px-1.5"
-                            title={isTh ? "+ เพิ่มจุดวัด Flux weight (Up/Lo)" : "+ Add Flux point"}
-                          >
-                            <Plus className="w-3 h-3" />
-                            <span>+</span>
-                          </button>
+                          <span className="text-[9px] text-emerald-400/80 font-normal">(g/m²)</span>
                           {fluxPointCount > 1 && (
-                            <button
-                              type="button"
-                              onClick={removeFluxPoint}
-                              className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md transition border border-slate-700 flex items-center text-[9px]"
-                              title={isTh ? "ลดจุดวัด Flux weight" : "Remove Flux point"}
-                            >
-                              <Minus className="w-3 h-3" />
-                            </button>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-900/60 text-emerald-200 border border-emerald-700/50">
+                              {fluxPointCount} {isTh ? 'จุด' : 'Pts'}
+                            </span>
                           )}
                         </div>
                       </th>
@@ -1697,27 +1706,11 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       >
                         <div className="flex items-center justify-center gap-1.5">
                           <span>Coverage % (Up / Lo)</span>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-900/60 text-amber-200 border border-amber-700/50">
-                            {coveragePointCount} {isTh ? 'จุด' : 'Pts'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={addCoveragePoint}
-                            className="p-1 bg-amber-600 hover:bg-amber-500 text-white rounded-md transition shadow flex items-center gap-0.5 text-[9px] font-bold px-1.5"
-                            title={isTh ? "+ เพิ่มจุดวัด Coverage % (Up/Lo)" : "+ Add Coverage point"}
-                          >
-                            <Plus className="w-3 h-3" />
-                            <span>+</span>
-                          </button>
+                          <span className="text-[9px] text-amber-400/80 font-normal">(%)</span>
                           {coveragePointCount > 1 && (
-                            <button
-                              type="button"
-                              onClick={removeCoveragePoint}
-                              className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md transition border border-slate-700 flex items-center text-[9px]"
-                              title={isTh ? "ลดจุดวัด Coverage %" : "Remove Coverage point"}
-                            >
-                              <Minus className="w-3 h-3" />
-                            </button>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-900/60 text-amber-200 border border-amber-700/50">
+                              {coveragePointCount} {isTh ? 'จุด' : 'Pts'}
+                            </span>
                           )}
                         </div>
                       </th>
@@ -1788,6 +1781,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                   <tbody className="divide-y divide-slate-800/60 font-mono">
                     {batchItems.map((item) => {
                       const currentStatus = judgeStatus(item);
+                      const currentStage = item.stage || 'SETTING';
+                      const activeSpec = getItemActiveSpecs(currentStage);
 
                       const rowZnAvgUp = calcAvg(item.raUp);
                       const rowZnAvgLo = calcAvg(item.raLo);
@@ -1804,28 +1799,68 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       return (
                         <tr key={item.id} className="hover:bg-slate-950/50 transition-colors">
                           <td className="px-3 py-2.5">
-                            <div className="flex gap-1.5 items-center">
-                              <input 
-                                type="text" 
-                                placeholder="Coil No." 
-                                value={item.lotNumber} 
-                                onChange={(e) => handleItemChange(item.id, 'lotNumber', e.target.value)} 
-                                className="w-28 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-200 uppercase focus:outline-none focus:border-indigo-500" 
-                              />
-                              <input 
-                                type="text" 
-                                placeholder="Side" 
-                                value={item.partId} 
-                                onChange={(e) => handleItemChange(item.id, 'partId', e.target.value)} 
-                                className="w-20 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-200 uppercase focus:outline-none focus:border-indigo-500" 
-                              />
-                              <input 
-                                type="text" 
-                                placeholder="Process" 
-                                value={item.process} 
-                                onChange={(e) => handleItemChange(item.id, 'process', e.target.value)} 
-                                className="w-24 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-200 uppercase focus:outline-none focus:border-indigo-500" 
-                              />
+                            <div className="flex gap-2 items-center">
+                              {/* Stage Checklist Selector right at FRONT of Coil */}
+                              <div className="flex flex-col gap-0.5 min-w-[78px]">
+                                <div className="flex rounded-lg overflow-hidden border border-slate-800 bg-slate-950 p-0.5 shadow-xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleItemChange(item.id, 'stage', 'SETTING')}
+                                    className={`flex-1 py-1 px-1 text-[9px] font-bold rounded flex items-center justify-center transition ${
+                                      currentStage === 'SETTING'
+                                        ? 'bg-amber-500 text-slate-950 shadow-xs'
+                                        : 'text-slate-500 hover:text-amber-300 hover:bg-slate-900'
+                                    }`}
+                                    title={isTh ? 'ช่วงปรับตั้งเครื่อง (ตัดสินด้วย Setting Spec)' : 'Setting stage (Judged by Setting Spec)'}
+                                  >
+                                    <span>SET</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleItemChange(item.id, 'stage', 'MASS')}
+                                    className={`flex-1 py-1 px-1 text-[9px] font-bold rounded flex items-center justify-center transition ${
+                                      currentStage === 'MASS'
+                                        ? 'bg-cyan-500 text-slate-950 shadow-xs'
+                                        : 'text-slate-500 hover:text-cyan-300 hover:bg-slate-900'
+                                    }`}
+                                    title={isTh ? 'ช่วงผลิตจริง (ตัดสินด้วย Mass Spec)' : 'Mass production stage (Judged by Mass Spec)'}
+                                  >
+                                    <span>MASS</span>
+                                  </button>
+                                </div>
+                                <span className={`text-[8px] text-center font-mono font-semibold tracking-tight ${
+                                  currentStage === 'SETTING' ? 'text-amber-400' : 'text-cyan-400'
+                                }`}>
+                                  {currentStage === 'SETTING' ? '⚙️ สเปกตั้ง' : '🏭 สเปกจริง'}
+                                </span>
+                              </div>
+
+                              {/* Coil Inputs */}
+                              <div className="flex-1 space-y-1">
+                                <input 
+                                  type="text" 
+                                  placeholder="Coil No." 
+                                  value={item.lotNumber} 
+                                  onChange={(e) => handleItemChange(item.id, 'lotNumber', e.target.value)} 
+                                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs font-semibold text-slate-200 uppercase focus:outline-none focus:border-indigo-500" 
+                                />
+                                <div className="flex gap-1">
+                                  <input 
+                                    type="text" 
+                                    placeholder="Side" 
+                                    value={item.partId} 
+                                    onChange={(e) => handleItemChange(item.id, 'partId', e.target.value)} 
+                                    className="w-16 bg-slate-950 border border-slate-800 rounded-md px-1.5 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-indigo-500" 
+                                  />
+                                  <input 
+                                    type="text" 
+                                    placeholder="Process" 
+                                    value={item.process} 
+                                    onChange={(e) => handleItemChange(item.id, 'process', e.target.value)} 
+                                    className="flex-1 bg-slate-950 border border-slate-800 rounded-md px-1.5 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-indigo-500" 
+                                  />
+                                </div>
+                              </div>
                             </div>
                           </td>
 
@@ -1833,36 +1868,32 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                           {Array.from({ length: znPointCount }).map((_, pIdx) => {
                             const valUp = item.raUp[pIdx] || '';
                             const valLo = item.raLo[pIdx] || '';
-                            const isPtUpFail = isOutOfSpec(valUp, headerInfo.requirementRaUp, headerInfo.requirementRzUp);
-                            const isPtLoFail = isOutOfSpec(valLo, headerInfo.requirementRaLo, headerInfo.requirementRzLo);
+                            const isPtUpFail = isOutOfSpec(valUp, activeSpec.znMinUp, activeSpec.znMaxUp);
+                            const isPtLoFail = isOutOfSpec(valLo, activeSpec.znMinLo, activeSpec.znMaxLo);
 
                             return (
                               <React.Fragment key={`zn-pt-${pIdx}`}>
                                 <td className="px-1 py-2.5 text-center bg-indigo-950/10 border-l border-slate-800/60">
-                                  {reqZnUp ? (
-                                    <input 
-                                      type="number" step="0.01" 
-                                      placeholder={`Up ${pIdx + 1}`} 
-                                      value={valUp} 
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'raUp', pIdx, e.target.value)} 
-                                      className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
-                                        isPtUpFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-indigo-300 focus:border-indigo-500'
-                                      }`} 
-                                    />
-                                  ) : <div className="w-14 py-1.5 text-slate-600 bg-slate-950 border border-slate-800 rounded-lg text-center">-</div>}
+                                  <input 
+                                    type="number" step="0.01" 
+                                    placeholder={`Up ${pIdx + 1}`} 
+                                    value={valUp} 
+                                    onChange={(e) => handleDynamicPointChange(item.id, 'raUp', pIdx, e.target.value)} 
+                                    className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
+                                      isPtUpFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-indigo-300 focus:border-indigo-500'
+                                    }`} 
+                                  />
                                 </td>
                                 <td className="px-1 py-2.5 text-center bg-indigo-950/10">
-                                  {reqZnLo ? (
-                                    <input 
-                                      type="number" step="0.01" 
-                                      placeholder={`Lo ${pIdx + 1}`} 
-                                      value={valLo} 
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'raLo', pIdx, e.target.value)} 
-                                      className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
-                                        isPtLoFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-indigo-300 focus:border-indigo-500'
-                                      }`} 
-                                    />
-                                  ) : <div className="w-14 py-1.5 text-slate-600 bg-slate-950 border border-slate-800 rounded-lg text-center">-</div>}
+                                  <input 
+                                    type="number" step="0.01" 
+                                    placeholder={`Lo ${pIdx + 1}`} 
+                                    value={valLo} 
+                                    onChange={(e) => handleDynamicPointChange(item.id, 'raLo', pIdx, e.target.value)} 
+                                    className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
+                                      isPtLoFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-indigo-300 focus:border-indigo-500'
+                                    }`} 
+                                  />
                                 </td>
                               </React.Fragment>
                             );
@@ -1886,36 +1917,32 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                           {Array.from({ length: fluxPointCount }).map((_, pIdx) => {
                             const valUp = item.rzUp[pIdx] || '';
                             const valLo = item.rzLo[pIdx] || '';
-                            const isPtUpFail = isOutOfSpec(valUp, headerInfo.requirementFluxMinUp, headerInfo.requirementFluxMaxUp);
-                            const isPtLoFail = isOutOfSpec(valLo, headerInfo.requirementFluxMinLo, headerInfo.requirementFluxMaxLo);
+                            const isPtUpFail = isOutOfSpec(valUp, activeSpec.fluxMinUp, activeSpec.fluxMaxUp);
+                            const isPtLoFail = isOutOfSpec(valLo, activeSpec.fluxMinLo, activeSpec.fluxMaxLo);
 
                             return (
                               <React.Fragment key={`flux-pt-${pIdx}`}>
                                 <td className="px-1 py-2.5 text-center bg-emerald-950/10 border-l border-slate-800/60">
-                                  {reqFluxUp ? (
-                                    <input 
-                                      type="number" step="0.01" 
-                                      placeholder={`Up ${pIdx + 1}`} 
-                                      value={valUp} 
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'rzUp', pIdx, e.target.value)} 
-                                      className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
-                                        isPtUpFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-emerald-300 focus:border-emerald-500'
-                                      }`} 
-                                    />
-                                  ) : <div className="w-14 py-1.5 text-slate-600 bg-slate-950 border border-slate-800 rounded-lg text-center">-</div>}
+                                  <input 
+                                    type="number" step="0.01" 
+                                    placeholder={`Up ${pIdx + 1}`} 
+                                    value={valUp} 
+                                    onChange={(e) => handleDynamicPointChange(item.id, 'rzUp', pIdx, e.target.value)} 
+                                    className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
+                                      isPtUpFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-emerald-300 focus:border-emerald-500'
+                                    }`} 
+                                  />
                                 </td>
                                 <td className="px-1 py-2.5 text-center bg-emerald-950/10">
-                                  {reqFluxLo ? (
-                                    <input 
-                                      type="number" step="0.01" 
-                                      placeholder={`Lo ${pIdx + 1}`} 
-                                      value={valLo} 
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'rzLo', pIdx, e.target.value)} 
-                                      className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
-                                        isPtLoFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-emerald-300 focus:border-emerald-500'
-                                      }`} 
-                                    />
-                                  ) : <div className="w-14 py-1.5 text-slate-600 bg-slate-950 border border-slate-800 rounded-lg text-center">-</div>}
+                                  <input 
+                                    type="number" step="0.01" 
+                                    placeholder={`Lo ${pIdx + 1}`} 
+                                    value={valLo} 
+                                    onChange={(e) => handleDynamicPointChange(item.id, 'rzLo', pIdx, e.target.value)} 
+                                    className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
+                                      isPtLoFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-emerald-300 focus:border-emerald-500'
+                                    }`} 
+                                  />
                                 </td>
                               </React.Fragment>
                             );
@@ -1939,36 +1966,32 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                           {Array.from({ length: coveragePointCount }).map((_, pIdx) => {
                             const valUp = item.rtUp[pIdx] || '';
                             const valLo = item.rtLo[pIdx] || '';
-                            const isPtUpFail = parseFloat(headerInfo.requirementCoverageLimitUp) > 0 && valUp !== '' && parseFloat(valUp) < parseFloat(headerInfo.requirementCoverageLimitUp);
-                            const isPtLoFail = parseFloat(headerInfo.requirementCoverageLimitLo) > 0 && valLo !== '' && parseFloat(valLo) < parseFloat(headerInfo.requirementCoverageLimitLo);
+                            const isPtUpFail = parseFloat(activeSpec.coverageUp) > 0 && valUp !== '' && parseFloat(valUp) < parseFloat(activeSpec.coverageUp);
+                            const isPtLoFail = parseFloat(activeSpec.coverageLo) > 0 && valLo !== '' && parseFloat(valLo) < parseFloat(activeSpec.coverageLo);
 
                             return (
                               <React.Fragment key={`cov-pt-${pIdx}`}>
                                 <td className="px-1 py-2.5 text-center bg-amber-950/10 border-l border-slate-800/60">
-                                  {reqCoverageUp ? (
-                                    <input 
-                                      type="number" step="0.1" 
-                                      placeholder={`Up ${pIdx + 1}`} 
-                                      value={valUp} 
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'rtUp', pIdx, e.target.value)} 
-                                      className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
-                                        isPtUpFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-amber-300 focus:border-amber-500'
-                                      }`} 
-                                    />
-                                  ) : <div className="w-14 py-1.5 text-slate-600 bg-slate-950 border border-slate-800 rounded-lg text-center">-</div>}
+                                  <input 
+                                    type="number" step="0.1" 
+                                    placeholder={`Up ${pIdx + 1}`} 
+                                    value={valUp} 
+                                    onChange={(e) => handleDynamicPointChange(item.id, 'rtUp', pIdx, e.target.value)} 
+                                    className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
+                                      isPtUpFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-amber-300 focus:border-amber-500'
+                                    }`} 
+                                  />
                                 </td>
                                 <td className="px-1 py-2.5 text-center bg-amber-950/10">
-                                  {reqCoverageLo ? (
-                                    <input 
-                                      type="number" step="0.1" 
-                                      placeholder={`Lo ${pIdx + 1}`} 
-                                      value={valLo} 
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'rtLo', pIdx, e.target.value)} 
-                                      className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
-                                        isPtLoFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-amber-300 focus:border-amber-500'
-                                      }`} 
-                                    />
-                                  ) : <div className="w-14 py-1.5 text-slate-600 bg-slate-950 border border-slate-800 rounded-lg text-center">-</div>}
+                                  <input 
+                                    type="number" step="0.1" 
+                                    placeholder={`Lo ${pIdx + 1}`} 
+                                    value={valLo} 
+                                    onChange={(e) => handleDynamicPointChange(item.id, 'rtLo', pIdx, e.target.value)} 
+                                    className={`w-14 text-center border rounded-lg px-1 py-1.5 font-mono font-bold text-xs outline-none ${
+                                      isPtLoFail ? 'border-rose-500 bg-rose-950/80 text-rose-300' : 'bg-slate-950 border-slate-800 text-amber-300 focus:border-amber-500'
+                                    }`} 
+                                  />
                                 </td>
                               </React.Fragment>
                             );
@@ -1990,15 +2013,24 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
 
                           {/* Status */}
                           <td className="px-3 py-2.5 text-center border-l border-slate-800">
-                            <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                              currentStatus === 'Pass' 
-                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
-                                : currentStatus === 'Fail' 
-                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' 
-                                : 'bg-slate-800 text-slate-400 border border-slate-700'
-                            }`}>
-                              {currentStatus}
-                            </span>
+                            <div className="flex flex-col items-center gap-1">
+                              <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                currentStatus === 'Pass' 
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                                  : currentStatus === 'Fail' 
+                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' 
+                                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                              }`}>
+                                {currentStatus}
+                              </span>
+                              <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded font-mono ${
+                                currentStage === 'SETTING'
+                                  ? 'text-amber-400 bg-amber-950/70 border border-amber-800/50'
+                                  : 'text-cyan-400 bg-cyan-950/70 border border-cyan-800/50'
+                              }`}>
+                                {currentStage === 'SETTING' ? 'SET SPEC' : 'MASS SPEC'}
+                              </span>
+                            </div>
                           </td>
 
                           {/* Delete Row */}
@@ -2064,10 +2096,22 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                     onClick={() => selectProfile(p)}
                   >
                     <div>
-                      <div className="font-bold text-xs">{p.name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                        Zn: {p.raUp}-{p.rzUp} | Flux: {p.fluxMinUp}-{p.fluxMaxUp} | Cov: {p.coverageLimitUp}%
+                      <div className="font-bold text-xs flex items-center gap-1.5">
+                        <span>{p.name}</span>
+                        {p.settingRaUp && (
+                          <span className="text-[8.5px] px-1 py-0.2 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60 font-mono">
+                            Dual Spec
+                          </span>
+                        )}
                       </div>
+                      <div className="text-[9.5px] text-cyan-400 font-mono mt-0.5">
+                        Mass: Zn {p.raUp}-{p.rzUp} | Flux {p.fluxMinUp}-{p.fluxMaxUp}
+                      </div>
+                      {p.settingRaUp && (
+                        <div className="text-[9px] text-amber-400/90 font-mono">
+                          Set: Zn {p.settingRaUp}-{p.settingRzUp} | Flux {p.settingFluxMinUp}-{p.settingFluxMaxUp}
+                        </div>
+                      )}
                     </div>
 
                     <button
@@ -2087,34 +2131,144 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
 
             {/* Right: Spec Editor */}
             <div className="lg:col-span-2 space-y-5">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                  Profile Name *
-                </label>
-                <input
-                  type="text"
-                  name="profileName"
-                  value={headerInfo.profileName}
-                  onChange={handleHeaderChange}
-                  placeholder="e.g. Standard_ZnCoating"
-                  className="w-full bg-slate-950 border border-slate-800 text-indigo-300 font-bold rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500"
-                />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                    Profile Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="profileName"
+                    value={headerInfo.profileName}
+                    onChange={handleHeaderChange}
+                    placeholder="e.g. Standard_ZnCoating"
+                    className="w-full bg-slate-950 border border-slate-800 text-indigo-300 font-bold rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                {/* Stage Checklist / Toggle Selector */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">
+                    {isTh ? 'เลือกตั้งค่าสเปกตามช่วงผลิต' : 'Select Spec Target Stage'}
+                  </label>
+                  <div className="flex rounded-xl overflow-hidden border border-slate-800 bg-slate-950 p-1 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSpecEditStage('SETTING')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 transition ${
+                        specEditStage === 'SETTING'
+                          ? 'bg-amber-500 text-slate-950 shadow'
+                          : 'text-slate-400 hover:text-amber-300 hover:bg-slate-900'
+                      }`}
+                    >
+                      <span>⚙️ ช่วงปรับตั้ง (Setting)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSpecEditStage('MASS')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 transition ${
+                        specEditStage === 'MASS'
+                          ? 'bg-cyan-500 text-slate-950 shadow'
+                          : 'text-slate-400 hover:text-cyan-300 hover:bg-slate-900'
+                      }`}
+                    >
+                      <span>🏭 ช่วงผลิตจริง (Mass)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stage Notification Banner & Quick Copy Action */}
+              <div className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                specEditStage === 'SETTING'
+                  ? 'bg-amber-950/30 border-amber-800/60 text-amber-300'
+                  : 'bg-cyan-950/30 border-cyan-800/60 text-cyan-300'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${specEditStage === 'SETTING' ? 'bg-amber-400 animate-pulse' : 'bg-cyan-400 animate-pulse'}`} />
+                  <span className="font-medium">
+                    {specEditStage === 'SETTING' 
+                      ? (isTh ? 'กำลังแก้ไขสเปกสำหรับช่วงปรับตั้งเครื่อง (Setting Spec) — จะใช้ตัดสิน Coil ที่เลือก SET' : 'Editing Setting Specs — Applied to judge coils set to SET')
+                      : (isTh ? 'กำลังแก้ไขสเปกสำหรับช่วงผลิตจริง (Mass Spec) — จะใช้ตัดสิน Coil ที่เลือก MASS' : 'Editing Mass Specs — Applied to judge coils set to MASS')}
+                  </span>
+                </div>
+
+                {specEditStage === 'SETTING' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHeaderInfo(prev => ({
+                        ...prev,
+                        requirementSettingRaUp: prev.requirementRaUp,
+                        requirementSettingRaLo: prev.requirementRaLo,
+                        requirementSettingRzUp: prev.requirementRzUp,
+                        requirementSettingRzLo: prev.requirementRzLo,
+                        requirementSettingFluxMinUp: prev.requirementFluxMinUp,
+                        requirementSettingFluxMinLo: prev.requirementFluxMinLo,
+                        requirementSettingFluxMaxUp: prev.requirementFluxMaxUp,
+                        requirementSettingFluxMaxLo: prev.requirementFluxMaxLo,
+                        requirementSettingCoverageLimitUp: prev.requirementCoverageLimitUp,
+                        requirementSettingCoverageLimitLo: prev.requirementCoverageLimitLo,
+                      }));
+                      showNotification(isTh ? 'คัดลอกค่าจาก Mass Spec ไปยัง Setting Spec เรียบร้อยแล้ว' : 'Copied Mass Specs to Setting Specs');
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-900/60 hover:bg-amber-800 text-amber-100 border border-amber-700/60 flex items-center gap-1 transition shrink-0"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>{isTh ? 'คัดลอกจาก Mass Spec' : 'Copy from Mass Spec'}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHeaderInfo(prev => ({
+                        ...prev,
+                        requirementRaUp: prev.requirementSettingRaUp,
+                        requirementRaLo: prev.requirementSettingRaLo,
+                        requirementRzUp: prev.requirementSettingRzUp,
+                        requirementRzLo: prev.requirementSettingRzLo,
+                        requirementFluxMinUp: prev.requirementSettingFluxMinUp,
+                        requirementFluxMinLo: prev.requirementSettingFluxMinLo,
+                        requirementFluxMaxUp: prev.requirementSettingFluxMaxUp,
+                        requirementFluxMaxLo: prev.requirementSettingFluxMaxLo,
+                        requirementCoverageLimitUp: prev.requirementSettingCoverageLimitUp,
+                        requirementCoverageLimitLo: prev.requirementSettingCoverageLimitLo,
+                      }));
+                      showNotification(isTh ? 'คัดลอกค่าจาก Setting Spec ไปยัง Mass Spec เรียบร้อยแล้ว' : 'Copied Setting Specs to Mass Specs');
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-cyan-900/60 hover:bg-cyan-800 text-cyan-100 border border-cyan-700/60 flex items-center gap-1 transition shrink-0"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>{isTh ? 'คัดลอกจาก Setting Spec' : 'Copy from Setting Spec'}</span>
+                  </button>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Upper Surface Spec */}
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-                  <h4 className="text-xs font-bold text-indigo-400 uppercase border-b border-slate-800 pb-2">
-                    Upper Surface Specifications
-                  </h4>
+                <div className={`bg-slate-950 p-4 rounded-xl border space-y-3 ${
+                  specEditStage === 'SETTING' ? 'border-amber-800/60' : 'border-slate-800'
+                }`}>
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h4 className="text-xs font-bold text-indigo-400 uppercase">
+                      Upper Surface Specs
+                    </h4>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                      specEditStage === 'SETTING' 
+                        ? 'bg-amber-950 text-amber-300 border border-amber-800' 
+                        : 'bg-cyan-950 text-cyan-300 border border-cyan-800'
+                    }`}>
+                      {specEditStage === 'SETTING' ? 'SETTING SPEC' : 'MASS SPEC'}
+                    </span>
+                  </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-[10px] text-slate-400 block mb-1">Zn weight Min (g/m²)</label>
                       <input
                         type="number" step="0.01"
-                        name="requirementRaUp"
-                        value={headerInfo.requirementRaUp}
+                        name={specEditStage === 'SETTING' ? 'requirementSettingRaUp' : 'requirementRaUp'}
+                        value={specEditStage === 'SETTING' ? headerInfo.requirementSettingRaUp : headerInfo.requirementRaUp}
                         onChange={handleHeaderChange}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-indigo-300 font-bold focus:outline-none focus:border-indigo-500"
                       />
@@ -2123,8 +2277,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       <label className="text-[10px] text-slate-400 block mb-1">Zn weight Max (g/m²)</label>
                       <input
                         type="number" step="0.01"
-                        name="requirementRzUp"
-                        value={headerInfo.requirementRzUp}
+                        name={specEditStage === 'SETTING' ? 'requirementSettingRzUp' : 'requirementRzUp'}
+                        value={specEditStage === 'SETTING' ? headerInfo.requirementSettingRzUp : headerInfo.requirementRzUp}
                         onChange={handleHeaderChange}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-indigo-300 font-bold focus:outline-none focus:border-indigo-500"
                       />
@@ -2134,8 +2288,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       <label className="text-[10px] text-slate-400 block mb-1">Flux weight Min (g/m²)</label>
                       <input
                         type="number" step="0.01"
-                        name="requirementFluxMinUp"
-                        value={headerInfo.requirementFluxMinUp}
+                        name={specEditStage === 'SETTING' ? 'requirementSettingFluxMinUp' : 'requirementFluxMinUp'}
+                        value={specEditStage === 'SETTING' ? headerInfo.requirementSettingFluxMinUp : headerInfo.requirementFluxMinUp}
                         onChange={handleHeaderChange}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-emerald-300 font-bold focus:outline-none focus:border-emerald-500"
                       />
@@ -2144,8 +2298,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       <label className="text-[10px] text-slate-400 block mb-1">Flux weight Max (g/m²)</label>
                       <input
                         type="number" step="0.01"
-                        name="requirementFluxMaxUp"
-                        value={headerInfo.requirementFluxMaxUp}
+                        name={specEditStage === 'SETTING' ? 'requirementSettingFluxMaxUp' : 'requirementFluxMaxUp'}
+                        value={specEditStage === 'SETTING' ? headerInfo.requirementSettingFluxMaxUp : headerInfo.requirementFluxMaxUp}
                         onChange={handleHeaderChange}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-emerald-300 font-bold focus:outline-none focus:border-emerald-500"
                       />
@@ -2155,8 +2309,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       <label className="text-[10px] text-slate-400 block mb-1">Coverage Limit Min (%)</label>
                       <input
                         type="number" step="0.1"
-                        name="requirementCoverageLimitUp"
-                        value={headerInfo.requirementCoverageLimitUp}
+                        name={specEditStage === 'SETTING' ? 'requirementSettingCoverageLimitUp' : 'requirementCoverageLimitUp'}
+                        value={specEditStage === 'SETTING' ? headerInfo.requirementSettingCoverageLimitUp : headerInfo.requirementCoverageLimitUp}
                         onChange={handleHeaderChange}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-amber-300 font-bold focus:outline-none focus:border-amber-500"
                       />
@@ -2165,18 +2319,29 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                 </div>
 
                 {/* Lower Surface Spec */}
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-                  <h4 className="text-xs font-bold text-emerald-400 uppercase border-b border-slate-800 pb-2">
-                    Lower Surface Specifications
-                  </h4>
+                <div className={`bg-slate-950 p-4 rounded-xl border space-y-3 ${
+                  specEditStage === 'SETTING' ? 'border-amber-800/60' : 'border-slate-800'
+                }`}>
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h4 className="text-xs font-bold text-emerald-400 uppercase">
+                      Lower Surface Specs
+                    </h4>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                      specEditStage === 'SETTING' 
+                        ? 'bg-amber-950 text-amber-300 border border-amber-800' 
+                        : 'bg-cyan-950 text-cyan-300 border border-cyan-800'
+                    }`}>
+                      {specEditStage === 'SETTING' ? 'SETTING SPEC' : 'MASS SPEC'}
+                    </span>
+                  </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-[10px] text-slate-400 block mb-1">Zn weight Min (g/m²)</label>
                       <input
                         type="number" step="0.01"
-                        name="requirementRaLo"
-                        value={headerInfo.requirementRaLo}
+                        name={specEditStage === 'SETTING' ? 'requirementSettingRaLo' : 'requirementRaLo'}
+                        value={specEditStage === 'SETTING' ? headerInfo.requirementSettingRaLo : headerInfo.requirementRaLo}
                         onChange={handleHeaderChange}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-indigo-300 font-bold focus:outline-none focus:border-indigo-500"
                       />
@@ -2185,8 +2350,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       <label className="text-[10px] text-slate-400 block mb-1">Zn weight Max (g/m²)</label>
                       <input
                         type="number" step="0.01"
-                        name="requirementRzLo"
-                        value={headerInfo.requirementRzLo}
+                        name={specEditStage === 'SETTING' ? 'requirementSettingRzLo' : 'requirementRzLo'}
+                        value={specEditStage === 'SETTING' ? headerInfo.requirementSettingRzLo : headerInfo.requirementRzLo}
                         onChange={handleHeaderChange}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-indigo-300 font-bold focus:outline-none focus:border-indigo-500"
                       />
@@ -2196,8 +2361,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       <label className="text-[10px] text-slate-400 block mb-1">Flux weight Min (g/m²)</label>
                       <input
                         type="number" step="0.01"
-                        name="requirementFluxMinLo"
-                        value={headerInfo.requirementFluxMinLo}
+                        name={specEditStage === 'SETTING' ? 'requirementSettingFluxMinLo' : 'requirementFluxMinLo'}
+                        value={specEditStage === 'SETTING' ? headerInfo.requirementSettingFluxMinLo : headerInfo.requirementFluxMinLo}
                         onChange={handleHeaderChange}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-emerald-300 font-bold focus:outline-none focus:border-emerald-500"
                       />
@@ -2206,8 +2371,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       <label className="text-[10px] text-slate-400 block mb-1">Flux weight Max (g/m²)</label>
                       <input
                         type="number" step="0.01"
-                        name="requirementFluxMaxLo"
-                        value={headerInfo.requirementFluxMaxLo}
+                        name={specEditStage === 'SETTING' ? 'requirementSettingFluxMaxLo' : 'requirementFluxMaxLo'}
+                        value={specEditStage === 'SETTING' ? headerInfo.requirementSettingFluxMaxLo : headerInfo.requirementFluxMaxLo}
                         onChange={handleHeaderChange}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-emerald-300 font-bold focus:outline-none focus:border-emerald-500"
                       />
@@ -2217,8 +2382,8 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       <label className="text-[10px] text-slate-400 block mb-1">Coverage Limit Min (%)</label>
                       <input
                         type="number" step="0.1"
-                        name="requirementCoverageLimitLo"
-                        value={headerInfo.requirementCoverageLimitLo}
+                        name={specEditStage === 'SETTING' ? 'requirementSettingCoverageLimitLo' : 'requirementCoverageLimitLo'}
+                        value={specEditStage === 'SETTING' ? headerInfo.requirementSettingCoverageLimitLo : headerInfo.requirementCoverageLimitLo}
                         onChange={handleHeaderChange}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-amber-300 font-bold focus:outline-none focus:border-amber-500"
                       />

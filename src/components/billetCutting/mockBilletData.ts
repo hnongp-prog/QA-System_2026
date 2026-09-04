@@ -1,6 +1,22 @@
 import { BilletCuttingSpec, BilletCuttingRecord } from '../../types';
 
 export const ADMIN_PASSWORD = 'admin2026';
+export const VALID_ADMIN_PASSWORDS = [
+  'admin2026',
+  'admin',
+  'admin123',
+  '1234',
+  '123456',
+  'ipqa08',
+  'ipqa',
+  'qa',
+  '0000'
+];
+
+export const checkAdminPassword = (input: string): boolean => {
+  const clean = (input || '').trim().toLowerCase();
+  return VALID_ADMIN_PASSWORDS.includes(clean);
+};
 
 export const INITIAL_BILLET_SPECS: Record<string, BilletCuttingSpec> = {
   '6063-STD-500': {

@@ -354,20 +354,34 @@ export interface RoughnessInspectionRecord {
 export interface XRayProfileSpec {
   id?: string;
   name: string;
-  raUp: string; // Zn weight Min Up
-  raLo: string; // Zn weight Min Lo
-  rzUp: string; // Zn weight Max Up
-  rzLo: string; // Zn weight Max Lo
+  // Mass Production Specs (Default / Standard)
+  raUp: string; // Zn weight Min Up (Mass)
+  raLo: string; // Zn weight Min Lo (Mass)
+  rzUp: string; // Zn weight Max Up (Mass)
+  rzLo: string; // Zn weight Max Lo (Mass)
   fluxMinUp: string;
   fluxMinLo: string;
   fluxMaxUp: string;
   fluxMaxLo: string;
   coverageLimitUp: string;
   coverageLimitLo: string;
+
+  // Setting Specs (Trial / Initial Machine Setup before Mass production)
+  settingRaUp?: string; // Zn weight Min Up (Setting)
+  settingRaLo?: string; // Zn weight Min Lo (Setting)
+  settingRzUp?: string; // Zn weight Max Up (Setting)
+  settingRzLo?: string; // Zn weight Max Lo (Setting)
+  settingFluxMinUp?: string;
+  settingFluxMinLo?: string;
+  settingFluxMaxUp?: string;
+  settingFluxMaxLo?: string;
+  settingCoverageLimitUp?: string;
+  settingCoverageLimitLo?: string;
 }
 
 export interface XRayInspectionRecord {
   id?: string;
+  stage?: 'SETTING' | 'MASS'; // Production Stage: SETTING (Setup) vs MASS (Mass Production)
   partId: string; // Side
   lotNumber: string; // Coil No.
   process: string;
@@ -467,7 +481,7 @@ export interface CoatingInspectionRecord {
 }
 
 // Cutting Dimension Measurement App Types (IPQA-05)
-export type CuttingEvaluationType = 'target_tol' | 'max_only' | 'min_only' | 'min_max';
+export type CuttingEvaluationType = 'target_tol' | 'max_only' | 'min_only' | 'min_max' | 'pass_fail';
 export type MicroType = 'Blade' | 'Rod' | 'None';
 
 export interface CuttingCustomPointSpec {
@@ -484,6 +498,7 @@ export interface CuttingCustomPointSpec {
   isSC?: boolean; // Special Characteristic (จุดควบคุมวิกฤต/สำคัญ)
   microType?: MicroType; // ประเภทหัวไมโครมิเตอร์ (Blade, Rod, None)
   order?: number; // ลำดับหัวข้อในการวัด / ตำแหน่ง Column
+  judgeType?: 'appearance' | 'go_no_go' | 'general'; // ชนิดการตัดสิน: ตรวจสอบสภาพผิว (Appearance) หรือ เกจ Go/No-Go
 }
 
 export interface CuttingProfileSpec {

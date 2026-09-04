@@ -44,7 +44,8 @@ import {
   Moon,
   Copy,
   ExternalLink,
-  Building2
+  Building2,
+  Maximize2
 } from 'lucide-react';
 import { useCloudState } from '../services/firestoreSync';
 
@@ -57,6 +58,8 @@ import {
   ThemeMode
 } from '../types';
 import { analyzeBilletCertClient, getGeminiApiKey } from '../services/geminiClient';
+import { BilletWeightAnalyticsChart } from './billetIncoming/BilletWeightAnalyticsChart';
+import { generateQrSvgString, QRCodeView, getBilletQrPayload, QrDataMode, QrZoomModal } from '../utils/qrCodeHelper';
 
 interface BilletIncomingAppProps {
   onBackToPortal?: () => void;
@@ -258,6 +261,14 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<string[]>([]);
   const [batchPrintLayout, setBatchPrintLayout] = useState<'roll' | 'grid'>('roll');
   const [batchCopiedInfo, setBatchCopiedInfo] = useState(false);
+  const [qrDataMode, setQrDataMode] = useState<QrDataMode>('full');
+  const [zoomQrPayload, setZoomQrPayload] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle?: string;
+    payload: string;
+  } | null>(null);
+  const [showQrInfoModal, setShowQrInfoModal] = useState(false);
   const [history, setHistory] = useCloudState<BilletInspectionItem[]>('billet_qc_history', INITIAL_HISTORY);
 
   // Search & Filter
@@ -889,20 +900,23 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
     const okRate = total > 0 ? ((ok / total) * 100).toFixed(1) : "0";
 
     const gradeSummaryMap: { [grade: string]: { grade: string; count: number; weight: number; pcs: number; heats: Set<string>; invoices: Set<string> } } = {};
+    let totalWeightKg = 0;
     
     filteredHistory.forEach(item => {
       const g = item.grade || 'Unknown';
       if (!gradeSummaryMap[g]) {
         gradeSummaryMap[g] = { grade: g, count: 0, weight: 0, pcs: 0, heats: new Set(), invoices: new Set() };
       }
+      const w = parseFloat(String(item.weight_kg).replace(/,/g, '').replace(/[^\d.-]/g, '')) || 0;
+      totalWeightKg += w;
       gradeSummaryMap[g].count++;
-      gradeSummaryMap[g].weight += parseFloat(String(item.weight_kg)) || 0;
-      gradeSummaryMap[g].pcs += parseInt(String(item.quantity_pcs)) || 0;
+      gradeSummaryMap[g].weight += w;
+      gradeSummaryMap[g].pcs += parseInt(String(item.quantity_pcs).replace(/,/g, '').replace(/[^\d.-]/g, ''), 10) || 0;
       if (item.heat_number) gradeSummaryMap[g].heats.add(item.heat_number);
       if (item.invoice_no) gradeSummaryMap[g].invoices.add(item.invoice_no);
     });
 
-    return { total, ok, ng, okRate, gradeSummary: Object.values(gradeSummaryMap) };
+    return { total, ok, ng, okRate, totalWeightKg, gradeSummary: Object.values(gradeSummaryMap) };
   }, [filteredHistory]);
 
   // Helper to chunk arrays for sheet printing
@@ -963,34 +977,22 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   };
 
   // Generate Individual Tag Card Inner HTML
-  const generateTagContentHtml = (item: BilletInspectionItem) => {
+  const generateTagContentHtml = (item: BilletInspectionItem, mode: QrDataMode = qrDataMode) => {
     const spec = findMatchingSpec(item.grade);
     const tagColor = spec?.color || "#2563eb";
     const jg = item.judgement || performJudgement(item);
     const isPass = jg === 'PASS';
+    const qrSvg = generateQrSvgString(getBilletQrPayload(item, mode), { margin: 4 });
 
     return `
       <div class="tag-box" style="border: 2.5px solid ${tagColor};">
         <div class="header" style="background: ${tagColor};">QUALITY APPROVED BILLET TAG</div>
         <div class="body-grid">
           <div class="qr-placeholder">
-            <svg width="72" height="72" viewBox="0 0 100 100">
-              <rect width="100" height="100" fill="#fff" />
-              <rect x="10" y="10" width="30" height="30" fill="#000"/>
-              <rect x="15" y="15" width="20" height="20" fill="#fff"/>
-              <rect x="20" y="20" width="10" height="10" fill="#000"/>
-              <rect x="60" y="10" width="30" height="30" fill="#000"/>
-              <rect x="65" y="15" width="20" height="20" fill="#fff"/>
-              <rect x="70" y="20" width="10" height="10" fill="#000"/>
-              <rect x="10" y="60" width="30" height="30" fill="#000"/>
-              <rect x="15" y="65" width="20" height="20" fill="#fff"/>
-              <rect x="20" y="70" width="10" height="10" fill="#000"/>
-              <rect x="45" y="45" width="12" height="12" fill="#000"/>
-              <rect x="65" y="55" width="15" height="15" fill="#000"/>
-              <rect x="45" y="65" width="10" height="20" fill="#000"/>
-              <rect x="65" y="75" width="20" height="15" fill="#000"/>
-            </svg>
-            <span style="font-size: 8px; font-weight: bold; margin-top: 2px; font-family: monospace;">HEAT:${item.heat_number || '-'}</span>
+            <div class="qr-svg-wrap">
+              ${qrSvg}
+            </div>
+            <span style="font-size: 7.5px; font-weight: bold; margin-top: 1px; font-family: monospace; max-width: 86px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.heat_number || '-'}</span>
           </div>
           <div class="details">
             <div><strong>HEAT NO:</strong> <span style="font-family: monospace; font-size:12px; font-weight:bold;">${item.heat_number || '-'}</span></div>
@@ -1014,7 +1016,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   };
 
   // Generate Print Tag HTML (Single or Batch with page breaks)
-  const generateMultipleTagsHtml = (items: BilletInspectionItem[], layout: 'roll' | 'grid' = 'roll') => {
+  const generateMultipleTagsHtml = (items: BilletInspectionItem[], layout: 'roll' | 'grid' = 'roll', mode: QrDataMode = qrDataMode) => {
     const isGrid = layout === 'grid';
     return `
       <!DOCTYPE html>
@@ -1055,7 +1057,9 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
             `}
             .header { color: #fff; text-align: center; font-weight: 800; padding: 6px 4px; border-radius: 6px; font-size: 13px; letter-spacing: 0.5px; }
             .body-grid { display: flex; margin-top: 8px; gap: 8px; align-items: stretch; }
-            .qr-placeholder { width: 90px; min-width: 90px; height: 90px; border: 2px solid #000; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; text-align: center; border-radius: 6px; }
+            .qr-placeholder { width: 90px; min-width: 90px; height: 90px; border: 1.5px solid #000; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; text-align: center; border-radius: 6px; padding: 2px; box-sizing: border-box; }
+            .qr-placeholder .qr-svg-wrap { width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; }
+            .qr-placeholder .qr-svg-wrap svg { width: 100%; height: 100%; display: block; }
             .details { flex: 1; font-size: 10.5px; line-height: 1.4; }
             .details > div { margin-bottom: 2px; }
             .badge { display: inline-block; padding: 1px 6px; font-weight: bold; border-radius: 4px; color: white; font-size: 9.5px; }
@@ -1071,14 +1075,14 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
             chunkArray(items, 4).map(chunk => `
               <div class="grid-page">
                 <div class="sheet-grid">
-                  ${chunk.map(item => generateTagContentHtml(item)).join('')}
+                  ${chunk.map(item => generateTagContentHtml(item, mode)).join('')}
                 </div>
               </div>
             `).join('')
           ) : (
             items.map(item => `
               <div class="tag-page">
-                ${generateTagContentHtml(item)}
+                ${generateTagContentHtml(item, mode)}
               </div>
             `).join('')
           )}
@@ -1088,13 +1092,13 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   };
 
   const generateTagHtml = (item: BilletInspectionItem) => {
-    return generateMultipleTagsHtml([item], 'roll');
+    return generateMultipleTagsHtml([item], 'roll', qrDataMode);
   };
 
   // Direct Print for Single or Multiple Tags via hidden iframe
-  const triggerDirectMultiplePrint = (items: BilletInspectionItem[], layout: 'roll' | 'grid' = 'roll') => {
+  const triggerDirectMultiplePrint = (items: BilletInspectionItem[], layout: 'roll' | 'grid' = 'roll', mode: QrDataMode = qrDataMode) => {
     if (items.length === 0) return;
-    const htmlContent = generateMultipleTagsHtml(items, layout);
+    const htmlContent = generateMultipleTagsHtml(items, layout, mode);
 
     try {
       let iframe = document.getElementById('billet-print-iframe') as HTMLIFrameElement;
@@ -2154,16 +2158,30 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
       {activeTab === 'history' && (
         <div className="space-y-6">
           {/* KPI Ribbon */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
             <div className={`p-4 rounded-2xl border shadow-xs ${
               isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
             }`}>
               <span className={`text-[10px] font-bold uppercase block ${
                 isLight ? 'text-slate-500' : 'text-slate-400'
-              }`}>Total Inspected</span>
+              }`}>{isTh ? 'จำนวน Heat ที่ตรวจ' : 'Total Inspected'}</span>
               <div className="flex items-baseline justify-between mt-1">
                 <span className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{dashboardStats.total}</span>
                 <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Heats</span>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-2xl border shadow-xs ${
+              isLight ? 'bg-white border-blue-200' : 'bg-slate-900 border-blue-900/40'
+            }`}>
+              <span className={`text-[10px] font-bold uppercase block ${
+                isLight ? 'text-blue-600' : 'text-blue-400'
+              }`}>{isTh ? 'น้ำหนักรวมรับเข้า' : 'Total Weight'}</span>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className={`text-2xl font-bold font-mono ${isLight ? 'text-blue-700' : 'text-blue-300'}`}>
+                  {dashboardStats.totalWeightKg.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                </span>
+                <span className={`text-xs ${isLight ? 'text-blue-600' : 'text-blue-400'}`}>kg</span>
               </div>
             </div>
 
@@ -2187,15 +2205,15 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               </div>
             </div>
 
-            <div className={`p-4 rounded-2xl border shadow-xs ${
-              isLight ? 'bg-white border-blue-200' : 'bg-slate-900 border-cyan-900/40'
+            <div className={`p-4 rounded-2xl border shadow-xs col-span-2 sm:col-span-1 ${
+              isLight ? 'bg-white border-cyan-200' : 'bg-slate-900 border-cyan-900/40'
             }`}>
               <span className={`text-[10px] font-bold uppercase block ${
-                isLight ? 'text-blue-600' : 'text-cyan-400'
+                isLight ? 'text-cyan-700' : 'text-cyan-400'
               }`}>Quality Pass Rate</span>
               <div className="flex items-baseline justify-between mt-1">
-                <span className={`text-2xl font-bold ${isLight ? 'text-blue-600' : 'text-cyan-400'}`}>{dashboardStats.okRate}%</span>
-                <span className={`text-xs ${isLight ? 'text-blue-600' : 'text-cyan-400'}`}>Yield</span>
+                <span className={`text-2xl font-bold ${isLight ? 'text-cyan-700' : 'text-cyan-400'}`}>{dashboardStats.okRate}%</span>
+                <span className={`text-xs ${isLight ? 'text-cyan-700' : 'text-cyan-400'}`}>Yield</span>
               </div>
             </div>
           </div>
@@ -2314,6 +2332,14 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               )}
             </div>
           </div>
+
+          {/* Weight Analytics Chart by Grade & Supplier */}
+          <BilletWeightAnalyticsChart
+            items={filteredHistory}
+            gradeSpecs={gradeSpecs}
+            isLight={isLight}
+            isTh={isTh}
+          />
 
           {/* Summary Table by Grade */}
           <div className={`border rounded-2xl p-5 space-y-3 shadow-xs ${
@@ -3554,6 +3580,36 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               </button>
             </div>
 
+            {/* QR Code Payload Selector & Info */}
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl border text-xs ${
+              isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
+            }`}>
+              <div className="flex items-center gap-1.5">
+                <QrCode className="w-4 h-4 text-blue-500" />
+                <span className="font-semibold">{isTh ? 'รูปแบบข้อมูล QR Code:' : 'QR Code Format:'}</span>
+              </div>
+              <div className="inline-flex rounded-lg p-0.5 bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setQrDataMode('full')}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded transition ${
+                    qrDataMode === 'full' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {isTh ? 'ข้อมูลเต็ม (Full QA Info)' : 'Full QA Info'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQrDataMode('id')}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded transition ${
+                    qrDataMode === 'id' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {isTh ? 'เฉพาะ Heat No. (Code Only)' : 'Code Only'}
+                </button>
+              </div>
+            </div>
+
             {/* Visual Tag Preview Card */}
             {(() => {
               const spec = findMatchingSpec(activePrintItem.grade);
@@ -3575,26 +3631,30 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                   </div>
 
                   <div className="flex gap-3 items-stretch">
-                    {/* Simulated QR Code Graphic */}
-                    <div className="w-24 h-24 min-w-[96px] bg-slate-50 border-2 border-slate-900 rounded-xl flex flex-col items-center justify-center p-1 text-center">
-                      <svg width="68" height="68" viewBox="0 0 100 100">
-                        <rect width="100" height="100" fill="#fff" />
-                        <rect x="10" y="10" width="28" height="28" fill="#000"/>
-                        <rect x="15" y="15" width="18" height="18" fill="#fff"/>
-                        <rect x="19" y="19" width="10" height="10" fill="#000"/>
-                        <rect x="62" y="10" width="28" height="28" fill="#000"/>
-                        <rect x="67" y="15" width="18" height="18" fill="#fff"/>
-                        <rect x="71" y="19" width="10" height="10" fill="#000"/>
-                        <rect x="10" y="62" width="28" height="28" fill="#000"/>
-                        <rect x="15" y="67" width="18" height="18" fill="#fff"/>
-                        <rect x="19" y="71" width="10" height="10" fill="#000"/>
-                        <rect x="45" y="45" width="12" height="12" fill="#000"/>
-                        <rect x="62" y="52" width="14" height="14" fill="#000"/>
-                        <rect x="45" y="65" width="10" height="18" fill="#000"/>
-                        <rect x="62" y="72" width="20" height="15" fill="#000"/>
-                      </svg>
-                      <span className="text-[7px] font-mono font-bold text-slate-800 truncate max-w-full">
+                    {/* 100% Real Scannable Vector QR Code */}
+                    <div 
+                      onClick={() => setZoomQrPayload({
+                        isOpen: true,
+                        title: isTh ? 'QR Code ตรวจรับบิลเล็ต (IQA-01)' : 'Billet Inspection QR Code',
+                        subtitle: `${activePrintItem.grade} • Heat: ${activePrintItem.heat_number}`,
+                        payload: getBilletQrPayload(activePrintItem, qrDataMode)
+                      })}
+                      className="w-[104px] min-w-[104px] bg-white border border-slate-300 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center p-2 text-center shadow-xs hover:shadow-md transition cursor-pointer group"
+                      title={isTh ? 'คลิกเพื่อขยาย QR Code สำหรับสแกนผ่านหน้าจอ' : 'Click to enlarge QR for screen scan'}
+                    >
+                      <div className="w-[88px] h-[88px] flex items-center justify-center overflow-hidden">
+                        <QRCodeView 
+                          value={getBilletQrPayload(activePrintItem, qrDataMode)} 
+                          size={88} 
+                          margin={4} 
+                        />
+                      </div>
+                      <span className="text-[7.5px] font-mono font-bold text-slate-800 truncate max-w-full mt-1">
                         {activePrintItem.heat_number || 'BILLET-QR'}
+                      </span>
+                      <span className="text-[8px] text-blue-600 font-semibold mt-0.5 opacity-80 group-hover:opacity-100 flex items-center gap-0.5">
+                        <Maximize2 className="w-2.5 h-2.5" />
+                        {isTh ? 'แตะขยายสแกน' : 'Zoom Scan'}
                       </span>
                     </div>
 
@@ -3658,6 +3718,25 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
             {/* Modal Actions */}
             <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setZoomQrPayload({
+                  isOpen: true,
+                  title: isTh ? 'QR Code ตรวจรับบิลเล็ต (IQA-01)' : 'Billet Inspection QR Code',
+                  subtitle: `${activePrintItem.grade} • Heat: ${activePrintItem.heat_number}`,
+                  payload: getBilletQrPayload(activePrintItem, qrDataMode)
+                })}
+                className={`px-3 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${
+                  isLight 
+                    ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200' 
+                    : 'bg-blue-950/40 hover:bg-blue-900/60 text-blue-300 border-blue-800'
+                }`}
+                title={isTh ? 'เปิด QR ขนาดใหญ่สำหรับสแกนผ่านหน้าจอ' : 'Open large QR for screen scan'}
+              >
+                <QrCode className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span>{isTh ? 'สแกนผ่านจอ' : 'Screen Scan'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -3746,33 +3825,65 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
             <div className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 ${
               isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
             }`}>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className={`text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
-                  {isTh ? 'รูปแบบการพิมพ์:' : 'Print Layout:'}
-                </span>
-                <div className="inline-flex rounded-xl p-1 bg-slate-200/70 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => setBatchPrintLayout('roll')}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
-                      batchPrintLayout === 'roll'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : isLight ? 'text-slate-700 hover:text-slate-900' : 'text-slate-300 hover:text-white'
-                    }`}
-                  >
-                    🏷️ {isTh ? 'ม้วนสติกเกอร์ (100x100mm)' : 'Label Roll (100x100mm)'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBatchPrintLayout('grid')}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
-                      batchPrintLayout === 'grid'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : isLight ? 'text-slate-700 hover:text-slate-900' : 'text-slate-300 hover:text-white'
-                    }`}
-                  >
-                    📄 {isTh ? 'กระดาษ A4 (4 แท็ก/หน้า)' : 'A4 Sheet Grid (4/page)'}
-                  </button>
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isTh ? 'รูปแบบการพิมพ์:' : 'Print Layout:'}
+                  </span>
+                  <div className="inline-flex rounded-xl p-1 bg-slate-200/70 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => setBatchPrintLayout('roll')}
+                      className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                        batchPrintLayout === 'roll'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : isLight ? 'text-slate-700 hover:text-slate-900' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      🏷️ {isTh ? 'ม้วนสติกเกอร์ (100x100mm)' : 'Label Roll (100x100mm)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBatchPrintLayout('grid')}
+                      className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                        batchPrintLayout === 'grid'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : isLight ? 'text-slate-700 hover:text-slate-900' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      📄 {isTh ? 'กระดาษ A4 (4 แท็ก/หน้า)' : 'A4 Sheet Grid (4/page)'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isTh ? 'QR Code:' : 'QR:'}
+                  </span>
+                  <div className="inline-flex rounded-xl p-1 bg-slate-200/70 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => setQrDataMode('full')}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                        qrDataMode === 'full'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : isLight ? 'text-slate-700 hover:text-slate-900' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      {isTh ? 'ข้อมูลเต็ม' : 'Full QA'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQrDataMode('id')}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                        qrDataMode === 'id'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : isLight ? 'text-slate-700 hover:text-slate-900' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      {isTh ? 'เฉพาะ Heat No.' : 'Code Only'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -3819,25 +3930,16 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                         </div>
 
                         <div className="flex gap-3 items-stretch">
-                          {/* Simulated QR Code Graphic */}
-                          <div className="w-20 h-20 min-w-[80px] bg-slate-50 border-2 border-slate-900 rounded-xl flex flex-col items-center justify-center p-1 text-center">
-                            <svg width="56" height="56" viewBox="0 0 100 100">
-                              <rect width="100" height="100" fill="#fff" />
-                              <rect x="10" y="10" width="28" height="28" fill="#000"/>
-                              <rect x="15" y="15" width="18" height="18" fill="#fff"/>
-                              <rect x="19" y="19" width="10" height="10" fill="#000"/>
-                              <rect x="62" y="10" width="28" height="28" fill="#000"/>
-                              <rect x="67" y="15" width="18" height="18" fill="#fff"/>
-                              <rect x="71" y="19" width="10" height="10" fill="#000"/>
-                              <rect x="10" y="62" width="28" height="28" fill="#000"/>
-                              <rect x="15" y="67" width="18" height="18" fill="#fff"/>
-                              <rect x="19" y="71" width="10" height="10" fill="#000"/>
-                              <rect x="45" y="45" width="12" height="12" fill="#000"/>
-                              <rect x="62" y="52" width="14" height="14" fill="#000"/>
-                              <rect x="45" y="65" width="10" height="18" fill="#000"/>
-                              <rect x="62" y="72" width="20" height="15" fill="#000"/>
-                            </svg>
-                            <span className="text-[6.5px] font-mono font-bold text-slate-800 truncate max-w-full">
+                          {/* 100% Real Scannable Vector QR Code */}
+                          <div className="w-24 h-24 min-w-[96px] bg-white border-2 border-slate-900 rounded-xl flex flex-col items-center justify-center p-1.5 text-center shadow-xs">
+                            <div className="w-[74px] h-[74px] flex items-center justify-center overflow-hidden bg-white">
+                              <QRCodeView 
+                                value={getBilletQrPayload(item, qrDataMode)} 
+                                size={72} 
+                                margin={4} 
+                              />
+                            </div>
+                            <span className="text-[7px] font-mono font-bold text-slate-800 truncate max-w-full mt-0.5">
                               {item.heat_number || 'BILLET-QR'}
                             </span>
                           </div>
@@ -3916,7 +4018,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
               <button
                 type="button"
-                onClick={() => triggerDirectMultiplePrint(activeBatchPrintItems, batchPrintLayout)}
+                onClick={() => triggerDirectMultiplePrint(activeBatchPrintItems, batchPrintLayout, qrDataMode)}
                 className="flex-1 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-md shadow-blue-600/20 flex items-center justify-center gap-2"
               >
                 <Printer className="w-4 h-4" />
@@ -3941,6 +4043,19 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* QR ZOOM MODAL FOR INSTANT SCREEN SCANNING */}
+      {zoomQrPayload && (
+        <QrZoomModal
+          isOpen={zoomQrPayload.isOpen}
+          onClose={() => setZoomQrPayload(null)}
+          title={zoomQrPayload.title}
+          subtitle={zoomQrPayload.subtitle}
+          payload={zoomQrPayload.payload}
+          isLight={isLight}
+          language={language}
+        />
       )}
 
     </div>

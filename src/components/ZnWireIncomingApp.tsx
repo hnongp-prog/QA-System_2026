@@ -39,7 +39,9 @@ import {
   Sun,
   Moon,
   Check,
-  Copy
+  Copy,
+  QrCode,
+  Maximize2
 } from 'lucide-react';
 
 import { 
@@ -51,6 +53,7 @@ import {
 } from '../types';
 import { analyzeZnWireCertClient } from '../services/geminiClient';
 import { useCloudState } from '../services/firestoreSync';
+import { generateQrSvgString, QRCodeView, getZnWireQrPayload, QrDataMode, QrZoomModal } from '../utils/qrCodeHelper';
 
 interface ZnWireIncomingAppProps {
   onBackToPortal?: () => void;
@@ -198,6 +201,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
   const [batchPrintLayout, setBatchPrintLayout] = useState<'roll' | 'grid'>('roll');
   const [batchCopiedInfo, setBatchCopiedInfo] = useState(false);
   const [copiedTagInfo, setCopiedTagInfo] = useState(false);
+  const [qrDataMode, setQrDataMode] = useState<QrDataMode>('full');
 
   // Config tab state
   const [editingGrade, setEditingGrade] = useState<string>('');
@@ -700,34 +704,22 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
   };
 
   // Generate Individual Tag Card Inner HTML
-  const generateTagContentHtml = (item: ZnWireInspectionRecord) => {
+  const generateTagContentHtml = (item: ZnWireInspectionRecord, mode: QrDataMode = qrDataMode) => {
     const tagColor = "#4f46e5";
     const jg = item.judgement || performJudgement(item);
     const isPass = jg === 'PASS';
     const dateStr = item.timestamp || (item.date ? item.date : new Date().toISOString().split('T')[0]);
+    const qrSvg = generateQrSvgString(getZnWireQrPayload(item, mode), { margin: 1 });
 
     return `
       <div class="tag-box" style="border: 2.5px solid ${tagColor};">
         <div class="header" style="background: ${tagColor};">QUALITY APPROVED ZINC WIRE TAG</div>
         <div class="body-grid">
           <div class="qr-placeholder">
-            <svg width="72" height="72" viewBox="0 0 100 100">
-              <rect width="100" height="100" fill="#fff" />
-              <rect x="10" y="10" width="30" height="30" fill="#000"/>
-              <rect x="15" y="15" width="20" height="20" fill="#fff"/>
-              <rect x="20" y="20" width="10" height="10" fill="#000"/>
-              <rect x="60" y="10" width="30" height="30" fill="#000"/>
-              <rect x="65" y="15" width="20" height="20" fill="#fff"/>
-              <rect x="70" y="20" width="10" height="10" fill="#000"/>
-              <rect x="10" y="60" width="30" height="30" fill="#000"/>
-              <rect x="15" y="65" width="20" height="20" fill="#fff"/>
-              <rect x="20" y="70" width="10" height="10" fill="#000"/>
-              <rect x="45" y="45" width="12" height="12" fill="#000"/>
-              <rect x="65" y="55" width="15" height="15" fill="#000"/>
-              <rect x="45" y="65" width="10" height="20" fill="#000"/>
-              <rect x="65" y="75" width="20" height="15" fill="#000"/>
-            </svg>
-            <span style="font-size: 8px; font-weight: bold; margin-top: 2px; font-family: monospace;">HEAT:${item.heat_number || '-'}</span>
+            <div class="qr-svg-wrap">
+              ${qrSvg}
+            </div>
+            <span style="font-size: 7.5px; font-weight: bold; margin-top: 1px; font-family: monospace; max-width: 86px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.heat_number || item.po_no || '-'}</span>
           </div>
           <div class="details">
             <div><strong>HEAT NO:</strong> <span style="font-family: monospace; font-size:12px; font-weight:bold;">${item.heat_number || '-'}</span></div>
@@ -746,13 +738,13 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
             ${Object.entries(item.chemical_composition).slice(0, 6).map(([k, v]) => `${k}:${v}`).join(' ')}
           </div>
         ` : ''}
-        <div class="footer">IQA-03 Zinc Wire Incoming Verification • Date: ${dateStr}</div>
+        <div class="footer">IQA-02 Zinc Wire Incoming Verification • Date: ${dateStr}</div>
       </div>
     `;
   };
 
   // Generate Print Tag HTML (Single or Batch with page breaks)
-  const generateMultipleTagsHtml = (items: ZnWireInspectionRecord[], layout: 'roll' | 'grid' = 'roll') => {
+  const generateMultipleTagsHtml = (items: ZnWireInspectionRecord[], layout: 'roll' | 'grid' = 'roll', mode: QrDataMode = qrDataMode) => {
     const isGrid = layout === 'grid';
     return `
       <!DOCTYPE html>
@@ -793,7 +785,9 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
             `}
             .header { color: #fff; text-align: center; font-weight: 800; padding: 6px 4px; border-radius: 6px; font-size: 13px; letter-spacing: 0.5px; }
             .body-grid { display: flex; margin-top: 8px; gap: 8px; align-items: stretch; }
-            .qr-placeholder { width: 90px; min-width: 90px; height: 90px; border: 2px solid #000; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; text-align: center; border-radius: 6px; }
+            .qr-placeholder { width: 90px; min-width: 90px; height: 90px; border: 1.5px solid #000; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; text-align: center; border-radius: 6px; padding: 2px; box-sizing: border-box; }
+            .qr-placeholder .qr-svg-wrap { width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; }
+            .qr-placeholder .qr-svg-wrap svg { width: 100%; height: 100%; display: block; }
             .details { flex: 1; font-size: 10.5px; line-height: 1.4; }
             .details > div { margin-bottom: 2px; }
             .badge { display: inline-block; padding: 1px 6px; font-weight: bold; border-radius: 4px; color: white; font-size: 9.5px; }
@@ -809,14 +803,14 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
             chunkArray(items, 4).map(chunk => `
               <div class="grid-page">
                 <div class="sheet-grid">
-                  ${chunk.map(item => generateTagContentHtml(item)).join('')}
+                  ${chunk.map(item => generateTagContentHtml(item, mode)).join('')}
                 </div>
               </div>
             `).join('')
           ) : (
             items.map(item => `
               <div class="tag-page">
-                ${generateTagContentHtml(item)}
+                ${generateTagContentHtml(item, mode)}
               </div>
             `).join('')
           )}
@@ -826,9 +820,9 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
   };
 
   // Direct Print via hidden iframe
-  const triggerDirectMultiplePrint = (items: ZnWireInspectionRecord[], layout: 'roll' | 'grid' = 'roll') => {
+  const triggerDirectMultiplePrint = (items: ZnWireInspectionRecord[], layout: 'roll' | 'grid' = 'roll', mode: QrDataMode = qrDataMode) => {
     if (items.length === 0) return;
-    const htmlContent = generateMultipleTagsHtml(items, layout);
+    const htmlContent = generateMultipleTagsHtml(items, layout, mode);
 
     try {
       let iframe = document.getElementById('znwire-print-iframe') as HTMLIFrameElement;
@@ -2262,6 +2256,34 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
               </button>
             </div>
 
+            {/* QR Code Payload Selector */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-950/60 text-xs">
+              <div className="flex items-center gap-1.5 text-slate-300">
+                <QrCode className="w-4 h-4 text-indigo-400" />
+                <span className="font-semibold">{isTh ? 'รูปแบบข้อมูล QR Code:' : 'QR Code Format:'}</span>
+              </div>
+              <div className="inline-flex rounded-lg p-0.5 bg-slate-800 border border-slate-700 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setQrDataMode('full')}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded transition ${
+                    qrDataMode === 'full' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-300'
+                  }`}
+                >
+                  {isTh ? 'ข้อมูลเต็ม (Full QA Info)' : 'Full QA Info'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQrDataMode('id')}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded transition ${
+                    qrDataMode === 'id' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-300'
+                  }`}
+                >
+                  {isTh ? 'เฉพาะ Heat No. (Code Only)' : 'Code Only'}
+                </button>
+              </div>
+            </div>
+
             {/* Tag Visual Preview */}
             <div className="rounded-2xl p-4 bg-white text-slate-900 border-2 border-indigo-600 shadow-sm relative">
               <div className="bg-indigo-600 text-white text-center font-black py-1.5 px-3 rounded-lg text-xs tracking-wider uppercase shadow-xs mb-3">
@@ -2269,26 +2291,17 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
               </div>
 
               <div className="flex gap-3 items-stretch">
-                {/* Simulated QR Code Graphic */}
-                <div className="w-24 h-24 min-w-[96px] bg-slate-50 border-2 border-slate-900 rounded-xl flex flex-col items-center justify-center p-1 text-center">
-                  <svg width="68" height="68" viewBox="0 0 100 100">
-                    <rect width="100" height="100" fill="#fff" />
-                    <rect x="10" y="10" width="30" height="30" fill="#000"/>
-                    <rect x="15" y="15" width="20" height="20" fill="#fff"/>
-                    <rect x="20" y="20" width="10" height="10" fill="#000"/>
-                    <rect x="60" y="10" width="30" height="30" fill="#000"/>
-                    <rect x="65" y="15" width="20" height="20" fill="#fff"/>
-                    <rect x="70" y="20" width="10" height="10" fill="#000"/>
-                    <rect x="10" y="60" width="30" height="30" fill="#000"/>
-                    <rect x="15" y="65" width="20" height="20" fill="#fff"/>
-                    <rect x="20" y="70" width="10" height="10" fill="#000"/>
-                    <rect x="45" y="45" width="12" height="12" fill="#000"/>
-                    <rect x="65" y="55" width="15" height="15" fill="#000"/>
-                    <rect x="45" y="65" width="10" height="20" fill="#000"/>
-                    <rect x="65" y="75" width="20" height="15" fill="#000"/>
-                  </svg>
-                  <span className="text-[7px] font-mono font-bold text-slate-800 truncate max-w-full">
-                    {activePrintItem.heat_number || 'ZN-WIRE'}
+                {/* 100% Real Scannable Vector QR Code */}
+                <div className="w-24 h-24 min-w-[96px] bg-white border-2 border-slate-900 rounded-xl flex flex-col items-center justify-center p-1 text-center shadow-xs">
+                  <div className="w-[68px] h-[68px] flex items-center justify-center overflow-hidden">
+                    <QRCodeView 
+                      value={getZnWireQrPayload(activePrintItem, qrDataMode)} 
+                      size={66} 
+                      margin={1} 
+                    />
+                  </div>
+                  <span className="text-[7px] font-mono font-bold text-slate-800 truncate max-w-full mt-0.5">
+                    {activePrintItem.heat_number || activePrintItem.po_no || 'ZN-WIRE'}
                   </span>
                 </div>
 
@@ -2413,33 +2426,65 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
 
             {/* Options Bar: Layout Selector & Summary */}
             <div className="p-3 rounded-2xl border border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold text-slate-300">
-                  {isTh ? 'รูปแบบการพิมพ์:' : 'Print Layout:'}
-                </span>
-                <div className="inline-flex rounded-xl p-1 bg-slate-800 border border-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => setBatchPrintLayout('roll')}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
-                      batchPrintLayout === 'roll'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'text-slate-300 hover:text-white'
-                    }`}
-                  >
-                    🏷️ {isTh ? 'ม้วนสติกเกอร์ (100x100mm)' : 'Label Roll (100x100mm)'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBatchPrintLayout('grid')}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
-                      batchPrintLayout === 'grid'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'text-slate-300 hover:text-white'
-                    }`}
-                  >
-                    📄 {isTh ? 'กระดาษ A4 (4 แท็ก/หน้า)' : 'A4 Sheet Grid (4/page)'}
-                  </button>
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-slate-300">
+                    {isTh ? 'รูปแบบการพิมพ์:' : 'Print Layout:'}
+                  </span>
+                  <div className="inline-flex rounded-xl p-1 bg-slate-800 border border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => setBatchPrintLayout('roll')}
+                      className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                        batchPrintLayout === 'roll'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      🏷️ {isTh ? 'ม้วนสติกเกอร์ (100x100mm)' : 'Label Roll (100x100mm)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBatchPrintLayout('grid')}
+                      className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                        batchPrintLayout === 'grid'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      📄 {isTh ? 'กระดาษ A4 (4 แท็ก/หน้า)' : 'A4 Sheet Grid (4/page)'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-slate-300">
+                    {isTh ? 'QR Code:' : 'QR:'}
+                  </span>
+                  <div className="inline-flex rounded-xl p-1 bg-slate-800 border border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => setQrDataMode('full')}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                        qrDataMode === 'full'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      {isTh ? 'ข้อมูลเต็ม' : 'Full QA'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQrDataMode('id')}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                        qrDataMode === 'id'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      {isTh ? 'เฉพาะ Heat No.' : 'Code Only'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2480,26 +2525,17 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                         </div>
 
                         <div className="flex gap-3 items-stretch">
-                          {/* Simulated QR Code Graphic */}
-                          <div className="w-20 h-20 min-w-[80px] bg-slate-50 border-2 border-slate-900 rounded-xl flex flex-col items-center justify-center p-1 text-center">
-                            <svg width="56" height="56" viewBox="0 0 100 100">
-                              <rect width="100" height="100" fill="#fff" />
-                              <rect x="10" y="10" width="28" height="28" fill="#000"/>
-                              <rect x="15" y="15" width="18" height="18" fill="#fff"/>
-                              <rect x="19" y="19" width="10" height="10" fill="#000"/>
-                              <rect x="62" y="10" width="28" height="28" fill="#000"/>
-                              <rect x="67" y="15" width="18" height="18" fill="#fff"/>
-                              <rect x="71" y="19" width="10" height="10" fill="#000"/>
-                              <rect x="10" y="62" width="28" height="28" fill="#000"/>
-                              <rect x="15" y="67" width="18" height="18" fill="#fff"/>
-                              <rect x="19" y="71" width="10" height="10" fill="#000"/>
-                              <rect x="45" y="45" width="12" height="12" fill="#000"/>
-                              <rect x="62" y="52" width="14" height="14" fill="#000"/>
-                              <rect x="45" y="65" width="10" height="18" fill="#000"/>
-                              <rect x="62" y="72" width="20" height="15" fill="#000"/>
-                            </svg>
-                            <span className="text-[6.5px] font-mono font-bold text-slate-800 truncate max-w-full">
-                              {item.heat_number || 'ZN-WIRE'}
+                          {/* 100% Real Scannable Vector QR Code */}
+                          <div className="w-24 h-24 min-w-[96px] bg-white border-2 border-slate-900 rounded-xl flex flex-col items-center justify-center p-1.5 text-center shadow-xs">
+                            <div className="w-[74px] h-[74px] flex items-center justify-center overflow-hidden bg-white">
+                              <QRCodeView 
+                                value={getZnWireQrPayload(item, qrDataMode)} 
+                                size={72} 
+                                margin={4} 
+                              />
+                            </div>
+                            <span className="text-[7px] font-mono font-bold text-slate-800 truncate max-w-full mt-0.5">
+                              {item.heat_number || item.po_no || 'ZN-WIRE'}
                             </span>
                           </div>
 
@@ -2571,7 +2607,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
 
               <button
                 type="button"
-                onClick={() => triggerDirectMultiplePrint(activeBatchPrintItems, batchPrintLayout)}
+                onClick={() => triggerDirectMultiplePrint(activeBatchPrintItems, batchPrintLayout, qrDataMode)}
                 className="flex-1 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2"
               >
                 <Printer className="w-4 h-4" />

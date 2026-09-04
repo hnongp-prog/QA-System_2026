@@ -442,6 +442,22 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
         if (p.startsWith('P-') || p.toUpperCase().includes('PART')) extracted.partNo = p;
         else if (p.startsWith('DWG') || p.toUpperCase().includes('DRAWING')) extracted.drawing = p;
         else if (p.startsWith('BOX')) extracted.boxNo = p;
+        else if (p.toUpperCase().startsWith('HEAT:')) {
+          const val = p.substring(5).trim();
+          extracted.coils = [{ no: val, qty: 20, coatingDate: new Date().toISOString().split('T')[0], expireDate: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0] }];
+          if (!extracted.partNo) extracted.partNo = val;
+        }
+        else if (p.toUpperCase().startsWith('LOT:') || p.toUpperCase().startsWith('BATCH:')) {
+          const val = p.substring(4).trim();
+          if (!extracted.boxNo) extracted.boxNo = val;
+          if (!extracted.partNo) extracted.partNo = val;
+        }
+        else if (p.toUpperCase().startsWith('GRADE:')) {
+          if (!extracted.profileName) extracted.profileName = p.substring(6).trim();
+        }
+        else if (p.toUpperCase().startsWith('SUPP:')) {
+          if (!extracted.destinationTo) extracted.destinationTo = p.substring(5).trim();
+        }
         else if (p.includes('TOKYO') || p.includes('JAPAN') || p.includes('USA') || p.includes('BANGKOK') || p.includes('OSAKA')) extracted.destinationTo = p;
         else if (/^\d+(\.\d+)?$/.test(p)) {
           if (!extracted.dimW) extracted.dimW = p;

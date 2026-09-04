@@ -13,7 +13,7 @@ import {
   Sliders
 } from 'lucide-react';
 import { BilletCuttingSpec, Language } from '../../types';
-import { ADMIN_PASSWORD } from './mockBilletData';
+import { ADMIN_PASSWORD, checkAdminPassword } from './mockBilletData';
 
 interface BilletCuttingSpecModalProps {
   isOpen: boolean;
@@ -70,7 +70,7 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
 
   const handleVerifyPassword = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput.trim() === ADMIN_PASSWORD) {
+    if (checkAdminPassword(passwordInput)) {
       setIsAuthenticated(true);
       setAuthError(false);
       setPasswordInput('');

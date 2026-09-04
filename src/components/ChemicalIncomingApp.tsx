@@ -39,7 +39,9 @@ import {
   Sun,
   Moon,
   Printer,
-  Tag
+  Tag,
+  QrCode,
+  Maximize2
 } from 'lucide-react';
 
 import { 
@@ -53,6 +55,7 @@ import {
 } from '../types';
 import { analyzeChemicalCertClient } from '../services/geminiClient';
 import { useCloudState } from '../services/firestoreSync';
+import { generateQrSvgString, QRCodeView, getChemQrPayload, QrDataMode, QrZoomModal } from '../utils/qrCodeHelper';
 
 interface ChemicalIncomingAppProps {
   onBackToPortal?: () => void;
@@ -204,6 +207,13 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<string[]>([]);
   const [copiedTagInfo, setCopiedTagInfo] = useState<boolean>(false);
   const [batchCopiedInfo, setBatchCopiedInfo] = useState<boolean>(false);
+  const [qrDataMode, setQrDataMode] = useState<QrDataMode>('full');
+  const [zoomQrPayload, setZoomQrPayload] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle?: string;
+    payload: string;
+  } | null>(null);
 
   // Delete Confirmation Modal State with Password Protection (admin2026)
   const [confirmModal, setConfirmModal] = useState<{
@@ -766,7 +776,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
   }
 
   // Tag HTML Generator for Chemical Inspection
-  const generateTagContentHtml = (item: ChemicalInspectionEntry, tagIndex?: number) => {
+  const generateTagContentHtml = (item: ChemicalInspectionEntry, tagIndex?: number, mode: QrDataMode = qrDataMode) => {
     const jg = item.result || 'PASS';
     const isPass = jg === 'PASS';
     const bgBadge = isPass ? '#10b981' : '#ef4444';
@@ -775,6 +785,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     const itemsSummary = item.items && item.items.length > 0
       ? item.items.map(it => `${it.description}: ${it.value} (${it.status})`).join(' | ')
       : '';
+    const qrSvg = generateQrSvgString(getChemQrPayload(item, mode), { margin: 4 });
 
     return `
       <div class="tag-card">
@@ -785,23 +796,10 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
         <div class="tag-body">
           <div class="qr-box">
-            <svg width="70" height="70" viewBox="0 0 100 100">
-              <rect width="100" height="100" fill="#fff" />
-              <rect x="8" y="8" width="30" height="30" fill="#000"/>
-              <rect x="13" y="13" width="20" height="20" fill="#fff"/>
-              <rect x="18" y="18" width="10" height="10" fill="#000"/>
-              <rect x="62" y="8" width="30" height="30" fill="#000"/>
-              <rect x="67" y="13" width="20" height="20" fill="#fff"/>
-              <rect x="72" y="18" width="10" height="10" fill="#000"/>
-              <rect x="8" y="62" width="30" height="30" fill="#000"/>
-              <rect x="13" y="67" width="20" height="20" fill="#fff"/>
-              <rect x="18" y="72" width="10" height="10" fill="#000"/>
-              <rect x="45" y="45" width="12" height="12" fill="#000"/>
-              <rect x="62" y="52" width="14" height="14" fill="#000"/>
-              <rect x="45" y="65" width="10" height="18" fill="#000"/>
-              <rect x="62" y="72" width="20" height="15" fill="#000"/>
-            </svg>
-            <div class="qr-text">${item.batch_lot || 'CHEM-LOT'}</div>
+            <div class="qr-svg-wrap">
+              ${qrSvg}
+            </div>
+            <div class="qr-text">${item.batch_lot || item.chemical || 'CHEM-LOT'}</div>
           </div>
 
           <div class="info-box">
@@ -857,18 +855,18 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
         ` : ''}
 
         <div class="tag-footer">
-          <span>IQA-02 Coating Chemical Incoming Verification</span>
+          <span>IQA-01 Chemical Incoming Verification</span>
           <span>${item.timestamp || (item.date ? item.date : new Date().toLocaleDateString('th-TH'))}</span>
         </div>
       </div>
     `;
   };
 
-  const generateMultipleTagsHtml = (items: ChemicalInspectionEntry[], layout: 'roll' | 'grid') => {
+  const generateMultipleTagsHtml = (items: ChemicalInspectionEntry[], layout: 'roll' | 'grid', mode: QrDataMode = qrDataMode) => {
     if (layout === 'roll') {
       const tagsHtml = items.map((item, idx) => `
         <div class="page-container">
-          ${generateTagContentHtml(item, idx)}
+          ${generateTagContentHtml(item, idx, mode)}
         </div>
       `).join('');
 
@@ -948,16 +946,29 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               align-items: stretch;
             }
             .qr-box {
-              width: 78px;
-              min-width: 78px;
+              width: 96px;
+              min-width: 96px;
               border: 1.5px solid #0f172a;
               border-radius: 6px;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
-              padding: 2px;
-              background: #fafafa;
+              padding: 4px;
+              background: #ffffff;
+              box-sizing: border-box;
+            }
+            .qr-box .qr-svg-wrap {
+              width: 88px;
+              height: 88px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .qr-box .qr-svg-wrap svg {
+              width: 100%;
+              height: 100%;
+              display: block;
             }
             .qr-text {
               font-family: monospace;
@@ -1021,7 +1032,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               border-radius: 4px;
               border: 1px solid #e2e8f0;
               font-family: monospace;
-              font-size: 7px;
+              font-size: 7.5px;
               color: #334155;
               line-height: 1.2;
               white-space: nowrap;
@@ -1030,7 +1041,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
             }
             .tag-footer {
               border-top: 1px dashed #cbd5e1;
-              padding-top: 3px;
+              padding-top: 4px;
               font-size: 7px;
               color: #94a3b8;
               display: flex;
@@ -1049,7 +1060,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
       const pagesHtml = pages.map((pageItems, pageIdx) => `
         <div class="a4-page">
           <div class="grid-container">
-            ${pageItems.map((item, itemIdx) => generateTagContentHtml(item, (pageIdx * 4) + itemIdx)).join('')}
+            ${pageItems.map((item, itemIdx) => generateTagContentHtml(item, (pageIdx * 4) + itemIdx, mode)).join('')}
           </div>
         </div>
       `).join('');
@@ -1142,8 +1153,21 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               flex-direction: column;
               align-items: center;
               justify-content: center;
-              padding: 4px;
-              background: #fafafa;
+              padding: 3px;
+              background: #ffffff;
+              box-sizing: border-box;
+            }
+            .qr-box .qr-svg-wrap {
+              width: 76px;
+              height: 76px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .qr-box .qr-svg-wrap svg {
+              width: 100%;
+              height: 100%;
+              display: block;
             }
             .qr-text {
               font-family: monospace;
@@ -1167,14 +1191,14 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
             .info-row {
               display: flex;
               flex-direction: column;
-              margin-bottom: 3px;
+              margin-bottom: 4px;
             }
             .info-row-2col {
               display: grid;
               grid-template-columns: 1fr 1fr;
-              gap: 6px;
+              gap: 8px;
               font-size: 10px;
-              margin-bottom: 3px;
+              margin-bottom: 4px;
             }
             .label {
               font-size: 8px;
@@ -1193,8 +1217,8 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
             .mono { font-family: monospace; }
             .badge {
               display: inline-block;
-              padding: 2px 6px;
-              border-radius: 3px;
+              padding: 2px 8px;
+              border-radius: 4px;
               color: #fff;
               font-weight: 900;
               font-size: 9px;
@@ -1232,9 +1256,9 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     }
   };
 
-  const triggerDirectMultiplePrint = (items: ChemicalInspectionEntry[], layout: 'roll' | 'grid') => {
+  const triggerDirectMultiplePrint = (items: ChemicalInspectionEntry[], layout: 'roll' | 'grid', mode: QrDataMode = qrDataMode) => {
     if (!items || items.length === 0) return;
-    const printHtml = generateMultipleTagsHtml(items, layout);
+    const printHtml = generateMultipleTagsHtml(items, layout, mode);
 
     let iframe = document.getElementById('chem-print-iframe') as HTMLIFrameElement | null;
     if (!iframe) {
@@ -1284,8 +1308,8 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     }
   };
 
-  const triggerDirectPrint = (item: ChemicalInspectionEntry) => {
-    triggerDirectMultiplePrint([item], 'roll');
+  const triggerDirectPrint = (item: ChemicalInspectionEntry, mode: QrDataMode = qrDataMode) => {
+    triggerDirectMultiplePrint([item], 'roll', mode);
   };
 
   // Export CSV
@@ -2815,36 +2839,78 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               </button>
             </div>
 
+            {/* QR Format Selector */}
+            <div className={`flex items-center justify-between p-2.5 rounded-xl border text-xs ${
+              isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-slate-800'
+            }`}>
+              <div className="flex items-center gap-1.5 font-bold">
+                <QrCode className="w-4 h-4 text-indigo-500" />
+                <span className={isLight ? 'text-slate-700' : 'text-slate-300'}>
+                  {isTh ? 'รูปแบบ QR Code:' : 'QR Code Format:'}
+                </span>
+              </div>
+              <div className={`p-1 rounded-lg border flex gap-1 ${
+                isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-700'
+              }`}>
+                <button
+                  type="button"
+                  onClick={() => setQrDataMode('full')}
+                  className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${
+                    qrDataMode === 'full'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {isTh ? 'ข้อมูลครบชุด (Full QA)' : 'Full QA Info'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQrDataMode('code_only')}
+                  className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${
+                    qrDataMode === 'code_only'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {isTh ? 'เฉพาะ Lot/Batch (Code Only)' : 'Lot/Batch Only'}
+                </button>
+              </div>
+            </div>
+
             {/* Visual Tag Preview Card */}
             <div className="flex justify-center">
-              <div className="w-[320px] border-2 border-indigo-700 rounded-xl p-3.5 bg-white text-slate-900 shadow-md space-y-3 font-sans relative">
+              <div className="w-[360px] sm:w-[380px] border-2 border-indigo-700 rounded-xl p-4 bg-white text-slate-900 shadow-md space-y-3 font-sans relative">
                 {/* Header */}
-                <div className="bg-indigo-700 text-white font-black text-[11px] text-center py-1.5 px-2 rounded tracking-wide uppercase">
+                <div className="bg-indigo-700 text-white font-black text-xs text-center py-2 px-2.5 rounded-lg tracking-wide uppercase">
                   QUALITY APPROVED CHEMICAL TAG
                 </div>
 
                 {/* Body */}
                 <div className="flex gap-3 items-stretch">
-                  {/* Left QR */}
-                  <div className="w-[78px] min-w-[78px] border border-slate-900 rounded-md p-1.5 flex flex-col items-center justify-center bg-slate-50">
-                    <svg width="64" height="64" viewBox="0 0 100 100">
-                      <rect width="100" height="100" fill="#fff" />
-                      <rect x="8" y="8" width="30" height="30" fill="#000"/>
-                      <rect x="13" y="13" width="20" height="20" fill="#fff"/>
-                      <rect x="18" y="18" width="10" height="10" fill="#000"/>
-                      <rect x="62" y="8" width="30" height="30" fill="#000"/>
-                      <rect x="67" y="13" width="20" height="20" fill="#fff"/>
-                      <rect x="72" y="18" width="10" height="10" fill="#000"/>
-                      <rect x="8" y="62" width="30" height="30" fill="#000"/>
-                      <rect x="13" y="67" width="20" height="20" fill="#fff"/>
-                      <rect x="18" y="72" width="10" height="10" fill="#000"/>
-                      <rect x="45" y="45" width="12" height="12" fill="#000"/>
-                      <rect x="62" y="52" width="14" height="14" fill="#000"/>
-                      <rect x="45" y="65" width="10" height="18" fill="#000"/>
-                      <rect x="62" y="72" width="20" height="15" fill="#000"/>
-                    </svg>
-                    <span className="text-[7.5px] font-mono font-bold text-slate-900 mt-1 max-w-[70px] truncate text-center">
-                      {activePrintItem.batch_lot}
+                  {/* Left QR (100% Real Scannable Vector QR) */}
+                  <div 
+                    onClick={() => setZoomQrPayload({
+                      isOpen: true,
+                      title: isTh ? 'QR Code ตรวจรับสารเคมี (IQA-03)' : 'Chemical Inspection QR Code',
+                      subtitle: `${activePrintItem.chemical} • Lot: ${activePrintItem.batch_lot}`,
+                      payload: getChemQrPayload(activePrintItem, qrDataMode)
+                    })}
+                    className="w-[104px] min-w-[104px] border border-slate-300 hover:border-indigo-500 rounded-xl p-2 flex flex-col items-center justify-center bg-white shadow-xs hover:shadow-md transition cursor-pointer group"
+                    title={isTh ? 'คลิกเพื่อขยาย QR Code สำหรับสแกนผ่านหน้าจอ' : 'Click to enlarge QR for screen scan'}
+                  >
+                    <div className="w-[88px] h-[88px] flex items-center justify-center overflow-hidden">
+                      <QRCodeView 
+                        value={getChemQrPayload(activePrintItem, qrDataMode)} 
+                        size={88} 
+                        margin={4} 
+                      />
+                    </div>
+                    <span className="text-[7.5px] font-mono font-bold text-slate-900 mt-1 max-w-[92px] truncate text-center">
+                      {activePrintItem.batch_lot || activePrintItem.chemical}
+                    </span>
+                    <span className="text-[8px] text-indigo-600 font-semibold mt-0.5 opacity-80 group-hover:opacity-100 flex items-center gap-0.5">
+                      <Maximize2 className="w-2.5 h-2.5" />
+                      {isTh ? 'แตะขยายสแกน' : 'Zoom Scan'}
                     </span>
                   </div>
 
@@ -2920,6 +2986,23 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
             }`}>
               <button
                 type="button"
+                onClick={() => setZoomQrPayload({
+                  isOpen: true,
+                  title: isTh ? 'QR Code ตรวจรับสารเคมี (IQA-03)' : 'Chemical Inspection QR Code',
+                  subtitle: `${activePrintItem.chemical} • Lot: ${activePrintItem.batch_lot}`,
+                  payload: getChemQrPayload(activePrintItem, qrDataMode)
+                })}
+                className={`px-3 font-bold text-xs py-2.5 rounded-xl transition border flex items-center justify-center gap-1.5 ${
+                  isLight ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-300 border-indigo-800'
+                }`}
+                title={isTh ? 'เปิด QR ขนาดใหญ่สำหรับสแกนผ่านหน้าจอ' : 'Open large QR for screen scan'}
+              >
+                <QrCode className="w-4 h-4 text-indigo-500" />
+                <span>{isTh ? 'สแกนผ่านจอ' : 'Screen Scan'}</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   const tagText = `[QUALITY APPROVED CHEMICAL TAG]\nBatch/Lot: ${activePrintItem.batch_lot}\nChemical: ${activePrintItem.chemical}\nSupplier: ${activePrintItem.supplier || '-'}\nInspector: ${activePrintItem.inspector}\nMFG/EXP: ${activePrintItem.date || '-'} / ${activePrintItem.expiration || '-'}\nWeight: ${activePrintItem.weight} kg, Qty: ${activePrintItem.qty} pcs\nResult: ${activePrintItem.result}`;
                   navigator.clipboard.writeText(tagText);
@@ -2936,7 +3019,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
               <button
                 type="button"
-                onClick={() => triggerDirectPrint(activePrintItem)}
+                onClick={() => triggerDirectPrint(activePrintItem, qrDataMode)}
                 className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-md shadow-indigo-600/30 flex items-center justify-center gap-1.5"
               >
                 <Printer className="w-4 h-4" />
@@ -2994,37 +3077,73 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
               isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
             }`}>
               {/* Layout Switcher */}
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className={`text-xs font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                  {isTh ? 'รูปแบบกระดาษ:' : 'Print Layout:'}
-                </span>
-                <div className={`p-1 rounded-xl border flex gap-1 ${
-                  isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
-                }`}>
-                  <button
-                    type="button"
-                    onClick={() => setBatchPrintLayout('roll')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                      batchPrintLayout === 'roll'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Tag className="w-3.5 h-3.5" />
-                    <span>{isTh ? 'ม้วนสติกเกอร์ (100x100mm)' : 'Label Roll (100x100mm)'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBatchPrintLayout('grid')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                      batchPrintLayout === 'grid'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>{isTh ? 'กระดาษ A4 (4 ป้าย/แผ่น)' : 'A4 Sheet (4/page)'}</span>
-                  </button>
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                    {isTh ? 'รูปแบบกระดาษ:' : 'Print Layout:'}
+                  </span>
+                  <div className={`p-1 rounded-xl border flex gap-1 ${
+                    isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+                  }`}>
+                    <button
+                      type="button"
+                      onClick={() => setBatchPrintLayout('roll')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                        batchPrintLayout === 'roll'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Tag className="w-3.5 h-3.5" />
+                      <span>{isTh ? 'ม้วนสติกเกอร์ (100x100mm)' : 'Label Roll'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBatchPrintLayout('grid')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                        batchPrintLayout === 'grid'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>{isTh ? 'กระดาษ A4 (4 ป้าย/แผ่น)' : 'A4 Sheet'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* QR Code Format Selector */}
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                    {isTh ? 'รูปแบบ QR:' : 'QR Format:'}
+                  </span>
+                  <div className={`p-1 rounded-xl border flex gap-1 ${
+                    isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+                  }`}>
+                    <button
+                      type="button"
+                      onClick={() => setQrDataMode('full')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                        qrDataMode === 'full'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>{isTh ? 'ข้อมูลครบชุด' : 'Full QA'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQrDataMode('code_only')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                        qrDataMode === 'code_only'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <span>{isTh ? 'เฉพาะ Lot/Batch' : 'Lot Only'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -3068,26 +3187,17 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
                     {/* Body */}
                     <div className="flex gap-3 items-stretch">
-                      {/* Left QR */}
-                      <div className="w-[72px] min-w-[72px] border border-slate-900 rounded-md p-1 flex flex-col items-center justify-center bg-slate-50">
-                        <svg width="58" height="58" viewBox="0 0 100 100">
-                          <rect width="100" height="100" fill="#fff" />
-                          <rect x="8" y="8" width="30" height="30" fill="#000"/>
-                          <rect x="13" y="13" width="20" height="20" fill="#fff"/>
-                          <rect x="18" y="18" width="10" height="10" fill="#000"/>
-                          <rect x="62" y="8" width="30" height="30" fill="#000"/>
-                          <rect x="67" y="13" width="20" height="20" fill="#fff"/>
-                          <rect x="72" y="18" width="10" height="10" fill="#000"/>
-                          <rect x="8" y="62" width="30" height="30" fill="#000"/>
-                          <rect x="13" y="67" width="20" height="20" fill="#fff"/>
-                          <rect x="18" y="72" width="10" height="10" fill="#000"/>
-                          <rect x="45" y="45" width="12" height="12" fill="#000"/>
-                          <rect x="62" y="52" width="14" height="14" fill="#000"/>
-                          <rect x="45" y="65" width="10" height="18" fill="#000"/>
-                          <rect x="62" y="72" width="20" height="15" fill="#000"/>
-                        </svg>
-                        <span className="text-[7px] font-mono font-bold text-slate-900 mt-1 max-w-[65px] truncate text-center">
-                          {item.batch_lot}
+                      {/* Left QR (100% Real Scannable Vector QR) */}
+                      <div className="w-[88px] min-w-[88px] border border-slate-900 rounded-md p-1.5 flex flex-col items-center justify-center bg-white shadow-xs">
+                        <div className="w-[74px] h-[74px] flex items-center justify-center overflow-hidden bg-white">
+                          <QRCodeView 
+                            value={getChemQrPayload(item, qrDataMode)} 
+                            size={72} 
+                            margin={4} 
+                          />
+                        </div>
+                        <span className="text-[7.5px] font-mono font-bold text-slate-900 mt-1 max-w-[80px] truncate text-center">
+                          {item.batch_lot || item.chemical}
                         </span>
                       </div>
 
@@ -3151,7 +3261,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
                     {/* Footer */}
                     <div className="border-t border-dashed border-slate-300 pt-1 text-[7.5px] text-slate-500 flex justify-between items-center">
-                      <span>IQA-02 Chemical Incoming Verification</span>
+                      <span>IQA-01 Chemical Incoming Verification</span>
                       <span>{item.timestamp || (item.date ? item.date : new Date().toLocaleDateString('th-TH'))}</span>
                     </div>
                   </div>
@@ -3194,7 +3304,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => triggerDirectMultiplePrint(activeBatchPrintItems, batchPrintLayout)}
+                  onClick={() => triggerDirectMultiplePrint(activeBatchPrintItems, batchPrintLayout, qrDataMode)}
                   className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition shadow-md shadow-indigo-600/30 flex items-center justify-center gap-2"
                 >
                   <Printer className="w-4 h-4" />
@@ -3209,6 +3319,19 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* QR ZOOM MODAL FOR INSTANT SCREEN SCANNING */}
+      {zoomQrPayload && (
+        <QrZoomModal
+          isOpen={zoomQrPayload.isOpen}
+          onClose={() => setZoomQrPayload(null)}
+          title={zoomQrPayload.title}
+          subtitle={zoomQrPayload.subtitle}
+          payload={zoomQrPayload.payload}
+          isLight={isLight}
+          language={language}
+        />
       )}
 
     </div>

@@ -40,7 +40,9 @@ import {
   CheckSquare,
   Square,
   Wrench,
-  Disc
+  Disc,
+  Copy,
+  Eye
 } from 'lucide-react';
 
 import { 
@@ -74,6 +76,7 @@ export interface ActiveCuttingPoint {
   order: number;
   specText?: string;
   description?: string;
+  judgeType?: 'appearance' | 'go_no_go' | 'general';
 }
 
 interface CuttingDimensionAppProps {
@@ -175,17 +178,17 @@ const DEFAULT_PROFILES: CuttingProfileSpec[] = [
     bendingMax: '1.50',
     bendingIsSC: false,
     bendingMicroType: 'None',
-    bendingOrder: 6,
+    bendingOrder: 8,
     camberName: 'ความคด Camber',
     camberMax: '1.00',
     camberIsSC: false,
     camberMicroType: 'None',
-    camberOrder: 7,
+    camberOrder: 9,
     twistName: 'ความบิด Twist',
     twistMax: '0.50',
     twistIsSC: false,
     twistMicroType: 'None',
-    twistOrder: 8,
+    twistOrder: 10,
     customControlPoints: [
       {
         id: 'cp-w2',
@@ -212,9 +215,31 @@ const DEFAULT_PROFILES: CuttingProfileSpec[] = [
         isSC: false,
         microType: 'None',
         order: 5
+      },
+      {
+        id: 'cp-appearance',
+        name: 'Appearance (ตรวจสภาพผิว/รอยขีดข่วน)',
+        unit: '-',
+        evalType: 'pass_fail',
+        description: 'ตรวจรอยขีดข่วน ครีบ และความสะอาดผิวงาน',
+        isSC: true,
+        microType: 'None',
+        order: 6,
+        judgeType: 'appearance'
+      },
+      {
+        id: 'cp-gonogo',
+        name: 'Go/No-Go Gauge (เกจตรวจขนาดความกว้าง)',
+        unit: '-',
+        evalType: 'pass_fail',
+        description: 'เกจตรวจขนาดหน้าตัด ต้องผ่าน Go และไม่ผ่าน No-Go',
+        isSC: true,
+        microType: 'None',
+        order: 7,
+        judgeType: 'go_no_go'
       }
     ],
-    pointOrderList: ['width', 'height', 'length', 'cp-w2', 'cp-angle', 'bending', 'camber', 'twist']
+    pointOrderList: ['width', 'height', 'length', 'cp-w2', 'cp-angle', 'cp-appearance', 'cp-gonogo', 'bending', 'camber', 'twist']
   },
   { 
     name: 'HEAVY-CUT-PROFILE-200', 
@@ -295,7 +320,9 @@ const INITIAL_INSPECTIONS: CuttingInspectionRecord[] = [
     twist: '0.20',
     customPointValues: {
       'cp-w2': '25.08',
-      'cp-angle': '45.2'
+      'cp-angle': '45.2',
+      'cp-appearance': 'PASS',
+      'cp-gonogo': 'PASS'
     },
     status: 'Pass',
     profileName: 'CUT-PROFILE-STD-100',
@@ -723,6 +750,122 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     setProfileStatus('found');
   };
 
+  const handleCopyProfile = (sourceProfile: CuttingProfileSpec) => {
+    // Generate a unique new profile name e.g. "NAME_COPY" or "NAME_COPY_2"
+    let copyName = `${sourceProfile.name}_COPY`;
+    let counter = 2;
+    while (savedProfiles.some(p => p.name.toLowerCase() === copyName.toLowerCase())) {
+      copyName = `${sourceProfile.name}_COPY_${counter}`;
+      counter++;
+    }
+
+    // Clone custom control points with fresh IDs
+    const clonedCustomPoints: CuttingCustomPointSpec[] = (sourceProfile.customControlPoints || []).map(cp => ({
+      ...cp,
+      id: `cp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+    }));
+
+    setHeaderInfo(prev => ({
+      ...prev,
+      profileName: copyName,
+      partNo: sourceProfile.partNo ? `${sourceProfile.partNo}` : '',
+      widthName: sourceProfile.widthName || 'ความกว้าง (Width)',
+      widthTarget: formatSpecValue(sourceProfile.widthTarget),
+      widthTolPlus: formatSpecValue(sourceProfile.widthTolPlus),
+      widthTolMinus: formatSpecValue(sourceProfile.widthTolMinus),
+      widthIsSC: sourceProfile.widthIsSC ?? true,
+      widthMicroType: sourceProfile.widthMicroType || 'Blade',
+      widthOrder: sourceProfile.widthOrder ?? 1,
+      heightName: sourceProfile.heightName || 'ความสูง (Height)',
+      heightTarget: formatSpecValue(sourceProfile.heightTarget),
+      heightTolPlus: formatSpecValue(sourceProfile.heightTolPlus),
+      heightTolMinus: formatSpecValue(sourceProfile.heightTolMinus),
+      heightIsSC: sourceProfile.heightIsSC ?? true,
+      heightMicroType: sourceProfile.heightMicroType || 'Blade',
+      heightOrder: sourceProfile.heightOrder ?? 2,
+      lengthName: sourceProfile.lengthName || 'ความยาว (Length)',
+      lengthTarget: formatSpecValue(sourceProfile.lengthTarget),
+      lengthTolPlus: formatSpecValue(sourceProfile.lengthTolPlus),
+      lengthTolMinus: formatSpecValue(sourceProfile.lengthTolMinus),
+      lengthIsSC: sourceProfile.lengthIsSC ?? false,
+      lengthMicroType: sourceProfile.lengthMicroType || 'None',
+      lengthOrder: sourceProfile.lengthOrder ?? 3,
+      bendingName: sourceProfile.bendingName || 'ความโก่ง (Bending)',
+      bendingMax: formatSpecValue(sourceProfile.bendingMax),
+      bendingIsSC: sourceProfile.bendingIsSC ?? false,
+      bendingMicroType: sourceProfile.bendingMicroType || 'None',
+      bendingOrder: sourceProfile.bendingOrder ?? 6,
+      camberName: sourceProfile.camberName || 'ความคด (Camber)',
+      camberMax: formatSpecValue(sourceProfile.camberMax),
+      camberIsSC: sourceProfile.camberIsSC ?? false,
+      camberMicroType: sourceProfile.camberMicroType || 'None',
+      camberOrder: sourceProfile.camberOrder ?? 7,
+      twistName: sourceProfile.twistName || 'ความบิด (Twist)',
+      twistMax: formatSpecValue(sourceProfile.twistMax),
+      twistIsSC: sourceProfile.twistIsSC ?? false,
+      twistMicroType: sourceProfile.twistMicroType || 'None',
+      twistOrder: sourceProfile.twistOrder ?? 8,
+      customControlPoints: clonedCustomPoints,
+      pointOrderList: sourceProfile.pointOrderList ? [...sourceProfile.pointOrderList] : []
+    }));
+    setProfileStatus('not-found');
+    showNotification(
+      isTh 
+        ? `คัดลอก Profile "${sourceProfile.name}" เป็น "${copyName}" แล้ว — สามารถแก้ไขชื่อและค่าที่ต้องการ แล้วกด "บันทึก Profile Spec"` 
+        : `Copied "${sourceProfile.name}" to "${copyName}". Edit fields as needed and click Save Profile Spec.`
+    );
+  };
+
+  const handleCopyCurrentProfile = () => {
+    if (!headerInfo.profileName) {
+      showNotification(isTh ? 'กรุณาเลือก Profile ที่ต้องการคัดลอก' : 'Please select a profile to copy', 'error');
+      return;
+    }
+    const currentProfile: CuttingProfileSpec = {
+      name: headerInfo.profileName,
+      partNo: headerInfo.partNo,
+      widthName: headerInfo.widthName,
+      widthTarget: headerInfo.widthTarget,
+      widthTolPlus: headerInfo.widthTolPlus,
+      widthTolMinus: headerInfo.widthTolMinus,
+      widthIsSC: headerInfo.widthIsSC,
+      widthMicroType: headerInfo.widthMicroType,
+      widthOrder: headerInfo.widthOrder,
+      heightName: headerInfo.heightName,
+      heightTarget: headerInfo.heightTarget,
+      heightTolPlus: headerInfo.heightTolPlus,
+      heightTolMinus: headerInfo.heightTolMinus,
+      heightIsSC: headerInfo.heightIsSC,
+      heightMicroType: headerInfo.heightMicroType,
+      heightOrder: headerInfo.heightOrder,
+      lengthName: headerInfo.lengthName,
+      lengthTarget: headerInfo.lengthTarget,
+      lengthTolPlus: headerInfo.lengthTolPlus,
+      lengthTolMinus: headerInfo.lengthTolMinus,
+      lengthIsSC: headerInfo.lengthIsSC,
+      lengthMicroType: headerInfo.lengthMicroType,
+      lengthOrder: headerInfo.lengthOrder,
+      bendingName: headerInfo.bendingName,
+      bendingMax: headerInfo.bendingMax,
+      bendingIsSC: headerInfo.bendingIsSC,
+      bendingMicroType: headerInfo.bendingMicroType,
+      bendingOrder: headerInfo.bendingOrder,
+      camberName: headerInfo.camberName,
+      camberMax: headerInfo.camberMax,
+      camberIsSC: headerInfo.camberIsSC,
+      camberMicroType: headerInfo.camberMicroType,
+      camberOrder: headerInfo.camberOrder,
+      twistName: headerInfo.twistName,
+      twistMax: headerInfo.twistMax,
+      twistIsSC: headerInfo.twistIsSC,
+      twistMicroType: headerInfo.twistMicroType,
+      twistOrder: headerInfo.twistOrder,
+      customControlPoints: headerInfo.customControlPoints,
+      pointOrderList: headerInfo.pointOrderList
+    };
+    handleCopyProfile(currentProfile);
+  };
+
   useEffect(() => {
     if (headerInfo.profileName) {
       const match = savedProfiles.find(p => p.name.toLowerCase() === headerInfo.profileName.toLowerCase());
@@ -811,7 +954,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       newPoint = {
         id: newId,
         name: templateOrType.name || 'จุดควบคุมพิเศษ',
-        unit: templateOrType.unit || 'mm',
+        unit: templateOrType.unit || (templateOrType.evalType === 'pass_fail' ? '-' : 'mm'),
         evalType: templateOrType.evalType || 'target_tol',
         target: templateOrType.target || '',
         tolPlus: templateOrType.tolPlus || '',
@@ -819,10 +962,21 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         maxLimit: templateOrType.maxLimit || '',
         minLimit: templateOrType.minLimit || '',
         description: templateOrType.description || '',
-        isSC: templateOrType.isSC ?? false,
-        microType: templateOrType.microType || 'Blade',
-        order: templateOrType.order ?? nextOrder
+        isSC: templateOrType.isSC ?? (templateOrType.evalType === 'pass_fail' ? true : false),
+        microType: templateOrType.microType || 'None',
+        order: templateOrType.order ?? nextOrder,
+        judgeType: templateOrType.judgeType || (templateOrType.evalType === 'pass_fail' ? 'appearance' : undefined)
       };
+    } else if (templateOrType === 'appearance') {
+      newPoint = { id: newId, name: 'Appearance (ตรวจสภาพผิว/รอยขูดขีด)', unit: '-', evalType: 'pass_fail', description: 'ตรวจรอยขีดข่วน ครีบ และความสะอาดผิวงาน', isSC: true, microType: 'None', order: nextOrder, judgeType: 'appearance' };
+    } else if (templateOrType === 'burr') {
+      newPoint = { id: newId, name: 'Burr Check (ตรวจครีบตัด)', unit: '-', evalType: 'pass_fail', description: 'ตรวจครีบขอบตัด ไม่มีความคมเกินสเปก', isSC: true, microType: 'None', order: nextOrder, judgeType: 'appearance' };
+    } else if (templateOrType === 'gonogo') {
+      newPoint = { id: newId, name: 'Go/No-Go Gauge (เกจตรวจขนาด)', unit: '-', evalType: 'pass_fail', description: 'เกจตรวจขนาด ชิ้นงานต้องผ่าน Go และติด No-Go', isSC: true, microType: 'None', order: nextOrder, judgeType: 'go_no_go' };
+    } else if (templateOrType === 'pin_gauge') {
+      newPoint = { id: newId, name: 'Pin Gauge (เกจตรวจรูเจาะ)', unit: '-', evalType: 'pass_fail', description: 'ตรวจขนาดเส้นผ่านศูนย์กลางรูด้วย Pin Gauge', isSC: true, microType: 'None', order: nextOrder, judgeType: 'go_no_go' };
+    } else if (templateOrType === 'snap_gauge') {
+      newPoint = { id: newId, name: 'Snap Gauge (เกจตรวจความหนา)', unit: '-', evalType: 'pass_fail', description: 'ตรวจขนาดความหนาด้วย Snap Gauge', isSC: true, microType: 'None', order: nextOrder, judgeType: 'go_no_go' };
     } else if (templateOrType === 'w2') {
       newPoint = { id: newId, name: 'ความกว้าง W2 (Side Width)', unit: 'mm', evalType: 'target_tol', target: '25.00', tolPlus: '0.20', tolMinus: '0.20', description: 'วัดความกว้างปีกข้างตำแหน่งที่ 2', isSC: true, microType: 'Blade', order: nextOrder };
     } else if (templateOrType === 'flange') {
@@ -907,6 +1061,14 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   const validateCustomPoint = (valStr: string | undefined, point: CuttingCustomPointSpec): 'Pass' | 'Fail' | 'Pending' => {
     if (isIgnoredValue(valStr)) return 'Pending';
     const s = String(valStr).trim();
+
+    if (point.evalType === 'pass_fail') {
+      const upper = s.toUpperCase();
+      if (['PASS', 'P', 'OK', 'GO', 'ผ่าน', 'NORMAL', 'GOOD'].includes(upper)) return 'Pass';
+      if (['FAIL', 'F', 'NG', 'NO GO', 'NOGO', 'NO-GO', 'ไม่ผ่าน', 'DEFECT', 'REJECT'].includes(upper)) return 'Fail';
+      return 'Pending';
+    }
+
     const v = parseFloat(s);
     if (isNaN(v)) return 'Pending';
 
@@ -1163,6 +1325,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         specStr = `≤ ${cp.maxLimit}`;
       } else if (cp.evalType === 'min_only') {
         specStr = `≥ ${cp.minLimit}`;
+      } else if (cp.evalType === 'pass_fail') {
+        specStr = 'PASS / NG';
       }
 
       list.push({
@@ -1170,9 +1334,9 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         name: cp.name,
         isStandard: false,
         isSC: cp.isSC ?? false,
-        microType: cp.microType || 'Blade',
+        microType: cp.microType || (cp.evalType === 'pass_fail' ? 'None' : 'Blade'),
         order: cp.order ?? (4 + idx),
-        unit: cp.unit,
+        unit: cp.evalType === 'pass_fail' ? (cp.unit || '-') : cp.unit,
         evalType: cp.evalType,
         target: cp.target,
         tolPlus: cp.tolPlus,
@@ -1180,7 +1344,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         maxLimit: cp.maxLimit,
         minLimit: cp.minLimit,
         specText: specStr,
-        description: cp.description
+        description: cp.description,
+        judgeType: cp.judgeType || (cp.name.toLowerCase().includes('appearance') || cp.name.includes('ผิว') ? 'appearance' : cp.name.toLowerCase().includes('gauge') || cp.name.includes('เกจ') ? 'go_no_go' : 'general')
       });
     });
 
@@ -1393,6 +1558,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     headerInfo.customControlPoints.forEach(cp => {
       if (cp.evalType === 'target_tol' && cp.target) {
         initialCustomVals[cp.id] = cp.target;
+      } else if (cp.evalType === 'pass_fail') {
+        initialCustomVals[cp.id] = 'PASS';
       } else {
         initialCustomVals[cp.id] = '';
       }
@@ -1443,6 +1610,17 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       }
       return item;
     }));
+  };
+
+  const handleSetAllPointValues = (pointId: string, value: string) => {
+    setBatchItems(prevItems => prevItems.map(item => ({
+      ...item,
+      customPointValues: {
+        ...(item.customPointValues || {}),
+        [pointId]: value
+      }
+    })));
+    showNotification(isTh ? `กำหนดค่า "${value}" ให้ทุกแถวแล้ว` : `Set "${value}" for all rows`);
   };
 
   const saveBatch = () => {
@@ -2097,7 +2275,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                               <span className="font-bold">{point.name}</span>
                             </div>
 
-                            {/* Badges: SC Check & Micro Type Tip */}
+                            {/* Badges: SC Check & Micro Type Tip / Gauge Type */}
                             <div className="flex items-center justify-center gap-1 mt-1 flex-wrap">
                               {point.isSC && (
                                 <span 
@@ -2108,23 +2286,56 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                                   <span>SC</span>
                                 </span>
                               )}
-                              <span 
-                                title={isTh ? `ประเภทหัววัด Micrometer: ${point.microType}` : `Micrometer Tip: ${point.microType}`}
-                                className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border flex items-center gap-0.5 ${
-                                  point.microType === 'Blade'
-                                    ? 'bg-amber-950 text-amber-300 border-amber-800/80'
-                                    : point.microType === 'Rod'
-                                    ? 'bg-cyan-950 text-cyan-300 border-cyan-800/80'
-                                    : 'bg-slate-900 text-slate-400 border-slate-800'
-                                }`}
-                              >
-                                {point.microType === 'Blade' ? '🔪 Blade' : point.microType === 'Rod' ? '🦯 Rod' : 'None'}
-                              </span>
+                              {point.evalType === 'pass_fail' ? (
+                                <span 
+                                  title={isTh ? `ประเภท: ${point.judgeType === 'appearance' ? 'Appearance (ตรวจสภาพผิว)' : point.judgeType === 'go_no_go' ? 'Go / No-Go Gauge' : 'Pass / Fail'}` : `Type: ${point.judgeType || 'Pass/Fail'}`}
+                                  className="px-1.5 py-0.5 rounded text-[9px] font-semibold border flex items-center gap-1 bg-emerald-950/80 text-emerald-300 border-emerald-800"
+                                >
+                                  {point.judgeType === 'appearance' ? (
+                                    <>
+                                      <Eye className="w-2.5 h-2.5 text-emerald-400" />
+                                      <span>Appearance</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Ruler className="w-2.5 h-2.5 text-cyan-400" />
+                                      <span>Go/No-Go</span>
+                                    </>
+                                  )}
+                                </span>
+                              ) : (
+                                <span 
+                                  title={isTh ? `ประเภทหัววัด Micrometer: ${point.microType}` : `Micrometer Tip: ${point.microType}`}
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border flex items-center gap-0.5 ${
+                                    point.microType === 'Blade'
+                                      ? 'bg-amber-950 text-amber-300 border-amber-800/80'
+                                      : point.microType === 'Rod'
+                                      ? 'bg-cyan-950 text-cyan-300 border-cyan-800/80'
+                                      : 'bg-slate-900 text-slate-400 border-slate-800'
+                                  }`}
+                                >
+                                  {point.microType === 'Blade' ? '🔪 Blade' : point.microType === 'Rod' ? '🦯 Rod' : 'None'}
+                                </span>
+                              )}
                             </div>
 
                             <div className="text-[9px] font-mono text-slate-400 font-normal mt-0.5">
                               {point.specText}
                             </div>
+
+                            {point.evalType === 'pass_fail' && (
+                              <div className="mt-1 flex items-center justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetAllPointValues(point.id, 'PASS')}
+                                  title={isTh ? 'กดเพื่อตั้งทุกแถวเป็น PASS ทันที' : 'Set all rows to PASS'}
+                                  className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-700/70 hover:bg-emerald-850 hover:text-white transition flex items-center gap-1 shadow-sm"
+                                >
+                                  <Check className="w-2.5 h-2.5 text-emerald-400" />
+                                  <span>{isTh ? 'ทุกแถว PASS' : 'All PASS'}</span>
+                                </button>
+                              </div>
+                            )}
                           </th>
                         );
                       })}
@@ -2208,7 +2419,52 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                               placeholder = point.evalType === 'target_tol' ? (point.target || '0.00')
                                 : point.evalType === 'max_only' ? `≤ ${point.maxLimit}`
                                 : point.evalType === 'min_only' ? `≥ ${point.minLimit}`
+                                : point.evalType === 'pass_fail' ? 'PASS / NG'
                                 : `${point.minLimit}-${point.maxLimit}`;
+                            }
+
+                            if (point.evalType === 'pass_fail') {
+                              const upper = (val || '').toUpperCase();
+                              const isPass = ['PASS', 'P', 'OK', 'GO', 'ผ่าน', 'NORMAL', 'GOOD'].includes(upper);
+                              const isFail = ['FAIL', 'F', 'NG', 'NO GO', 'NOGO', 'NO-GO', 'ไม่ผ่าน', 'DEFECT', 'REJECT'].includes(upper);
+
+                              return (
+                                <td 
+                                  key={point.id} 
+                                  className={`p-2 border-x border-slate-800/40 text-center ${
+                                    point.isSC ? 'bg-amber-950/10' : !point.isStandard ? 'bg-cyan-950/10' : ''
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-center gap-1 min-w-[124px]">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCustomPointValueChange(item.id, point.id, 'PASS')}
+                                      className={`flex-1 py-1.5 px-2 rounded-lg font-bold text-xs transition border flex items-center justify-center gap-1 shadow-sm ${
+                                        isPass 
+                                          ? 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-900/50 scale-[1.02]' 
+                                          : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-emerald-300 hover:border-emerald-800/80 hover:bg-slate-850'
+                                      }`}
+                                      title={isTh ? 'ผ่านเกณฑ์ (PASS)' : 'Pass'}
+                                    >
+                                      <Check className={`w-3.5 h-3.5 ${isPass ? 'text-white stroke-[3]' : 'text-slate-500'}`} />
+                                      <span>PASS</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCustomPointValueChange(item.id, point.id, 'NG')}
+                                      className={`flex-1 py-1.5 px-2 rounded-lg font-bold text-xs transition border flex items-center justify-center gap-1 shadow-sm ${
+                                        isFail 
+                                          ? 'bg-rose-600 text-white border-rose-400 shadow-rose-900/50 scale-[1.02]' 
+                                          : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-rose-300 hover:border-rose-800/80 hover:bg-slate-850'
+                                      }`}
+                                      title={isTh ? 'ไม่ผ่านเกณฑ์ (NG)' : 'No-Go / Fail'}
+                                    >
+                                      <X className={`w-3.5 h-3.5 ${isFail ? 'text-white stroke-[3]' : 'text-slate-500'}`} />
+                                      <span>NG</span>
+                                    </button>
+                                  </div>
+                                </td>
+                              );
                             }
 
                             let borderClass = 'border-slate-800 text-slate-100 focus:border-indigo-500';
@@ -2310,7 +2566,17 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleCopyCurrentProfile}
+                  title={isTh ? 'คัดลอก Profile ปัจจุบันเพื่อลดเวลาในการสร้างใหม่ (แก้ไขเฉพาะรายการที่เปลี่ยน)' : 'Copy current profile to create a new one'}
+                  className="bg-slate-850 hover:bg-slate-800 text-indigo-300 hover:text-white font-bold text-xs px-3.5 py-2.5 rounded-xl transition flex items-center gap-1.5 border border-indigo-900/60 hover:border-indigo-600 shadow-sm"
+                >
+                  <Copy className="w-4 h-4 text-indigo-400" />
+                  <span>{isTh ? 'คัดลอก Profile นี้ (Duplicate)' : 'Copy Profile'}</span>
+                </button>
+
                 <button
                   onClick={handleSaveProfile}
                   className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-lg shadow-indigo-600/20"
@@ -2355,16 +2621,31 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                         <div className="text-[10px] text-slate-400 mt-0.5">Part: {p.partNo || 'N/A'}</div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteConfirm({ type: 'profile', id: p.name, label: p.name });
-                        }}
-                        className="p-1.5 text-slate-500 hover:text-rose-400 transition rounded-lg hover:bg-slate-800"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyProfile(p);
+                          }}
+                          title={isTh ? `คัดลอก Profile "${p.name}" (Duplicate)` : `Copy Profile "${p.name}"`}
+                          className="p-1.5 text-slate-400 hover:text-indigo-300 hover:bg-indigo-950/70 rounded-lg transition border border-transparent hover:border-indigo-800/80"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirm({ type: 'profile', id: p.name, label: p.name });
+                          }}
+                          title={isTh ? `ลบ Profile "${p.name}"` : `Delete Profile "${p.name}"`}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 transition rounded-lg hover:bg-slate-800"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -3116,6 +3397,10 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {[
+                        { name: '👁️ Appearance (สภาพผิว)', unit: '-', evalType: 'pass_fail' as const, judgeType: 'appearance' as const, isSC: true, description: 'ตรวจรอยขีดข่วน ครีบ และความสะอาด' },
+                        { name: '📏 Go/No-Go Gauge', unit: '-', evalType: 'pass_fail' as const, judgeType: 'go_no_go' as const, isSC: true, description: 'เกจตรวจขนาดหน้าตัด (Go/NG)' },
+                        { name: 'Burr Check (ครีบตัด)', unit: '-', evalType: 'pass_fail' as const, judgeType: 'appearance' as const, isSC: true, description: 'ตรวจครีบตัดขอบชิ้นงาน' },
+                        { name: 'Pin Gauge (รูเจาะ)', unit: '-', evalType: 'pass_fail' as const, judgeType: 'go_no_go' as const, isSC: true, description: 'ตรวจขนาดรูเจาะด้วยพินเกจ' },
                         { name: 'Width 2 (W2)', unit: 'mm', evalType: 'target_tol' as const, target: '25.00', tolPlus: '0.20', tolMinus: '0.20', description: 'ความกว้างช่วงที่ 2' },
                         { name: 'Flange Thickness (tf)', unit: 'mm', evalType: 'target_tol' as const, target: '4.00', tolPlus: '0.15', tolMinus: '0.15', description: 'ความหนาปีก' },
                         { name: 'Web Thickness (tw)', unit: 'mm', evalType: 'target_tol' as const, target: '3.20', tolPlus: '0.15', tolMinus: '0.15', description: 'ความหนาเอว' },
@@ -3166,7 +3451,15 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                               </span>
                               <span className="text-xs font-bold text-white font-mono">{cp.name || `Custom Point ${cpIdx + 1}`}</span>
                               <span className="text-[10px] text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                                {cp.evalType === 'target_tol' ? 'Target ± Tol' : cp.evalType === 'max_only' ? 'Max Limit (≤)' : cp.evalType === 'min_only' ? 'Min Limit (≥)' : 'Min-Max Range'}
+                                {cp.evalType === 'target_tol' 
+                                  ? 'Target ± Tol' 
+                                  : cp.evalType === 'max_only' 
+                                  ? 'Max Limit (≤)' 
+                                  : cp.evalType === 'min_only' 
+                                  ? 'Min Limit (≥)' 
+                                  : cp.evalType === 'pass_fail'
+                                  ? (cp.judgeType === 'appearance' ? '👁️ Appearance (PASS/NG)' : cp.judgeType === 'go_no_go' ? '📏 Go/No-Go Gauge' : '✔️ PASS/NG')
+                                  : 'Min-Max Range'}
                               </span>
                               {cp.isSC && (
                                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/50 flex items-center gap-1">
@@ -3223,30 +3516,53 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                               </label>
                               <select
                                 value={cp.evalType}
-                                onChange={(e) => handleUpdateCustomPoint(cp.id, 'evalType', e.target.value as any)}
+                                onChange={(e) => {
+                                  const newType = e.target.value as any;
+                                  handleUpdateCustomPoint(cp.id, 'evalType', newType);
+                                  if (newType === 'pass_fail') {
+                                    if (!cp.unit || cp.unit === 'mm') handleUpdateCustomPoint(cp.id, 'unit', '-');
+                                    if (!cp.judgeType) handleUpdateCustomPoint(cp.id, 'judgeType', 'appearance');
+                                    handleUpdateCustomPoint(cp.id, 'microType', 'None');
+                                  }
+                                }}
                                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-cyan-300 font-semibold focus:outline-none focus:border-cyan-500"
                               >
                                 <option value="target_tol">{isTh ? 'Target ± ค่าเผื่อ (Tol)' : 'Target ± Tolerance'}</option>
                                 <option value="max_only">{isTh ? 'กำหนดค่าสูงสุด (≤ Max Limit)' : 'Max Limit Only (≤)'}</option>
                                 <option value="min_only">{isTh ? 'กำหนดค่าต่ำสุด (≥ Min Limit)' : 'Min Limit Only (≥)'}</option>
                                 <option value="min_max">{isTh ? 'ช่วงต่ำสุด-สูงสุด (Min - Max Range)' : 'Min - Max Range'}</option>
+                                <option value="pass_fail">{isTh ? '✔️ ผ่าน/ไม่ผ่าน (PASS/NG - Appearance, Go/No-Go Gauge)' : '✔️ Pass/Fail (PASS/NG - Appearance, Go-No-Go)'}</option>
                               </select>
                             </div>
 
-                            {/* Micro Type */}
+                            {/* Micro Type or Gauge Category */}
                             <div>
                               <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                                {isTh ? 'Micro Type (หัววัด)' : 'Micro Type'}
+                                {cp.evalType === 'pass_fail' 
+                                  ? (isTh ? 'เกณฑ์ตัดสิน (Judge Type)' : 'Judge Type')
+                                  : (isTh ? 'Micro Type (หัววัด)' : 'Micro Type')}
                               </label>
-                              <select
-                                value={cp.microType || 'Blade'}
-                                onChange={(e) => handleUpdateCustomPoint(cp.id, 'microType', e.target.value as MicroType)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-amber-300 font-semibold focus:outline-none focus:border-cyan-500"
-                              >
-                                <option value="Blade">Blade</option>
-                                <option value="Rod">Rod</option>
-                                <option value="None">None</option>
-                              </select>
+                              {cp.evalType === 'pass_fail' ? (
+                                <select
+                                  value={cp.judgeType || 'appearance'}
+                                  onChange={(e) => handleUpdateCustomPoint(cp.id, 'judgeType', e.target.value as any)}
+                                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-emerald-300 font-semibold focus:outline-none focus:border-cyan-500"
+                                >
+                                  <option value="appearance">{isTh ? '👁️ Appearance (สภาพผิว)' : '👁️ Appearance'}</option>
+                                  <option value="go_no_go">{isTh ? '📏 Go / No-Go Gauge' : '📏 Go / No-Go Gauge'}</option>
+                                  <option value="general">{isTh ? '✔️ General Pass/Fail' : '✔️ General Pass/Fail'}</option>
+                                </select>
+                              ) : (
+                                <select
+                                  value={cp.microType || 'Blade'}
+                                  onChange={(e) => handleUpdateCustomPoint(cp.id, 'microType', e.target.value as MicroType)}
+                                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-amber-300 font-semibold focus:outline-none focus:border-cyan-500"
+                                >
+                                  <option value="Blade">Blade</option>
+                                  <option value="Rod">Rod</option>
+                                  <option value="None">None</option>
+                                </select>
+                              )}
                             </div>
 
                             {/* Unit */}
@@ -3259,7 +3575,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                                   type="text"
                                   value={cp.unit}
                                   onChange={(e) => handleUpdateCustomPoint(cp.id, 'unit', e.target.value)}
-                                  placeholder="mm, deg, mm/m"
+                                  placeholder={cp.evalType === 'pass_fail' ? '-' : 'mm, deg, mm/m'}
                                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
                                 />
                               </div>
@@ -3274,7 +3590,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                                 type="text"
                                 value={cp.description || ''}
                                 onChange={(e) => handleUpdateCustomPoint(cp.id, 'description', e.target.value)}
-                                placeholder={isTh ? 'เช่น จุดกึ่งกลางชิ้นงาน' : 'e.g. Center position'}
+                                placeholder={isTh ? 'เช่น ตรวจรอยขูดขีด ครีบตัด หรือเกจสวม' : 'e.g. Surface scratches, burr or gauge fit'}
                                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-300 text-xs focus:outline-none focus:border-cyan-500"
                               />
                             </div>
@@ -3282,6 +3598,39 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
                           {/* Dynamic Numeric Limit Inputs based on EvalType */}
                           <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
+                            {cp.evalType === 'pass_fail' && (
+                              <div className="p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-emerald-300 flex items-center gap-1">
+                                      {cp.judgeType === 'appearance' ? <Eye className="w-3.5 h-3.5 text-emerald-400" /> : <Ruler className="w-3.5 h-3.5 text-cyan-400" />}
+                                      {cp.judgeType === 'appearance' 
+                                        ? (isTh ? 'จุดตรวจลักษณะภายนอก (Appearance Inspection)' : 'Appearance Visual Inspection')
+                                        : cp.judgeType === 'go_no_go' 
+                                        ? (isTh ? 'เกจวัดขนาด Go / No-Go Gauge Inspection' : 'Go / No-Go Gauge Inspection')
+                                        : (isTh ? 'การตัดสินแบบผ่าน/ไม่ผ่าน (Pass/Fail Decision)' : 'Pass / Fail Decision')}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-900/60 text-emerald-200 border border-emerald-700 font-mono">
+                                      PASS / NG ONLY
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-slate-400">
+                                    {isTh 
+                                      ? 'ในตารางบันทึกการวัดจะมีปุ่มลัด [PASS] และ [NG] ให้ผู้ตรวจสอบคลิกเลือกได้ทันที หรือกดปุ่ม "ทุกแถว PASS" ที่หัวตาราง' 
+                                      : 'Interactive [PASS] and [NG] buttons will be provided in the measurement table with quick bulk-pass options.'}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <div className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-300 flex items-center gap-2">
+                                    <span className="text-emerald-400 font-bold">✓ PASS</span>
+                                    <span className="text-slate-600">|</span>
+                                    <span className="text-rose-400 font-bold">✕ NG</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             {cp.evalType === 'target_tol' && (
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>

@@ -18,7 +18,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { BilletCuttingRecord, Language } from '../../types';
-import { ADMIN_PASSWORD } from './mockBilletData';
+import { ADMIN_PASSWORD, checkAdminPassword } from './mockBilletData';
 
 interface BilletCuttingHistoryProps {
   records: BilletCuttingRecord[];
@@ -99,7 +99,7 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
   // Auth Handler
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput.trim() === ADMIN_PASSWORD) {
+    if (checkAdminPassword(passwordInput)) {
       setIsAuthModalOpen(false);
       setPasswordInput('');
       setAuthError(false);
