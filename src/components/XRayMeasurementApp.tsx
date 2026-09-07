@@ -825,86 +825,74 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
 
   // Add / Remove Zn Point
   const addZnPoint = () => {
-    setZnPointCount(prev => {
-      const newCount = prev + 1;
-      setBatchItems(items => items.map(it => ({
-        ...it,
-        raUp: [...it.raUp, ''],
-        raLo: [...it.raLo, '']
-      })));
-      return newCount;
-    });
-    showNotification(isTh ? `เพิ่มจุดวัด Zn weight เป็น ${znPointCount + 1} จุด` : `Added Zn weight point (${znPointCount + 1} points total)`);
+    const newCount = znPointCount + 1;
+    setZnPointCount(newCount);
+    setBatchItems(items => items.map(it => ({
+      ...it,
+      raUp: [...(Array.isArray(it.raUp) ? it.raUp : [it.raUp || '']), ''],
+      raLo: [...(Array.isArray(it.raLo) ? it.raLo : [it.raLo || '']), '']
+    })));
+    showNotification(isTh ? `เพิ่มจุดวัด Zn weight เป็น ${newCount} จุด` : `Added Zn weight point (${newCount} points total)`);
   };
 
   const removeZnPoint = () => {
     if (znPointCount <= 1) return;
-    setZnPointCount(prev => {
-      const newCount = Math.max(1, prev - 1);
-      setBatchItems(items => items.map(it => ({
-        ...it,
-        raUp: it.raUp.slice(0, newCount),
-        raLo: it.raLo.slice(0, newCount)
-      })));
-      return newCount;
-    });
-    showNotification(isTh ? `ลดจุดวัด Zn weight เหลือ ${znPointCount - 1} จุด` : `Reduced Zn weight point`);
+    const newCount = znPointCount - 1;
+    setZnPointCount(newCount);
+    setBatchItems(items => items.map(it => ({
+      ...it,
+      raUp: (Array.isArray(it.raUp) ? it.raUp : [it.raUp || '']).slice(0, newCount),
+      raLo: (Array.isArray(it.raLo) ? it.raLo : [it.raLo || '']).slice(0, newCount)
+    })));
+    showNotification(isTh ? `ลดจุดวัด Zn weight เหลือ ${newCount} จุด` : `Reduced Zn weight point (${newCount} points)`);
   };
 
   // Add / Remove Flux Point
   const addFluxPoint = () => {
-    setFluxPointCount(prev => {
-      const newCount = prev + 1;
-      setBatchItems(items => items.map(it => ({
-        ...it,
-        rzUp: [...it.rzUp, ''],
-        rzLo: [...it.rzLo, '']
-      })));
-      return newCount;
-    });
-    showNotification(isTh ? `เพิ่มจุดวัด Flux weight เป็น ${fluxPointCount + 1} จุด` : `Added Flux weight point (${fluxPointCount + 1} points total)`);
+    const newCount = fluxPointCount + 1;
+    setFluxPointCount(newCount);
+    setBatchItems(items => items.map(it => ({
+      ...it,
+      rzUp: [...(Array.isArray(it.rzUp) ? it.rzUp : [it.rzUp || '']), ''],
+      rzLo: [...(Array.isArray(it.rzLo) ? it.rzLo : [it.rzLo || '']), '']
+    })));
+    showNotification(isTh ? `เพิ่มจุดวัด Flux weight เป็น ${newCount} จุด` : `Added Flux weight point (${newCount} points total)`);
   };
 
   const removeFluxPoint = () => {
     if (fluxPointCount <= 1) return;
-    setFluxPointCount(prev => {
-      const newCount = Math.max(1, prev - 1);
-      setBatchItems(items => items.map(it => ({
-        ...it,
-        rzUp: it.rzUp.slice(0, newCount),
-        rzLo: it.rzLo.slice(0, newCount)
-      })));
-      return newCount;
-    });
-    showNotification(isTh ? `ลดจุดวัด Flux weight เหลือ ${fluxPointCount - 1} จุด` : `Reduced Flux weight point`);
+    const newCount = fluxPointCount - 1;
+    setFluxPointCount(newCount);
+    setBatchItems(items => items.map(it => ({
+      ...it,
+      rzUp: (Array.isArray(it.rzUp) ? it.rzUp : [it.rzUp || '']).slice(0, newCount),
+      rzLo: (Array.isArray(it.rzLo) ? it.rzLo : [it.rzLo || '']).slice(0, newCount)
+    })));
+    showNotification(isTh ? `ลดจุดวัด Flux weight เหลือ ${newCount} จุด` : `Reduced Flux weight point (${newCount} points)`);
   };
 
   // Add / Remove Coverage Point
   const addCoveragePoint = () => {
-    setCoveragePointCount(prev => {
-      const newCount = prev + 1;
-      setBatchItems(items => items.map(it => ({
-        ...it,
-        rtUp: [...it.rtUp, ''],
-        rtLo: [...it.rtLo, '']
-      })));
-      return newCount;
-    });
-    showNotification(isTh ? `เพิ่มจุดวัด Coverage % เป็น ${coveragePointCount + 1} จุด` : `Added Coverage point (${coveragePointCount + 1} points total)`);
+    const newCount = coveragePointCount + 1;
+    setCoveragePointCount(newCount);
+    setBatchItems(items => items.map(it => ({
+      ...it,
+      rtUp: [...(Array.isArray(it.rtUp) ? it.rtUp : [it.rtUp || '']), ''],
+      rtLo: [...(Array.isArray(it.rtLo) ? it.rtLo : [it.rtLo || '']), '']
+    })));
+    showNotification(isTh ? `เพิ่มจุดวัด Coverage % เป็น ${newCount} จุด` : `Added Coverage point (${newCount} points total)`);
   };
 
   const removeCoveragePoint = () => {
     if (coveragePointCount <= 1) return;
-    setCoveragePointCount(prev => {
-      const newCount = Math.max(1, prev - 1);
-      setBatchItems(items => items.map(it => ({
-        ...it,
-        rtUp: it.rtUp.slice(0, newCount),
-        rtLo: it.rtLo.slice(0, newCount)
-      })));
-      return newCount;
-    });
-    showNotification(isTh ? `ลดจุดวัด Coverage % เหลือ ${coveragePointCount - 1} จุด` : `Reduced Coverage point`);
+    const newCount = coveragePointCount - 1;
+    setCoveragePointCount(newCount);
+    setBatchItems(items => items.map(it => ({
+      ...it,
+      rtUp: (Array.isArray(it.rtUp) ? it.rtUp : [it.rtUp || '']).slice(0, newCount),
+      rtLo: (Array.isArray(it.rtLo) ? it.rtLo : [it.rtLo || '']).slice(0, newCount)
+    })));
+    showNotification(isTh ? `ลดจุดวัด Coverage % เหลือ ${newCount} จุด` : `Reduced Coverage point (${newCount} points)`);
   };
 
   const handleResetForm = () => {
@@ -1669,49 +1657,139 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                       
                       {/* Zn Weight Header */}
                       <th 
-                        className="px-3 py-2 text-center bg-indigo-950/40 text-indigo-300 border-l border-slate-800" 
+                        className="px-2 py-2 text-center bg-indigo-950/40 text-indigo-300 border-l border-slate-800" 
                         colSpan={znPointCount * 2 + (znPointCount > 1 ? 1 : 0)}
                       >
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span>Zn weight (Up / Lo)</span>
-                          <span className="text-[9px] text-indigo-400/80 font-normal">(g/m²)</span>
-                          {znPointCount > 1 && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-200 border border-indigo-700/50">
+                        <div className="flex items-center justify-center gap-2 flex-wrap">
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold">Zn weight (Up / Lo)</span>
+                            <span className="text-[9px] text-indigo-400/80 font-normal font-mono">(g/m²)</span>
+                          </div>
+
+                          {/* + and - buttons on column header */}
+                          <div className="flex items-center gap-1 bg-slate-950/90 px-1.5 py-0.5 rounded-lg border border-indigo-900/70 shadow-xs">
+                            <button
+                              type="button"
+                              onClick={removeZnPoint}
+                              disabled={znPointCount <= 1}
+                              title={isTh ? 'ลดจุดวัด Zn weight (-1 จุด)' : 'Remove Zn weight point (-1 pt)'}
+                              className={`w-5 h-5 rounded flex items-center justify-center font-bold text-xs transition ${
+                                znPointCount <= 1
+                                  ? 'text-slate-600 bg-slate-900/40 cursor-not-allowed'
+                                  : 'text-rose-400 bg-rose-950/50 hover:bg-rose-900 hover:text-white border border-rose-800/60 active:scale-95'
+                              }`}
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+
+                            <span 
+                              className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-900/80 text-indigo-200 min-w-[36px] text-center"
+                              title={isTh ? `จำนวนจุดวัด Zn weight: ${znPointCount} จุด` : `Zn weight points: ${znPointCount}`}
+                            >
                               {znPointCount} {isTh ? 'จุด' : 'Pts'}
                             </span>
-                          )}
+
+                            <button
+                              type="button"
+                              onClick={addZnPoint}
+                              title={isTh ? 'เพิ่มจุดวัด Zn weight (+1 จุด)' : 'Add Zn weight point (+1 pt)'}
+                              className="w-5 h-5 rounded flex items-center justify-center font-bold text-xs text-emerald-400 bg-emerald-950/60 hover:bg-emerald-800 hover:text-white border border-emerald-700/60 transition active:scale-95"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                       </th>
 
                       {/* Flux Weight Header */}
                       <th 
-                        className="px-3 py-2 text-center bg-emerald-950/40 text-emerald-300 border-l border-slate-800" 
+                        className="px-2 py-2 text-center bg-emerald-950/40 text-emerald-300 border-l border-slate-800" 
                         colSpan={fluxPointCount * 2 + (fluxPointCount > 1 ? 1 : 0)}
                       >
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span>Flux weight (Up / Lo)</span>
-                          <span className="text-[9px] text-emerald-400/80 font-normal">(g/m²)</span>
-                          {fluxPointCount > 1 && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-900/60 text-emerald-200 border border-emerald-700/50">
+                        <div className="flex items-center justify-center gap-2 flex-wrap">
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold">Flux weight (Up / Lo)</span>
+                            <span className="text-[9px] text-emerald-400/80 font-normal font-mono">(g/m²)</span>
+                          </div>
+
+                          {/* + and - buttons on column header */}
+                          <div className="flex items-center gap-1 bg-slate-950/90 px-1.5 py-0.5 rounded-lg border border-emerald-900/70 shadow-xs">
+                            <button
+                              type="button"
+                              onClick={removeFluxPoint}
+                              disabled={fluxPointCount <= 1}
+                              title={isTh ? 'ลดจุดวัด Flux weight (-1 จุด)' : 'Remove Flux weight point (-1 pt)'}
+                              className={`w-5 h-5 rounded flex items-center justify-center font-bold text-xs transition ${
+                                fluxPointCount <= 1
+                                  ? 'text-slate-600 bg-slate-900/40 cursor-not-allowed'
+                                  : 'text-rose-400 bg-rose-950/50 hover:bg-rose-900 hover:text-white border border-rose-800/60 active:scale-95'
+                              }`}
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+
+                            <span 
+                              className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-900/80 text-emerald-200 min-w-[36px] text-center"
+                              title={isTh ? `จำนวนจุดวัด Flux weight: ${fluxPointCount} จุด` : `Flux weight points: ${fluxPointCount}`}
+                            >
                               {fluxPointCount} {isTh ? 'จุด' : 'Pts'}
                             </span>
-                          )}
+
+                            <button
+                              type="button"
+                              onClick={addFluxPoint}
+                              title={isTh ? 'เพิ่มจุดวัด Flux weight (+1 จุด)' : 'Add Flux weight point (+1 pt)'}
+                              className="w-5 h-5 rounded flex items-center justify-center font-bold text-xs text-emerald-400 bg-emerald-950/60 hover:bg-emerald-800 hover:text-white border border-emerald-700/60 transition active:scale-95"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                       </th>
 
                       {/* Coverage % Header */}
                       <th 
-                        className="px-3 py-2 text-center bg-amber-950/40 text-amber-300 border-l border-slate-800" 
+                        className="px-2 py-2 text-center bg-amber-950/40 text-amber-300 border-l border-slate-800" 
                         colSpan={coveragePointCount * 2 + (coveragePointCount > 1 ? 1 : 0)}
                       >
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span>Coverage % (Up / Lo)</span>
-                          <span className="text-[9px] text-amber-400/80 font-normal">(%)</span>
-                          {coveragePointCount > 1 && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-900/60 text-amber-200 border border-amber-700/50">
+                        <div className="flex items-center justify-center gap-2 flex-wrap">
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold">Coverage % (Up / Lo)</span>
+                            <span className="text-[9px] text-amber-400/80 font-normal font-mono">(%)</span>
+                          </div>
+
+                          {/* + and - buttons on column header */}
+                          <div className="flex items-center gap-1 bg-slate-950/90 px-1.5 py-0.5 rounded-lg border border-amber-900/70 shadow-xs">
+                            <button
+                              type="button"
+                              onClick={removeCoveragePoint}
+                              disabled={coveragePointCount <= 1}
+                              title={isTh ? 'ลดจุดวัด Coverage % (-1 จุด)' : 'Remove Coverage point (-1 pt)'}
+                              className={`w-5 h-5 rounded flex items-center justify-center font-bold text-xs transition ${
+                                coveragePointCount <= 1
+                                  ? 'text-slate-600 bg-slate-900/40 cursor-not-allowed'
+                                  : 'text-rose-400 bg-rose-950/50 hover:bg-rose-900 hover:text-white border border-rose-800/60 active:scale-95'
+                              }`}
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+
+                            <span 
+                              className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-900/80 text-amber-200 min-w-[36px] text-center"
+                              title={isTh ? `จำนวนจุดวัด Coverage %: ${coveragePointCount} จุด` : `Coverage points: ${coveragePointCount}`}
+                            >
                               {coveragePointCount} {isTh ? 'จุด' : 'Pts'}
                             </span>
-                          )}
+
+                            <button
+                              type="button"
+                              onClick={addCoveragePoint}
+                              title={isTh ? 'เพิ่มจุดวัด Coverage % (+1 จุด)' : 'Add Coverage point (+1 pt)'}
+                              className="w-5 h-5 rounded flex items-center justify-center font-bold text-xs text-emerald-400 bg-emerald-950/60 hover:bg-emerald-800 hover:text-white border border-emerald-700/60 transition active:scale-95"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                       </th>
 
