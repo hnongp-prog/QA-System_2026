@@ -42,7 +42,8 @@ import {
   Wrench,
   Disc,
   Copy,
-  Eye
+  Eye,
+  Calculator
 } from 'lucide-react';
 
 import { 
@@ -57,6 +58,12 @@ import {
 import { useCloudState } from '../services/firestoreSync';
 import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
 import { STANDARD_PROCESS_OPTIONS, STANDARD_MACHINE_OPTIONS } from '../constants/processOptions';
+import {
+  evaluatePointFormula,
+  getAvailablePointVariables,
+  previewFormulaWithTargets,
+  computeRowCalculatedPoints
+} from '../utils/formulaEvaluator';
 
 export interface ActiveCuttingPoint {
   id: string; // 'width' | 'height' | 'length' | 'bending' | 'camber' | 'twist' | custom id
@@ -77,6 +84,8 @@ export interface ActiveCuttingPoint {
   specText?: string;
   description?: string;
   judgeType?: 'appearance' | 'go_no_go' | 'general';
+  isCalculated?: boolean;
+  formula?: string;
 }
 
 interface CuttingDimensionAppProps {
@@ -302,6 +311,71 @@ const DEFAULT_PROFILES: CuttingProfileSpec[] = [
       }
     ],
     pointOrderList: ['width', 'height', 'length', 'cp-flange-t', 'cp-pitch', 'bending', 'camber', 'twist']
+  },
+  {
+    name: 'CUT-PROFILE-EF-INSIDE',
+    partNo: 'PART-300-CALC',
+    widthName: 'ความกว้าง W (Width)',
+    widthTarget: '120.00', widthTolPlus: '0.50', widthTolMinus: '0.50',
+    widthIsSC: true,
+    widthMicroType: 'Blade',
+    widthOrder: 1,
+    heightName: 'ความสูง H (Height)',
+    heightTarget: '60.00', heightTolPlus: '0.30', heightTolMinus: '0.30',
+    heightIsSC: true,
+    heightMicroType: 'Blade',
+    heightOrder: 2,
+    lengthName: 'ความยาวตัด (Length)',
+    lengthTarget: '2000.00', lengthTolPlus: '2.00', lengthTolMinus: '2.00',
+    lengthIsSC: false,
+    lengthMicroType: 'None',
+    lengthOrder: 3,
+    bendingName: 'ความแอ่นแนวระนาบ (Bending)',
+    bendingMax: '1.50',
+    bendingIsSC: false,
+    bendingMicroType: 'None',
+    bendingOrder: 8,
+    camberName: 'ความคดงอแนวแกน (Camber)',
+    camberMax: '1.00',
+    camberIsSC: false,
+    camberMicroType: 'None',
+    camberOrder: 9,
+    twistName: 'องศาการบิดตัว (Twist)',
+    twistMax: '0.50',
+    twistIsSC: false,
+    twistMicroType: 'None',
+    twistOrder: 10,
+    customControlPoints: [
+      {
+        id: 'cp-ef-len',
+        name: 'EF length',
+        unit: 'mm',
+        evalType: 'target_tol',
+        target: '50.00',
+        tolPlus: '0.50',
+        tolMinus: '0.50',
+        description: 'ระยะขอบปลาย (EF Length)',
+        isSC: true,
+        microType: 'Blade',
+        order: 4
+      },
+      {
+        id: 'cp-l-inside',
+        name: 'L inside',
+        unit: 'mm',
+        evalType: 'target_tol',
+        target: '1950.00',
+        tolPlus: '2.00',
+        tolMinus: '2.00',
+        description: 'ความยาวภายในคำนวณจาก [Length] - [EF length]',
+        isSC: true,
+        microType: 'None',
+        order: 5,
+        isCalculated: true,
+        formula: '[Length] - [EF length]'
+      }
+    ],
+    pointOrderList: ['width', 'height', 'length', 'cp-ef-len', 'cp-l-inside', 'bending', 'camber', 'twist']
   }
 ];
 
@@ -945,6 +1019,38 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     showNotification(isTh ? 'เพิ่มจุดควบคุมกำหนดเองใหม่แล้ว' : 'Added new custom control point');
   };
 
+  const handleAddCalculatedPoint = () => {
+    const newId = `cp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const nextOrder = 4 + headerInfo.customControlPoints.length;
+    // Suggest formula based on available points
+    const defaultFormula = headerInfo.customControlPoints?.some(cp => cp.name.includes('EF')) 
+      ? '[Length] - [EF length]' 
+      : '[Length] - [EF length]';
+
+    const newPoint: CuttingCustomPointSpec = {
+      id: newId,
+      name: 'L inside',
+      unit: 'mm',
+      evalType: 'target_tol',
+      target: '1950.00',
+      tolPlus: '2.00',
+      tolMinus: '2.00',
+      description: 'คำนวณจาก [Length] - [EF length]',
+      isSC: true,
+      microType: 'None',
+      order: nextOrder,
+      isCalculated: true,
+      formula: defaultFormula
+    };
+
+    setHeaderInfo(prev => ({
+      ...prev,
+      customControlPoints: [...prev.customControlPoints, newPoint],
+      pointOrderList: prev.pointOrderList ? [...prev.pointOrderList, newId] : [newId]
+    }));
+    showNotification(isTh ? 'เพิ่มจุดคำนวณจากสูตร (Formula Point) แล้ว' : 'Added new calculated point');
+  };
+
   const handleApplyCustomPointTemplate = (templateOrType: string | Partial<CuttingCustomPointSpec>) => {
     const newId = `cp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const nextOrder = 4 + headerInfo.customControlPoints.length;
@@ -965,7 +1071,9 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         isSC: templateOrType.isSC ?? (templateOrType.evalType === 'pass_fail' ? true : false),
         microType: templateOrType.microType || 'None',
         order: templateOrType.order ?? nextOrder,
-        judgeType: templateOrType.judgeType || (templateOrType.evalType === 'pass_fail' ? 'appearance' : undefined)
+        judgeType: templateOrType.judgeType || (templateOrType.evalType === 'pass_fail' ? 'appearance' : undefined),
+        isCalculated: templateOrType.isCalculated ?? false,
+        formula: templateOrType.formula || ''
       };
     } else if (templateOrType === 'appearance') {
       newPoint = { id: newId, name: 'Appearance (ตรวจสภาพผิว/รอยขูดขีด)', unit: '-', evalType: 'pass_fail', description: 'ตรวจรอยขีดข่วน ครีบ และความสะอาดผิวงาน', isSC: true, microType: 'None', order: nextOrder, judgeType: 'appearance' };
@@ -1317,7 +1425,13 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     // Custom points
     activeCustomPoints.forEach((cp, idx) => {
       let specStr = '-';
-      if (cp.evalType === 'target_tol' && cp.target) {
+      if (cp.isCalculated && cp.formula) {
+        if (cp.evalType === 'target_tol' && cp.target) {
+          specStr = `${cp.target} (fx: ${cp.formula})`;
+        } else {
+          specStr = `fx: ${cp.formula}`;
+        }
+      } else if (cp.evalType === 'target_tol' && cp.target) {
         specStr = `${cp.target} (+${cp.tolPlus || '0'}/-${cp.tolMinus || '0'})`;
       } else if (cp.evalType === 'min_max') {
         specStr = `${cp.minLimit || '-'} - ${cp.maxLimit || '-'}`;
@@ -1345,7 +1459,9 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         minLimit: cp.minLimit,
         specText: specStr,
         description: cp.description,
-        judgeType: cp.judgeType || (cp.name.toLowerCase().includes('appearance') || cp.name.includes('ผิว') ? 'appearance' : cp.name.toLowerCase().includes('gauge') || cp.name.includes('เกจ') ? 'go_no_go' : 'general')
+        judgeType: cp.judgeType || (cp.name.toLowerCase().includes('appearance') || cp.name.includes('ผิว') ? 'appearance' : cp.name.toLowerCase().includes('gauge') || cp.name.includes('เกจ') ? 'go_no_go' : 'general'),
+        isCalculated: cp.isCalculated,
+        formula: cp.formula
       });
     });
 
@@ -1528,7 +1644,14 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     // Validate Custom Control Points
     if (activeCustomPoints.length > 0) {
       for (const point of activeCustomPoints) {
-        const val = item.customPointValues?.[point.id];
+        let val = item.customPointValues?.[point.id];
+        if (point.isCalculated && point.formula && isIgnoredValue(val)) {
+          const vars = getAvailablePointVariables(headerInfo, point.id, item);
+          const evalRes = evaluatePointFormula(point.formula, vars);
+          if (evalRes.value) {
+            val = evalRes.value;
+          }
+        }
         if (!isIgnoredValue(val)) {
           const res = validateCustomPoint(val, point);
           if (res === 'Fail') {
@@ -1551,6 +1674,20 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     setTimeout(() => setNotification(null), 3000);
   };
 
+  // Automatically recalculate rows when profile custom control points change
+  useEffect(() => {
+    const hasCalculated = headerInfo.customControlPoints?.some(cp => cp.isCalculated && cp.formula);
+    if (!hasCalculated) return;
+
+    setBatchItems(prev => prev.map(item => {
+      const recalculated = computeRowCalculatedPoints(item, headerInfo.customControlPoints || [], headerInfo);
+      return {
+        ...item,
+        customPointValues: recalculated
+      };
+    }));
+  }, [headerInfo.customControlPoints]);
+
   const addRow = () => {
     const nextNum = batchItems.length + 1;
     // Pre-populate custom point values if target exists
@@ -1565,22 +1702,29 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       }
     });
 
-    setBatchItems(prev => [
-      ...prev,
-      {
-        id: Date.now() + Math.random(),
-        sampleName: `Sample ${nextNum}`,
-        width: showWidth ? (headerInfo.widthTarget || '') : '',
-        height: showHeight ? (headerInfo.heightTarget || '') : '',
-        length: showLength ? (headerInfo.lengthTarget || '') : '',
-        bending: '',
-        camber: '',
-        twist: '',
-        customPointValues: initialCustomVals,
-        status: 'Pending' as 'Pass' | 'Fail' | 'Pending',
-        remarks: ''
-      }
-    ]);
+    const newItem = {
+      id: Date.now() + Math.random(),
+      sampleName: `Sample ${nextNum}`,
+      width: showWidth ? (headerInfo.widthTarget || '') : '',
+      height: showHeight ? (headerInfo.heightTarget || '') : '',
+      length: showLength ? (headerInfo.lengthTarget || '') : '',
+      bending: '',
+      camber: '',
+      twist: '',
+      customPointValues: initialCustomVals,
+      status: 'Pending' as 'Pass' | 'Fail' | 'Pending',
+      remarks: ''
+    };
+
+    if (headerInfo.customControlPoints?.some(cp => cp.isCalculated && cp.formula)) {
+      newItem.customPointValues = computeRowCalculatedPoints(
+        newItem,
+        headerInfo.customControlPoints,
+        headerInfo
+      );
+    }
+
+    setBatchItems(prev => [...prev, newItem]);
   };
 
   const handleHeaderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1591,7 +1735,15 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   const handleItemChange = (id: number, field: string, value: string) => {
     setBatchItems(prevItems => prevItems.map(item => {
       if (item.id === id) {
-        return { ...item, [field]: value };
+        const updated = { ...item, [field]: value };
+        if (headerInfo.customControlPoints?.some(cp => cp.isCalculated && cp.formula)) {
+          updated.customPointValues = computeRowCalculatedPoints(
+            updated,
+            headerInfo.customControlPoints,
+            headerInfo
+          );
+        }
+        return updated;
       }
       return item;
     }));
@@ -1600,13 +1752,21 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   const handleCustomPointValueChange = (itemId: number, pointId: string, value: string) => {
     setBatchItems(prevItems => prevItems.map(item => {
       if (item.id === itemId) {
-        return {
+        const updated = {
           ...item,
           customPointValues: {
             ...(item.customPointValues || {}),
             [pointId]: value
           }
         };
+        if (headerInfo.customControlPoints?.some(cp => cp.isCalculated && cp.formula)) {
+          updated.customPointValues = computeRowCalculatedPoints(
+            updated,
+            headerInfo.customControlPoints,
+            headerInfo
+          );
+        }
+        return updated;
       }
       return item;
     }));
@@ -1639,6 +1799,13 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       const decision = judgeStatus(item);
       const recId = `rec-cut-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
 
+      const finalCustomVals = {
+        ...(item.customPointValues || {}),
+        ...(headerInfo.customControlPoints?.some(cp => cp.isCalculated && cp.formula)
+          ? computeRowCalculatedPoints(item, headerInfo.customControlPoints, headerInfo)
+          : {})
+      };
+
       const rec: CuttingInspectionRecord = {
         id: recId,
         lotNumber: headerInfo.coilNo.trim().toUpperCase() || 'COIL-UNTITLED',
@@ -1651,7 +1818,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         bending: item.bending,
         camber: item.camber,
         twist: item.twist,
-        customPointValues: { ...(item.customPointValues || {}) },
+        customPointValues: finalCustomVals,
         status: decision,
         remarks: item.remarks,
         profileName: headerInfo.profileName,
@@ -2286,7 +2453,15 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                                   <span>SC</span>
                                 </span>
                               )}
-                              {point.evalType === 'pass_fail' ? (
+                              {point.isCalculated ? (
+                                <span 
+                                  title={isTh ? `คำนวณอัตโนมัติจากสูตร: ${point.formula || ''}` : `Auto-calculated by formula: ${point.formula || ''}`}
+                                  className="px-1.5 py-0.5 rounded text-[9px] font-semibold border flex items-center gap-1 bg-indigo-950/90 text-indigo-300 border-indigo-700/80 shadow-xs"
+                                >
+                                  <Calculator className="w-2.5 h-2.5 text-indigo-400" />
+                                  <span>fx สูตร</span>
+                                </span>
+                              ) : point.evalType === 'pass_fail' ? (
                                 <span 
                                   title={isTh ? `ประเภท: ${point.judgeType === 'appearance' ? 'Appearance (ตรวจสภาพผิว)' : point.judgeType === 'go_no_go' ? 'Go / No-Go Gauge' : 'Pass / Fail'}` : `Type: ${point.judgeType || 'Pass/Fail'}`}
                                   className="px-1.5 py-0.5 rounded text-[9px] font-semibold border flex items-center gap-1 bg-emerald-950/80 text-emerald-300 border-emerald-800"
@@ -2368,6 +2543,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                             let val = '';
                             let fieldStatus: 'pass' | 'fail' | 'neutral' = 'neutral';
                             let placeholder = point.specText || '-';
+                            let formulaBreakdown = '';
+                            let isPendingFormula = false;
 
                             if (point.isStandard) {
                               if (point.key === 'width') {
@@ -2397,6 +2574,17 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                               }
                             } else {
                               val = item.customPointValues?.[point.id] || '';
+
+                              if (point.isCalculated && point.formula) {
+                                const vars = getAvailablePointVariables(headerInfo, point.id, item);
+                                const evalRes = evaluatePointFormula(point.formula, vars);
+                                if (!val && evalRes.value) {
+                                  val = evalRes.value;
+                                }
+                                formulaBreakdown = evalRes.breakdown;
+                                isPendingFormula = evalRes.pendingVars.length > 0;
+                              }
+
                               const cpSpec: CuttingCustomPointSpec = {
                                 id: point.id,
                                 name: point.name,
@@ -2410,13 +2598,17 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                                 description: point.description,
                                 isSC: point.isSC,
                                 microType: point.microType,
-                                order: point.order
+                                order: point.order,
+                                isCalculated: point.isCalculated,
+                                formula: point.formula
                               };
                               const cStatus = validateCustomPoint(val, cpSpec);
                               if (!isIgnoredValue(val)) {
                                 fieldStatus = cStatus === 'Pass' ? 'pass' : cStatus === 'Fail' ? 'fail' : 'neutral';
                               }
-                              placeholder = point.evalType === 'target_tol' ? (point.target || '0.00')
+                              placeholder = point.isCalculated
+                                ? (isPendingFormula ? `fx (รอค่าตัวแปร)` : `fx: ${point.formula}`)
+                                : point.evalType === 'target_tol' ? (point.target || '0.00')
                                 : point.evalType === 'max_only' ? `≤ ${point.maxLimit}`
                                 : point.evalType === 'min_only' ? `≥ ${point.minLimit}`
                                 : point.evalType === 'pass_fail' ? 'PASS / NG'
@@ -2462,6 +2654,55 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                                       <X className={`w-3.5 h-3.5 ${isFail ? 'text-white stroke-[3]' : 'text-slate-500'}`} />
                                       <span>NG</span>
                                     </button>
+                                  </div>
+                                </td>
+                              );
+                            }
+
+                            // Calculated Point Cell
+                            if (point.isCalculated) {
+                              let borderClass = 'border-indigo-800/80 bg-indigo-950/20 text-indigo-200 focus:border-indigo-400';
+                              if (fieldStatus === 'pass') {
+                                borderClass = 'border-emerald-500/80 bg-emerald-950/30 text-emerald-200 focus:border-emerald-400';
+                              } else if (fieldStatus === 'fail') {
+                                borderClass = 'border-rose-500/80 bg-rose-950/40 text-rose-200 focus:border-rose-400';
+                              }
+
+                              return (
+                                <td 
+                                  key={point.id} 
+                                  className={`p-2 border-x border-slate-800/40 ${
+                                    point.isSC ? 'bg-amber-950/10' : 'bg-indigo-950/10'
+                                  }`}
+                                >
+                                  <div className="relative group/calc">
+                                    <div className="relative flex items-center">
+                                      <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={val}
+                                        onChange={(e) => {
+                                          handleCustomPointValueChange(item.id, point.id, e.target.value);
+                                        }}
+                                        placeholder={placeholder}
+                                        title={`สูตร: ${point.name} = ${point.formula}\n${formulaBreakdown ? `การคำนวณ: ${formulaBreakdown}` : ''}`}
+                                        className={`w-full bg-slate-950 border font-mono text-center rounded-lg pl-6 pr-2 py-1.5 focus:outline-none font-bold text-xs ${borderClass}`}
+                                      />
+                                      <div 
+                                        className="absolute left-2 pointer-events-none text-indigo-400 font-mono text-[10px] font-bold select-none"
+                                        title={isTh ? 'จุดคำนวณจากสูตร (fx)' : 'Formula Point (fx)'}
+                                      >
+                                        fx
+                                      </div>
+                                    </div>
+
+                                    {/* Formula breakdown tooltip */}
+                                    {formulaBreakdown && (
+                                      <div className="hidden group-hover/calc:flex absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-30 px-2.5 py-1 bg-slate-900 border border-indigo-700/90 rounded-md text-[10px] text-indigo-200 font-mono shadow-xl whitespace-nowrap items-center gap-1.5 pointer-events-none">
+                                        <Calculator className="w-3 h-3 text-indigo-400" />
+                                        <span>{formulaBreakdown}</span>
+                                      </div>
+                                    )}
                                   </div>
                                 </td>
                               );
@@ -3379,14 +3620,25 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleAddCustomPoint}
-                      className="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-600/20"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>{isTh ? '+ เพิ่มจุดควบคุมใหม่' : '+ Add Custom Point'}</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAddCalculatedPoint}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/20"
+                      >
+                        <Calculator className="w-4 h-4" />
+                        <span>{isTh ? '+ เพิ่มจุดคำนวณจากสูตร (fx)' : '+ Add Formula Point (fx)'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleAddCustomPoint}
+                        className="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-600/20"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>{isTh ? '+ เพิ่มจุดควบคุมใหม่' : '+ Add Custom Point'}</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Preset Template Quick-Add Chips */}
@@ -3397,6 +3649,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {[
+                        { name: '📐 L inside ([Length] - [EF length])', unit: 'mm', evalType: 'target_tol' as const, target: '1950.00', tolPlus: '2.00', tolMinus: '2.00', isCalculated: true, formula: '[Length] - [EF length]', isSC: true, description: 'ความยาวภายในคำนวณจาก [Length] - [EF length]' },
+                        { name: 'EF length (ระยะปลาย)', unit: 'mm', evalType: 'target_tol' as const, target: '50.00', tolPlus: '0.50', tolMinus: '0.50', isSC: true, description: 'ระยะขอบปลายชิ้นงาน (EF Length)' },
                         { name: '👁️ Appearance (สภาพผิว)', unit: '-', evalType: 'pass_fail' as const, judgeType: 'appearance' as const, isSC: true, description: 'ตรวจรอยขีดข่วน ครีบ และความสะอาด' },
                         { name: '📏 Go/No-Go Gauge', unit: '-', evalType: 'pass_fail' as const, judgeType: 'go_no_go' as const, isSC: true, description: 'เกจตรวจขนาดหน้าตัด (Go/NG)' },
                         { name: 'Burr Check (ครีบตัด)', unit: '-', evalType: 'pass_fail' as const, judgeType: 'appearance' as const, isSC: true, description: 'ตรวจครีบตัดขอบชิ้นงาน' },
@@ -3594,6 +3848,179 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-300 text-xs focus:outline-none focus:border-cyan-500"
                               />
                             </div>
+                          </div>
+
+                          {/* FORMULA CALCULATED POINT CONFIGURATION */}
+                          <div className={`p-3 rounded-xl border transition-all ${
+                            cp.isCalculated 
+                              ? 'bg-indigo-950/30 border-indigo-700/80 shadow-inner' 
+                              : 'bg-slate-950/40 border-slate-800'
+                          }`}>
+                            <div className="flex items-center justify-between gap-3">
+                              <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={cp.isCalculated || false}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    handleUpdateCustomPoint(cp.id, 'isCalculated', checked);
+                                    if (checked && !cp.formula) {
+                                      const defaultFormula = headerInfo.customControlPoints?.some(p => p.id !== cp.id && p.name.includes('EF'))
+                                        ? '[Length] - [EF length]'
+                                        : '[Length] - 50';
+                                      handleUpdateCustomPoint(cp.id, 'formula', defaultFormula);
+                                    }
+                                  }}
+                                  className="w-4 h-4 rounded text-indigo-600 bg-slate-900 border-slate-700 focus:ring-indigo-500 focus:ring-offset-slate-900"
+                                />
+                                <div className="flex items-center gap-1.5">
+                                  <Calculator className={`w-3.5 h-3.5 ${cp.isCalculated ? 'text-indigo-400' : 'text-slate-500'}`} />
+                                  <span className={`text-xs font-bold ${cp.isCalculated ? 'text-indigo-300' : 'text-slate-400'}`}>
+                                    {isTh ? 'จุดคำนวณจากสูตรอัตโนมัติ (Calculated from Formula - fx)' : 'Calculated Point from Formula (fx)'}
+                                  </span>
+                                </div>
+                              </label>
+
+                              {cp.isCalculated && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-900/60 text-indigo-300 border border-indigo-700">
+                                  AUTO-COMPUTE
+                                </span>
+                              )}
+                            </div>
+
+                            {cp.isCalculated && (
+                              <div className="mt-3 space-y-2.5 pt-2.5 border-t border-indigo-900/50">
+                                <div>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <label className="text-[10px] font-bold text-indigo-300 uppercase flex items-center gap-1">
+                                      <span>{isTh ? 'สมการสูตรคำนวณ (Formula Expression) *' : 'Formula Expression *'}</span>
+                                    </label>
+                                    <span className="text-[10px] text-slate-400">
+                                      {isTh ? 'ใส่ชื่อจุดวัดในวงเล็บก้ามปู เช่น [Length] - [EF length]' : 'Use bracketed names e.g. [Length] - [EF length]'}
+                                    </span>
+                                  </div>
+                                  <div className="relative flex items-center">
+                                    <input
+                                      type="text"
+                                      value={cp.formula || ''}
+                                      onChange={(e) => handleUpdateCustomPoint(cp.id, 'formula', e.target.value)}
+                                      placeholder="e.g. [Length] - [EF length]"
+                                      className="w-full bg-slate-900 border border-indigo-700/80 rounded-lg pl-3 pr-8 py-2 text-indigo-200 font-mono font-bold text-sm focus:outline-none focus:border-indigo-400"
+                                    />
+                                    {cp.formula && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateCustomPoint(cp.id, 'formula', '')}
+                                        className="absolute right-2 p-1 text-slate-400 hover:text-white"
+                                        title={isTh ? 'ล้างสูตร' : 'Clear formula'}
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Variable chips and math operators */}
+                                <div className="space-y-1.5">
+                                  <div className="flex flex-wrap items-center gap-1 text-xs">
+                                    <span className="text-[10px] text-slate-400 font-semibold mr-1">
+                                      {isTh ? 'คลิกเพื่อใส่ตัวแปร:' : 'Click to insert variable:'}
+                                    </span>
+                                    {/* Standard points */}
+                                    {['Length', 'Width', 'Height', 'Bending', 'Camber', 'Twist'].map(vName => (
+                                      <button
+                                        key={vName}
+                                        type="button"
+                                        onClick={() => {
+                                          const token = `[${vName}]`;
+                                          const cur = (cp.formula || '').trim();
+                                          handleUpdateCustomPoint(cp.id, 'formula', cur ? `${cur} ${token}` : token);
+                                        }}
+                                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-900 text-indigo-300 hover:text-white border border-slate-700 hover:border-indigo-500 font-mono text-[11px] transition"
+                                      >
+                                        + [{vName}]
+                                      </button>
+                                    ))}
+
+                                    {/* Other custom points in this profile */}
+                                    {headerInfo.customControlPoints
+                                      ?.filter(other => other.id !== cp.id && other.name)
+                                      .map(other => (
+                                        <button
+                                          key={other.id}
+                                          type="button"
+                                          onClick={() => {
+                                            const token = `[${other.name}]`;
+                                            const cur = (cp.formula || '').trim();
+                                            handleUpdateCustomPoint(cp.id, 'formula', cur ? `${cur} ${token}` : token);
+                                          }}
+                                          className="px-2 py-0.5 rounded bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-white border border-cyan-800 hover:border-cyan-600 font-mono text-[11px] transition"
+                                        >
+                                          + [{other.name}]
+                                        </button>
+                                      ))}
+                                  </div>
+
+                                  {/* Arithmetic operator buttons */}
+                                  <div className="flex flex-wrap items-center gap-1 text-xs">
+                                    <span className="text-[10px] text-slate-400 font-semibold mr-1">
+                                      {isTh ? 'เครื่องหมายคำนวณ:' : 'Operators:'}
+                                    </span>
+                                    {['+', '-', '*', '/', '(', ')'].map(op => (
+                                      <button
+                                        key={op}
+                                        type="button"
+                                        onClick={() => {
+                                          const cur = (cp.formula || '').trim();
+                                          handleUpdateCustomPoint(cp.id, 'formula', cur ? `${cur} ${op}` : op);
+                                        }}
+                                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white border border-slate-700 font-mono text-[11px] font-bold transition"
+                                      >
+                                        {op}
+                                      </button>
+                                    ))}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleUpdateCustomPoint(cp.id, 'formula', '[Length] - [EF length]');
+                                      }}
+                                      className="ml-auto px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800 hover:bg-indigo-900 text-[10px] font-mono transition"
+                                    >
+                                      {isTh ? 'สูตรตัวอย่าง: [Length] - [EF length]' : 'Example: [Length] - [EF length]'}
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Live Formula Preview Test */}
+                                {(() => {
+                                  const vars = getAvailablePointVariables(headerInfo, undefined, cp.id);
+                                  const preview = previewFormulaWithTargets(cp.formula || '', vars);
+                                  return (
+                                    <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                                          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                                          <span>{isTh ? 'ผลทดสอบคำนวณจากค่า Target ใน Profile:' : 'Live Test with Profile Targets:'}</span>
+                                        </span>
+                                        {preview.resultNum !== null ? (
+                                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                                            {preview.resultNum.toFixed(2)} {cp.unit || 'mm'}
+                                          </span>
+                                        ) : (
+                                          <span className="px-2 py-0.5 rounded text-[10px] font-mono text-amber-400 bg-amber-950/60 border border-amber-800">
+                                            {isTh ? 'ยังไม่มีผลลัพธ์' : 'Pending'}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="mt-1 font-mono text-[11px] text-indigo-300 bg-slate-950/80 p-1.5 rounded border border-slate-800/80">
+                                        {preview.previewText}
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            )}
                           </div>
 
                           {/* Dynamic Numeric Limit Inputs based on EvalType */}

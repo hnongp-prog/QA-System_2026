@@ -499,6 +499,8 @@ export interface CuttingCustomPointSpec {
   microType?: MicroType; // ประเภทหัวไมโครมิเตอร์ (Blade, Rod, None)
   order?: number; // ลำดับหัวข้อในการวัด / ตำแหน่ง Column
   judgeType?: 'appearance' | 'go_no_go' | 'general'; // ชนิดการตัดสิน: ตรวจสอบสภาพผิว (Appearance) หรือ เกจ Go/No-Go
+  isCalculated?: boolean; // เป็นจุดคำนวณจากสูตร (Formula / Calculated Point)
+  formula?: string; // สูตรคำนวณ เช่น "[Length] - [EF length]" หรือ "Length - EF length"
 }
 
 export interface CuttingProfileSpec {
