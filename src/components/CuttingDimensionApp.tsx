@@ -451,6 +451,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminAuthError, setAdminAuthError] = useState(false);
+  const [selectedHistoryDetail, setSelectedHistoryDetail] = useState<CuttingInspectionRecord | null>(null);
 
   // Header Metadata State (including customControlPoints, customizable point names, SC, MicroType, Order)
   const [headerInfo, setHeaderInfo] = useState<{
@@ -621,6 +622,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   const [trendFilterProfile, setTrendFilterProfile] = useState('All');
   const [trendFilterMonth, setTrendFilterMonth] = useState('All');
   const [historySearchTerm, setHistorySearchTerm] = useState('');
+  const [historyProfileFilter, setHistoryProfileFilter] = useState('All');
 
   // Handle Admin Verification
   const handleAdminAuth = (e: React.FormEvent) => {
@@ -1646,7 +1648,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       for (const point of activeCustomPoints) {
         let val = item.customPointValues?.[point.id];
         if (point.isCalculated && point.formula && isIgnoredValue(val)) {
-          const vars = getAvailablePointVariables(headerInfo, point.id, item);
+          const vars = getAvailablePointVariables(headerInfo, point.id, item, orderedActivePoints);
           const evalRes = evaluatePointFormula(point.formula, vars);
           if (evalRes.value) {
             val = evalRes.value;
@@ -1664,7 +1666,16 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       }
     }
 
-    if (numericEvaluatedCount === 0) return 'Pending';
+    if (numericEvaluatedCount === 0) {
+      const hasAnyValue = (item.width && !isIgnoredValue(item.width)) ||
+                          (item.height && !isIgnoredValue(item.height)) ||
+                          (item.length && !isIgnoredValue(item.length)) ||
+                          (item.bending && !isIgnoredValue(item.bending)) ||
+                          (item.camber && !isIgnoredValue(item.camber)) ||
+                          (item.twist && !isIgnoredValue(item.twist)) ||
+                          Object.values(item.customPointValues || {}).some(v => v !== undefined && v !== null && !isIgnoredValue(String(v)));
+      return hasAnyValue ? 'Pass' : 'Pending';
+    }
 
     return hasFailed ? 'Fail' : 'Pass';
   };
@@ -1680,7 +1691,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     if (!hasCalculated) return;
 
     setBatchItems(prev => prev.map(item => {
-      const recalculated = computeRowCalculatedPoints(item, headerInfo.customControlPoints || [], headerInfo);
+      const recalculated = computeRowCalculatedPoints(item, headerInfo.customControlPoints || [], headerInfo, orderedActivePoints);
       return {
         ...item,
         customPointValues: recalculated
@@ -1720,7 +1731,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       newItem.customPointValues = computeRowCalculatedPoints(
         newItem,
         headerInfo.customControlPoints,
-        headerInfo
+        headerInfo,
+        orderedActivePoints
       );
     }
 
@@ -1740,7 +1752,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
           updated.customPointValues = computeRowCalculatedPoints(
             updated,
             headerInfo.customControlPoints,
-            headerInfo
+            headerInfo,
+            orderedActivePoints
           );
         }
         return updated;
@@ -1763,7 +1776,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
           updated.customPointValues = computeRowCalculatedPoints(
             updated,
             headerInfo.customControlPoints,
-            headerInfo
+            headerInfo,
+            orderedActivePoints
           );
         }
         return updated;
@@ -1773,36 +1787,116 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   };
 
   const handleSetAllPointValues = (pointId: string, value: string) => {
-    setBatchItems(prevItems => prevItems.map(item => ({
-      ...item,
-      customPointValues: {
-        ...(item.customPointValues || {}),
-        [pointId]: value
+    setBatchItems(prevItems => prevItems.map(item => {
+      const updated = {
+        ...item,
+        customPointValues: {
+          ...(item.customPointValues || {}),
+          [pointId]: value
+        }
+      };
+      if (headerInfo.customControlPoints?.some(cp => cp.isCalculated && cp.formula)) {
+        updated.customPointValues = computeRowCalculatedPoints(
+          updated,
+          headerInfo.customControlPoints,
+          headerInfo,
+          orderedActivePoints
+        );
       }
-    })));
+      return updated;
+    }));
     showNotification(isTh ? `กำหนดค่า "${value}" ให้ทุกแถวแล้ว` : `Set "${value}" for all rows`);
   };
 
+  const handleAutoFillSpecs = () => {
+    setBatchItems(prev => prev.map((item, idx) => {
+      if (idx === 0) {
+        const initialCustomVals: Record<string, string> = { ...(item.customPointValues || {}) };
+        headerInfo.customControlPoints?.forEach(cp => {
+          if (cp.evalType === 'target_tol' && cp.target) {
+            initialCustomVals[cp.id] = cp.target;
+          } else if (cp.evalType === 'pass_fail') {
+            initialCustomVals[cp.id] = 'PASS';
+          }
+        });
+
+        const updated = {
+          ...item,
+          width: headerInfo.widthTarget || item.width || '',
+          height: headerInfo.heightTarget || item.height || '',
+          length: headerInfo.lengthTarget || item.length || '',
+          bending: item.bending || '0.00',
+          camber: item.camber || '0.00',
+          twist: item.twist || '0.00',
+          customPointValues: initialCustomVals
+        };
+
+        if (headerInfo.customControlPoints?.some(cp => cp.isCalculated && cp.formula)) {
+          updated.customPointValues = computeRowCalculatedPoints(
+            updated,
+            headerInfo.customControlPoints,
+            headerInfo,
+            orderedActivePoints
+          );
+        }
+        return updated;
+      }
+      return item;
+    }));
+    showNotification(isTh ? 'ดึงค่าสเปกเป้าหมาย (Specs Target) มาใส่ในแถวที่ 1 และคำนวณสูตรแล้ว' : 'Auto-filled specs target into row 1 and evaluated formulas');
+  };
+
+  const handleRecalculateAllRows = () => {
+    setBatchItems(prev => prev.map(item => ({
+      ...item,
+      customPointValues: headerInfo.customControlPoints?.some(cp => cp.isCalculated && cp.formula)
+        ? computeRowCalculatedPoints(item, headerInfo.customControlPoints, headerInfo, orderedActivePoints)
+        : (item.customPointValues || {})
+    })));
+    showNotification(isTh ? 'คำนวณค่าจากสูตรใหม่ทุกแถวเรียบร้อยแล้ว' : 'Recalculated all formula rows');
+  };
+
   const saveBatch = () => {
-    const validItems = batchItems.filter(item => {
-      const hasCustom = Object.values(item.customPointValues || {}).some(v => v && String(v).trim() !== '');
-      return (item.sampleName || item.width || item.height || item.length || hasCustom) && judgeStatus(item) !== 'Pending';
+    // 1. Recalculate calculated points across all batch items to ensure values are fresh and persisted
+    const recalculatedItems = batchItems.map(item => {
+      const computedCustom = headerInfo.customControlPoints?.some(cp => cp.isCalculated && cp.formula)
+        ? computeRowCalculatedPoints(item, headerInfo.customControlPoints, headerInfo, orderedActivePoints)
+        : (item.customPointValues || {});
+      return {
+        ...item,
+        customPointValues: {
+          ...(item.customPointValues || {}),
+          ...computedCustom
+        }
+      };
+    });
+
+    const validItems = recalculatedItems.filter(item => {
+      const hasCustom = Object.values(item.customPointValues || {}).some(v => v !== undefined && v !== null && !isIgnoredValue(String(v)));
+      const hasStandard = (item.width && !isIgnoredValue(item.width)) ||
+                          (item.height && !isIgnoredValue(item.height)) ||
+                          (item.length && !isIgnoredValue(item.length)) ||
+                          (item.bending && !isIgnoredValue(item.bending)) ||
+                          (item.camber && !isIgnoredValue(item.camber)) ||
+                          (item.twist && !isIgnoredValue(item.twist));
+      return hasStandard || hasCustom || (item.sampleName && item.sampleName.trim() !== '');
     });
 
     if (validItems.length === 0) {
-      showNotification(isTh ? 'กรุณากรอกข้อมูลให้ครบถ้วนอย่างน้อย 1 รายการ' : 'Please enter inspection data', 'error');
+      showNotification(isTh ? 'กรุณากรอกข้อมูลการวัดอย่างน้อย 1 รายการก่อนบันทึก' : 'Please enter inspection data before saving', 'error');
       return;
     }
 
     const now = new Date();
     const newRecords: CuttingInspectionRecord[] = validItems.map(item => {
-      const decision = judgeStatus(item);
+      const rawDecision = judgeStatus(item);
+      const decision = rawDecision === 'Fail' ? 'Fail' : 'Pass';
       const recId = `rec-cut-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
 
       const finalCustomVals = {
         ...(item.customPointValues || {}),
         ...(headerInfo.customControlPoints?.some(cp => cp.isCalculated && cp.formula)
-          ? computeRowCalculatedPoints(item, headerInfo.customControlPoints, headerInfo)
+          ? computeRowCalculatedPoints(item, headerInfo.customControlPoints, headerInfo, orderedActivePoints)
           : {})
       };
 
@@ -1833,7 +1927,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       if (onLogNewActivity) {
         const isPass = decision === 'Pass';
         const customPointsSummary = headerInfo.customControlPoints.map(cp => {
-          const val = item.customPointValues?.[cp.id];
+          const val = finalCustomVals[cp.id];
           return `${cp.name}: ${val || '-'}${cp.unit}`;
         }).join(', ');
 
@@ -1865,7 +1959,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     });
 
     setInspections(prev => [...newRecords, ...prev]);
-    showNotification(isTh ? `บันทึกข้อมูล ${validItems.length} รายการเรียบร้อยแล้ว` : `Saved ${validItems.length} inspection items`);
+    showNotification(isTh ? `บันทึกข้อมูล ${validItems.length} รายการเรียบร้อยแล้ว (รวมจุดคำนวณสูตร)` : `Saved ${validItems.length} inspection items (including formulas)`);
 
     setBatchItems([
       {
@@ -1886,40 +1980,254 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     setActiveTab('history');
   };
 
-  const exportToExcel = () => {
-    if (inspections.length === 0) {
-      showNotification(isTh ? 'ไม่มีข้อมูลสำหรับ Export' : 'No history to export', 'error');
-      return;
+  // Measurement points for history table matching the Batch Entry Table (หน้าบันทึกกลุ่มงาน)
+  const historyActivePoints: ActiveCuttingPoint[] = useMemo(() => {
+    // If a specific saved profile is filtered in history (and differs from current form), build its active points
+    if (historyProfileFilter !== 'All' && historyProfileFilter !== headerInfo.profileName) {
+      const selectedP = savedProfiles.find(p => p.name === historyProfileFilter);
+      if (selectedP) {
+        const list: ActiveCuttingPoint[] = [];
+        const hasWidth = Boolean(selectedP.widthTarget && selectedP.widthTarget.trim() !== '');
+        const hasHeight = Boolean(selectedP.heightTarget && selectedP.heightTarget.trim() !== '');
+        const hasLength = Boolean(selectedP.lengthTarget && selectedP.lengthTarget.trim() !== '');
+        const hasBending = Boolean(selectedP.bendingMax && selectedP.bendingMax.trim() !== '');
+        const hasCamber = Boolean(selectedP.camberMax && selectedP.camberMax.trim() !== '');
+        const hasTwist = Boolean(selectedP.twistMax && selectedP.twistMax.trim() !== '');
+
+        if (hasWidth) {
+          list.push({
+            id: 'width',
+            name: selectedP.widthName || 'ความกว้าง (Width)',
+            key: 'width',
+            isStandard: true,
+            isSC: selectedP.widthIsSC ?? true,
+            microType: selectedP.widthMicroType || 'Blade',
+            order: selectedP.widthOrder ?? 1,
+            unit: 'mm',
+            evalType: 'target_tol',
+            target: selectedP.widthTarget,
+            tolPlus: selectedP.widthTolPlus,
+            tolMinus: selectedP.widthTolMinus,
+            specText: selectedP.widthTarget ? `${selectedP.widthTarget} (+${selectedP.widthTolPlus || '0'}/-${selectedP.widthTolMinus || '0'})` : '-'
+          });
+        }
+        if (hasHeight) {
+          list.push({
+            id: 'height',
+            name: selectedP.heightName || 'ความสูง (Height)',
+            key: 'height',
+            isStandard: true,
+            isSC: selectedP.heightIsSC ?? true,
+            microType: selectedP.heightMicroType || 'Blade',
+            order: selectedP.heightOrder ?? 2,
+            unit: 'mm',
+            evalType: 'target_tol',
+            target: selectedP.heightTarget,
+            tolPlus: selectedP.heightTolPlus,
+            tolMinus: selectedP.heightTolMinus,
+            specText: selectedP.heightTarget ? `${selectedP.heightTarget} (+${selectedP.heightTolPlus || '0'}/-${selectedP.heightTolMinus || '0'})` : '-'
+          });
+        }
+        if (hasLength) {
+          list.push({
+            id: 'length',
+            name: selectedP.lengthName || 'ความยาว (Length)',
+            key: 'length',
+            isStandard: true,
+            isSC: selectedP.lengthIsSC ?? false,
+            microType: selectedP.lengthMicroType || 'None',
+            order: selectedP.lengthOrder ?? 3,
+            unit: 'mm',
+            evalType: 'target_tol',
+            target: selectedP.lengthTarget,
+            tolPlus: selectedP.lengthTolPlus,
+            tolMinus: selectedP.lengthTolMinus,
+            specText: selectedP.lengthTarget ? `${selectedP.lengthTarget} (+${selectedP.lengthTolPlus || '0'}/-${selectedP.lengthTolMinus || '0'})` : '-'
+          });
+        }
+        selectedP.customControlPoints?.forEach((cp, idx) => {
+          let specStr = '-';
+          if (cp.isCalculated && cp.formula) {
+            specStr = cp.target ? `${cp.target} (fx: ${cp.formula})` : `fx: ${cp.formula}`;
+          } else if (cp.evalType === 'target_tol' && cp.target) {
+            specStr = `${cp.target} (+${cp.tolPlus || '0'}/-${cp.tolMinus || '0'})`;
+          } else if (cp.evalType === 'min_max') {
+            specStr = `${cp.minLimit || '-'} - ${cp.maxLimit || '-'}`;
+          } else if (cp.evalType === 'max_only') {
+            specStr = `≤ ${cp.maxLimit}`;
+          } else if (cp.evalType === 'min_only') {
+            specStr = `≥ ${cp.minLimit}`;
+          } else if (cp.evalType === 'pass_fail') {
+            specStr = 'PASS / NG';
+          }
+          list.push({
+            id: cp.id,
+            name: cp.name,
+            isStandard: false,
+            isSC: cp.isSC ?? false,
+            microType: cp.microType || (cp.evalType === 'pass_fail' ? 'None' : 'Blade'),
+            order: cp.order ?? (4 + idx),
+            unit: cp.evalType === 'pass_fail' ? (cp.unit || '-') : cp.unit,
+            evalType: cp.evalType,
+            target: cp.target,
+            tolPlus: cp.tolPlus,
+            tolMinus: cp.tolMinus,
+            maxLimit: cp.maxLimit,
+            minLimit: cp.minLimit,
+            specText: specStr,
+            description: cp.description,
+            judgeType: cp.judgeType || (cp.name.toLowerCase().includes('appearance') || cp.name.includes('ผิว') ? 'appearance' : cp.name.toLowerCase().includes('gauge') || cp.name.includes('เกจ') ? 'go_no_go' : 'general'),
+            isCalculated: cp.isCalculated,
+            formula: cp.formula
+          });
+        });
+        if (hasBending) {
+          list.push({
+            id: 'bending',
+            name: selectedP.bendingName || 'ความโก่ง (Bending)',
+            key: 'bending',
+            isStandard: true,
+            isSC: selectedP.bendingIsSC ?? false,
+            microType: selectedP.bendingMicroType || 'None',
+            order: selectedP.bendingOrder ?? 100,
+            unit: 'mm/m',
+            evalType: 'max_only',
+            maxLimit: selectedP.bendingMax,
+            specText: selectedP.bendingMax ? `≤ ${selectedP.bendingMax}` : '-'
+          });
+        }
+        if (hasCamber) {
+          list.push({
+            id: 'camber',
+            name: selectedP.camberName || 'ความคด (Camber)',
+            key: 'camber',
+            isStandard: true,
+            isSC: selectedP.camberIsSC ?? false,
+            microType: selectedP.camberMicroType || 'None',
+            order: selectedP.camberOrder ?? 101,
+            unit: 'mm/m',
+            evalType: 'max_only',
+            maxLimit: selectedP.camberMax,
+            specText: selectedP.camberMax ? `≤ ${selectedP.camberMax}` : '-'
+          });
+        }
+        if (hasTwist) {
+          list.push({
+            id: 'twist',
+            name: selectedP.twistName || 'ความบิด (Twist)',
+            key: 'twist',
+            isStandard: true,
+            isSC: selectedP.twistIsSC ?? false,
+            microType: selectedP.twistMicroType || 'None',
+            order: selectedP.twistOrder ?? 102,
+            unit: 'deg/m',
+            evalType: 'max_only',
+            maxLimit: selectedP.twistMax,
+            specText: selectedP.twistMax ? `≤ ${selectedP.twistMax}` : '-'
+          });
+        }
+        return list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      }
     }
 
-    // Collect all unique custom control point ids & names across saved profiles & inspections
-    const allCustomPointMap: Record<string, string> = {};
-    savedProfiles.forEach(p => {
-      p.customControlPoints?.forEach(cp => {
-        allCustomPointMap[cp.id] = `${cp.name} (${cp.unit || 'mm'})`;
-      });
-    });
+    // Default or 'All': Start with orderedActivePoints from the batch recording page
+    const points: ActiveCuttingPoint[] = [...orderedActivePoints];
+    const existingIds = new Set(points.map(p => p.id));
+    const existingNames = new Set(points.map(p => p.name));
+
+    // Also include any extra custom points from inspections that aren't in orderedActivePoints so data is never hidden
     inspections.forEach(ins => {
       if (ins.customPointValues) {
-        Object.keys(ins.customPointValues).forEach(k => {
-          if (!allCustomPointMap[k]) {
-            allCustomPointMap[k] = `Point ${k}`;
+        Object.entries(ins.customPointValues).forEach(([key, val]) => {
+          if (!existingIds.has(key) && !existingNames.has(key)) {
+            let pointName = key;
+            let specStr = '-';
+            let isCalc = false;
+            let formula = '';
+            let isSC = false;
+            let microType: 'Blade' | 'Rod' | 'None' = 'Blade';
+            let evalType: 'target_tol' | 'min_max' | 'max_only' | 'min_only' | 'pass_fail' = 'target_tol';
+
+            for (const p of savedProfiles) {
+              const found = p.customControlPoints?.find(cp => cp.id === key || cp.name === key);
+              if (found) {
+                pointName = found.name;
+                isCalc = found.isCalculated || false;
+                formula = found.formula || '';
+                isSC = found.isSC || false;
+                microType = found.microType || 'Blade';
+                evalType = found.evalType;
+                if (found.isCalculated && found.formula) {
+                  specStr = `fx: ${found.formula}`;
+                } else if (found.evalType === 'target_tol' && found.target) {
+                  specStr = `${found.target} (+${found.tolPlus || '0'}/-${found.tolMinus || '0'})`;
+                } else if (found.evalType === 'pass_fail') {
+                  specStr = 'PASS / NG';
+                }
+                break;
+              }
+            }
+
+            existingIds.add(key);
+            existingNames.add(pointName);
+            points.push({
+              id: key,
+              name: pointName,
+              isStandard: false,
+              isSC,
+              microType,
+              order: 999,
+              unit: 'mm',
+              evalType,
+              specText: specStr,
+              isCalculated: isCalc,
+              formula
+            });
           }
         });
       }
     });
 
-    const customPointKeys = Object.keys(allCustomPointMap);
+    return points;
+  }, [historyProfileFilter, orderedActivePoints, headerInfo.profileName, savedProfiles, inspections]);
+
+  const filteredInspections = useMemo(() => {
+    let list = inspections;
+    if (historyProfileFilter !== 'All') {
+      list = list.filter(i => i.profileName === historyProfileFilter);
+    }
+    if (!historySearchTerm) return list;
+    const term = historySearchTerm.toLowerCase();
+    return list.filter(i => 
+      i.lotNumber.toLowerCase().includes(term) ||
+      i.profileName.toLowerCase().includes(term) ||
+      i.inspectorName.toLowerCase().includes(term) ||
+      (i.workOrder && i.workOrder.toLowerCase().includes(term)) ||
+      (i.partId && i.partId.toLowerCase().includes(term)) ||
+      (i.sampleName && i.sampleName.toLowerCase().includes(term))
+    );
+  }, [inspections, historyProfileFilter, historySearchTerm]);
+
+  const exportToExcel = () => {
+    if (filteredInspections.length === 0) {
+      showNotification(isTh ? 'ไม่มีข้อมูลสำหรับ Export' : 'No history to export', 'error');
+      return;
+    }
 
     const baseHeaders = [
-      'Timestamp', 'Inspector', 'Employee', 'Machine', 'Work Order', 'Coil No', 'Profile Name', 'Part No', 'Sample Name', 
-      'Width (mm)', 'Height (mm)', 'Length (mm)', 'Bending (mm/m)', 'Camber (mm/m)', 'Twist (deg/m)'
+      'Timestamp', 'Inspector', 'Employee', 'Machine', 'Work Order', 'Coil No', 'Profile Name', 'Part No', 'Sample Name'
     ];
 
-    const customHeaders = customPointKeys.map(k => `"${allCustomPointMap[k]}"`);
-    const finalHeaders = [...baseHeaders, ...customHeaders, 'Status', 'Remarks'];
+    // Export measurement point headers matching historyActivePoints exactly
+    const pointHeaders = historyActivePoints.map((p, idx) => {
+      const scTag = p.isSC ? ' [SC]' : '';
+      const fxTag = p.isCalculated ? ' [fx]' : '';
+      return `"${idx + 1}. ${p.name}${scTag}${fxTag} (${p.specText || '-'})"`;
+    });
 
-    const csvRows = inspections.map(ins => {
+    const finalHeaders = [...baseHeaders, ...pointHeaders, 'Status', 'Remarks'];
+
+    const csvRows = filteredInspections.map(ins => {
       const baseValues = [
         `"${ins.timestamp}"`,
         `"${ins.inspectorName}"`,
@@ -1929,17 +2237,25 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         `"${ins.lotNumber}"`,
         `"${ins.profileName}"`,
         `"${ins.partId}"`,
-        `"${ins.sampleName || '-'}"`,
-        ins.width || '-', ins.height || ins.heightLeft || '-', ins.length || '-',
-        ins.bending || '-', ins.camber || '-', ins.twist || '-'
+        `"${ins.sampleName || '-'}"`
       ];
 
-      const customValues = customPointKeys.map(k => {
-        const val = ins.customPointValues?.[k];
+      const pointValues = historyActivePoints.map(p => {
+        let val = '';
+        if (p.isStandard) {
+          if (p.key === 'width') val = ins.width || '';
+          else if (p.key === 'height') val = ins.height || ins.heightLeft || '';
+          else if (p.key === 'length') val = ins.length || '';
+          else if (p.key === 'bending') val = ins.bending || '';
+          else if (p.key === 'camber') val = ins.camber || '';
+          else if (p.key === 'twist') val = ins.twist || '';
+        } else {
+          val = ins.customPointValues?.[p.id] ?? ins.customPointValues?.[p.name] ?? '';
+        }
         return val ? `"${val}"` : `"-"`;
       });
 
-      return [...baseValues, ...customValues, `"${ins.status}"`, `"${ins.remarks || '-'}"`];
+      return [...baseValues, ...pointValues, `"${ins.status}"`, `"${ins.remarks || '-'}"`];
     });
 
     const csvContent = [finalHeaders.join(','), ...csvRows.map(e => e.join(','))].join('\n');
@@ -1955,18 +2271,6 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     
     showNotification(isTh ? 'ส่งออกไฟล์ CSV เรียบร้อยแล้ว' : 'Exported CSV successfully');
   };
-
-  const filteredInspections = useMemo(() => {
-    if (!historySearchTerm) return inspections;
-    const term = historySearchTerm.toLowerCase();
-    return inspections.filter(i => 
-      i.lotNumber.toLowerCase().includes(term) ||
-      i.profileName.toLowerCase().includes(term) ||
-      i.inspectorName.toLowerCase().includes(term) ||
-      (i.workOrder && i.workOrder.toLowerCase().includes(term)) ||
-      (i.partId && i.partId.toLowerCase().includes(term))
-    );
-  }, [inspections, historySearchTerm]);
 
   return (
     <div className="min-h-screen bg-slate-950 font-sans text-slate-100 p-4 sm:p-6 space-y-6">
@@ -2349,30 +2653,6 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                 {showTwist && <div><span className="text-slate-500">{headerInfo.twistName || 'Twist'}:</span> <strong className="text-amber-300">{headerInfo.twistMax ? `≤ ${headerInfo.twistMax} deg/m` : '-'}</strong></div>}
                 <div><span className="text-slate-500">Part No:</span> <strong className="text-purple-300">{headerInfo.partNo || '-'}</strong></div>
               </div>
-
-              {/* Dynamic Custom Control Points Bar */}
-              {headerInfo.customControlPoints && headerInfo.customControlPoints.length > 0 && (
-                <div className="pt-2 border-t border-slate-800/60 flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-[11px]">
-                    <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>{isTh ? 'จุดควบคุมพิเศษประจำ Profile:' : 'Custom Profile Points:'}</span>
-                  </div>
-                  {headerInfo.customControlPoints.map((cp, cIdx) => (
-                    <span 
-                      key={cp.id || cIdx} 
-                      className="px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-800/80 text-cyan-300 text-[11px] font-mono flex items-center gap-1.5"
-                    >
-                      <span className="font-sans font-bold text-slate-300">{cp.name}:</span>
-                      <strong className="text-cyan-200">
-                        {cp.evalType === 'target_tol' && `${cp.target} (+${cp.tolPlus}/-${cp.tolMinus}) ${cp.unit}`}
-                        {cp.evalType === 'max_only' && `≤ ${cp.maxLimit} ${cp.unit}`}
-                        {cp.evalType === 'min_only' && `≥ ${cp.minLimit} ${cp.unit}`}
-                        {cp.evalType === 'min_max' && `${cp.minLimit} - ${cp.maxLimit} ${cp.unit}`}
-                      </strong>
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 
@@ -2384,7 +2664,27 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                 {isTh ? '2. ตารางบันทึกค่าขนาดจากการตัด (Cutting Measurement Entry Table)' : '2. Cutting Dimension Table'}
               </h3>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleAutoFillSpecs}
+                  title={isTh ? 'ดึงค่าสเปกเป้าหมาย (Specs Target) มาใส่ในแถวที่ 1 เพื่อทดสอบหรือเริ่มบันทึก' : 'Auto-fill target specs into row 1'}
+                  className="bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 hover:text-white font-semibold text-xs px-3 py-2 rounded-xl border border-indigo-800/80 flex items-center gap-1.5 transition shadow-xs"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>{isTh ? '📥 ดึงค่าสเปก (Auto-Fill)' : 'Auto-Fill Specs'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRecalculateAllRows}
+                  title={isTh ? 'คำนวณสูตรคณิตศาสตร์ใหม่ทุกแถว' : 'Recalculate all formulas'}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs px-3 py-2 rounded-xl border border-slate-700 flex items-center gap-1.5 transition"
+                >
+                  <Calculator className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>{isTh ? '🔄 คำนวณสูตร' : 'Recalculate'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={handleResetForm}
@@ -2545,6 +2845,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                             let placeholder = point.specText || '-';
                             let formulaBreakdown = '';
                             let isPendingFormula = false;
+                            let pendingListText = '';
 
                             if (point.isStandard) {
                               if (point.key === 'width') {
@@ -2575,14 +2876,18 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                             } else {
                               val = item.customPointValues?.[point.id] || '';
 
+                              pendingListText = '';
                               if (point.isCalculated && point.formula) {
-                                const vars = getAvailablePointVariables(headerInfo, point.id, item);
+                                const vars = getAvailablePointVariables(headerInfo, point.id, item, orderedActivePoints);
                                 const evalRes = evaluatePointFormula(point.formula, vars);
-                                if (!val && evalRes.value) {
+                                if (evalRes.value) {
                                   val = evalRes.value;
                                 }
                                 formulaBreakdown = evalRes.breakdown;
                                 isPendingFormula = evalRes.pendingVars.length > 0;
+                                if (isPendingFormula) {
+                                  pendingListText = evalRes.pendingVars.join(', ');
+                                }
                               }
 
                               const cpSpec: CuttingCustomPointSpec = {
@@ -2607,7 +2912,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                                 fieldStatus = cStatus === 'Pass' ? 'pass' : cStatus === 'Fail' ? 'fail' : 'neutral';
                               }
                               placeholder = point.isCalculated
-                                ? (isPendingFormula ? `fx (รอค่าตัวแปร)` : `fx: ${point.formula}`)
+                                ? (isPendingFormula ? (isTh ? `fx (รอค่า: ${pendingListText})` : `fx (Wait: ${pendingListText})`) : `fx: ${point.formula}`)
                                 : point.evalType === 'target_tol' ? (point.target || '0.00')
                                 : point.evalType === 'max_only' ? `≤ ${point.maxLimit}`
                                 : point.evalType === 'min_only' ? `≥ ${point.minLimit}`
@@ -2686,7 +2991,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                                         }}
                                         placeholder={placeholder}
                                         title={`สูตร: ${point.name} = ${point.formula}\n${formulaBreakdown ? `การคำนวณ: ${formulaBreakdown}` : ''}`}
-                                        className={`w-full bg-slate-950 border font-mono text-center rounded-lg pl-6 pr-2 py-1.5 focus:outline-none font-bold text-xs ${borderClass}`}
+                                        className={`w-full bg-slate-950 border font-mono text-center rounded-lg pl-6 pr-8 py-1.5 focus:outline-none font-bold text-xs ${borderClass}`}
                                       />
                                       <div 
                                         className="absolute left-2 pointer-events-none text-indigo-400 font-mono text-[10px] font-bold select-none"
@@ -2694,13 +2999,21 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                                       >
                                         fx
                                       </div>
+                                      {val && !isPendingFormula && (
+                                        <div
+                                          className="absolute right-1.5 pointer-events-none px-1 py-0.5 bg-indigo-950/90 border border-indigo-500/50 rounded text-[9px] text-indigo-300 font-mono font-bold select-none uppercase tracking-tighter"
+                                          title={isTh ? 'คำนวณค่าอัตโนมัติเรียบร้อย' : 'Auto-calculated'}
+                                        >
+                                          auto
+                                        </div>
+                                      )}
                                     </div>
 
                                     {/* Formula breakdown tooltip */}
-                                    {formulaBreakdown && (
+                                    {(formulaBreakdown || (point.formula && isPendingFormula)) && (
                                       <div className="hidden group-hover/calc:flex absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-30 px-2.5 py-1 bg-slate-900 border border-indigo-700/90 rounded-md text-[10px] text-indigo-200 font-mono shadow-xl whitespace-nowrap items-center gap-1.5 pointer-events-none">
                                         <Calculator className="w-3 h-3 text-indigo-400" />
-                                        <span>{formulaBreakdown}</span>
+                                        <span>{formulaBreakdown || (isTh ? `สูตร: ${point.formula} (รอค่า: ${pendingListText})` : `Formula: ${point.formula} (Wait: ${pendingListText})`)}</span>
                                       </div>
                                     )}
                                   </div>
@@ -3994,7 +4307,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
                                 {/* Live Formula Preview Test */}
                                 {(() => {
-                                  const vars = getAvailablePointVariables(headerInfo, undefined, cp.id);
+                                  const vars = getAvailablePointVariables(headerInfo, cp.id);
                                   const preview = previewFormulaWithTargets(cp.formula || '', vars);
                                   return (
                                     <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs">
@@ -4305,28 +4618,59 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
       {/* TAB 4: INSPECTION HISTORY */}
       {activeTab === 'history' && (
         <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 shadow-md">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-800">
-            <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-              <History className="w-4 h-4 text-indigo-400" />
-              <span>{isTh ? 'ประวัติการตรวจวัดขนาดจากการตัด (Cutting Inspection Records)' : 'Cutting Inspection History'}</span>
-            </h3>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                <History className="w-4 h-4 text-indigo-400" />
+                <span>{isTh ? 'ประวัติการตรวจวัดขนาดจากการตัด (Cutting Inspection Records)' : 'Cutting Inspection History'}</span>
+              </h3>
+              <span className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-950/80 border border-indigo-800 text-indigo-300 font-semibold flex items-center gap-1">
+                <Sliders className="w-3 h-3 text-indigo-400" />
+                <span>{historyActivePoints.length} {isTh ? 'จุดวัด (ตรงตามหน้าบันทึก)' : 'Measurement Points'}</span>
+              </span>
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-3">
-              <div className="relative w-full sm:w-64">
+              {/* Profile Filter Dropdown */}
+              <div className="w-full sm:w-auto flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs">
+                <Tag className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <select
+                  value={historyProfileFilter}
+                  onChange={(e) => setHistoryProfileFilter(e.target.value)}
+                  className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer pr-1"
+                >
+                  <option value="All" className="bg-slate-900 text-slate-200">
+                    {isTh ? 'แสดงทุก Profile' : 'All Profiles'} ({inspections.length})
+                  </option>
+                  {headerInfo.profileName && (
+                    <option value={headerInfo.profileName} className="bg-slate-900 text-indigo-300 font-bold">
+                      ★ {isTh ? 'โปรไฟล์ปัจจุบัน:' : 'Current:'} {headerInfo.profileName}
+                    </option>
+                  )}
+                  {savedProfiles.filter(p => p.name !== headerInfo.profileName).map(p => (
+                    <option key={p.name} value={p.name} className="bg-slate-900 text-slate-200">
+                      {p.name} {p.partNo ? `(${p.partNo})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="relative w-full sm:w-60">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
                 <input
                   type="text"
                   value={historySearchTerm}
                   onChange={(e) => setHistorySearchTerm(e.target.value)}
-                  placeholder={isTh ? 'ค้นหา Coil, WO, Profile...' : 'Search Coil, WO, Profile...'}
+                  placeholder={isTh ? 'ค้นหา Coil, WO, Profile, Sample...' : 'Search Coil, WO, Profile...'}
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl pl-8 pr-3 py-1.5 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               <button
                 onClick={exportToExcel}
-                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-1.5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20"
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-1.5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 shrink-0"
               >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
                 <span>Export CSV/Excel</span>
               </button>
             </div>
@@ -4336,24 +4680,67 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-950 text-slate-400 font-bold border-b border-slate-800 text-[11px] uppercase">
-                  <th className="p-2.5">Timestamp</th>
-                  <th className="p-2.5">Profile & Part</th>
-                  <th className="p-2.5">Coil / WO</th>
-                  <th className="p-2.5 text-center">Width</th>
-                  <th className="p-2.5 text-center">Height</th>
-                  <th className="p-2.5 text-center">Length</th>
-                  <th className="p-2.5 text-center">Bending</th>
-                  <th className="p-2.5 text-center">Camber</th>
-                  <th className="p-2.5 text-center">Twist</th>
-                  <th className="p-2.5 text-center">Status</th>
-                  <th className="p-2.5">Inspector</th>
-                  <th className="p-2.5 text-center">Action</th>
+                  <th className="p-2.5 whitespace-nowrap min-w-[120px]">Timestamp</th>
+                  <th className="p-2.5 whitespace-nowrap min-w-[130px]">Profile / Sample</th>
+                  <th className="p-2.5 whitespace-nowrap min-w-[120px]">Coil / WO</th>
+
+                  {/* Dynamic Measurement Point Column Headers Matching หน้าบันทึกกลุ่มงาน */}
+                  {historyActivePoints.map((point, pIdx) => (
+                    <th 
+                      key={point.id} 
+                      className={`p-2.5 text-center whitespace-nowrap min-w-[110px] border-r border-slate-800/40 ${
+                        point.isSC ? 'bg-amber-950/20' : point.isCalculated ? 'bg-indigo-950/20' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-1 mb-0.5">
+                        <span className="w-4 h-4 rounded-full bg-slate-800 text-[9px] text-slate-300 flex items-center justify-center font-mono font-bold">
+                          {pIdx + 1}
+                        </span>
+                        {point.isSC && (
+                          <span className="px-1 py-0.2 text-[8px] font-black tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded uppercase flex items-center gap-0.5" title="Special Characteristic / Critical Dimension">
+                            <ShieldAlert className="w-2.5 h-2.5" />
+                            SC
+                          </span>
+                        )}
+                        {point.isCalculated && (
+                          <span className="px-1 py-0.2 text-[8px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 rounded" title={`สูตรคำนวณ: ${point.formula}`}>
+                            fx
+                          </span>
+                        )}
+                        {point.microType && point.microType !== 'None' && (
+                          <span className="px-1 py-0.2 text-[8px] font-medium bg-slate-800 text-slate-400 rounded">
+                            {point.microType}
+                          </span>
+                        )}
+                        {point.judgeType === 'appearance' && (
+                          <span className="px-1 py-0.2 text-[8px] font-medium bg-purple-900/40 text-purple-300 border border-purple-800/50 rounded">
+                            Skin
+                          </span>
+                        )}
+                        {point.judgeType === 'go_no_go' && (
+                          <span className="px-1 py-0.2 text-[8px] font-medium bg-emerald-900/40 text-emerald-300 border border-emerald-800/50 rounded">
+                            Go/No
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-bold text-slate-200 text-xs truncate max-w-[150px]" title={point.name}>
+                        {point.name}
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-500 font-normal mt-0.5 truncate max-w-[150px]" title={point.specText}>
+                        {point.specText}
+                      </div>
+                    </th>
+                  ))}
+
+                  <th className="p-2.5 text-center whitespace-nowrap min-w-[70px]">Status</th>
+                  <th className="p-2.5 whitespace-nowrap min-w-[110px]">Inspector</th>
+                  <th className="p-2.5 text-center whitespace-nowrap min-w-[100px]">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {filteredInspections.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="p-6 text-center text-slate-500 text-xs">
+                    <td colSpan={historyActivePoints.length + 6} className="p-6 text-center text-slate-500 text-xs">
                       {isTh ? 'ไม่พบข้อมูลประวัติการตรวจวัด' : 'No inspection records found'}
                     </td>
                   </tr>
@@ -4363,39 +4750,108 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                       <td className="p-2.5 text-slate-400 font-mono text-[11px] whitespace-nowrap">{ins.timestamp}</td>
                       <td className="p-2.5">
                         <div className="font-bold text-indigo-300">{ins.profileName}</div>
-                        <div className="text-[10px] text-slate-400">Part: {ins.partId}</div>
+                        {ins.sampleName && <div className="text-[10px] text-slate-300 font-medium">Sample: {ins.sampleName}</div>}
+                        <div className="text-[10px] text-slate-500">Part: {ins.partId || '-'}</div>
                       </td>
                       <td className="p-2.5">
                         <div className="font-bold text-slate-200">{ins.lotNumber}</div>
                         <div className="text-[10px] text-slate-400">WO: {ins.workOrder || '-'}</div>
                       </td>
-                      <td className="p-2.5 text-center font-mono font-semibold text-slate-200">{ins.width || '-'}</td>
-                      <td className="p-2.5 text-center font-mono font-semibold text-slate-200">{ins.height || ins.heightLeft || '-'}</td>
-                      <td className="p-2.5 text-center font-mono font-semibold text-slate-200">{ins.length || '-'}</td>
-                      <td className="p-2.5 text-center font-mono font-semibold text-amber-300">{ins.bending || '-'}</td>
-                      <td className="p-2.5 text-center font-mono font-semibold text-amber-300">{ins.camber || '-'}</td>
-                      <td className="p-2.5 text-center font-mono font-semibold text-purple-300">{ins.twist || '-'}</td>
+
+                      {/* Dynamic Point Value Cells with Pass/Fail evaluation */}
+                      {historyActivePoints.map((point) => {
+                        let val: string | number | undefined = '';
+                        if (point.isStandard) {
+                          if (point.key === 'width') val = ins.width;
+                          else if (point.key === 'height') val = ins.height || ins.heightLeft;
+                          else if (point.key === 'length') val = ins.length;
+                          else if (point.key === 'bending') val = ins.bending;
+                          else if (point.key === 'camber') val = ins.camber;
+                          else if (point.key === 'twist') val = ins.twist;
+                        } else {
+                          val = ins.customPointValues?.[point.id] ?? ins.customPointValues?.[point.name];
+                        }
+
+                        const hasVal = !isIgnoredValue(val);
+                        let isFail = false;
+                        let isPass = false;
+
+                        if (hasVal && val !== undefined && val !== null) {
+                          const valStr = String(val).trim();
+                          if (point.isStandard) {
+                            if (point.evalType === 'target_tol') {
+                              const st = getFieldStatus(valStr, point.target, point.tolPlus, point.tolMinus);
+                              if (st === 'fail') isFail = true;
+                              else if (st === 'pass') isPass = true;
+                            } else if (point.evalType === 'max_only') {
+                              const st = getLimitStatus(valStr, point.maxLimit);
+                              if (st === 'fail') isFail = true;
+                              else if (st === 'pass') isPass = true;
+                            }
+                          } else {
+                            const cpSpec: CuttingCustomPointSpec = {
+                              id: point.id,
+                              name: point.name,
+                              evalType: point.evalType,
+                              target: point.target,
+                              tolPlus: point.tolPlus,
+                              tolMinus: point.tolMinus,
+                              maxLimit: point.maxLimit,
+                              minLimit: point.minLimit,
+                              unit: point.unit || 'mm',
+                              order: point.order ?? 0,
+                              isCalculated: point.isCalculated,
+                              formula: point.formula
+                            };
+                            const cpStatus = validateCustomPoint(valStr, cpSpec);
+                            if (cpStatus === 'Fail') isFail = true;
+                            else if (cpStatus === 'Pass') isPass = true;
+                          }
+                        }
+
+                        return (
+                          <td key={point.id} className="p-2.5 text-center font-mono border-r border-slate-800/30">
+                            {hasVal ? (
+                              <div className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
+                                isFail
+                                  ? 'bg-rose-950/80 text-rose-300 border border-rose-700/80'
+                                  : isPass
+                                  ? (point.isCalculated ? 'text-cyan-300 font-bold bg-cyan-950/40 px-2' : 'text-emerald-300')
+                                  : (point.isCalculated ? 'text-indigo-300 font-bold' : 'text-slate-200')
+                              }`}>
+                                {String(val)}
+                              </div>
+                            ) : (
+                              <span className="text-slate-600">-</span>
+                            )}
+                          </td>
+                        );
+                      })}
                       
                       {/* Status */}
-                      <td className="p-2.5 text-center">
+                      <td className="p-2.5 text-center whitespace-nowrap">
                         {ins.status === 'Pass' ? (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 border border-emerald-800 text-emerald-300">PASS</span>
                         ) : (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-950 border border-rose-800 text-rose-300">FAIL</span>
                         )}
-                        {ins.customPointValues && Object.keys(ins.customPointValues).length > 0 && (
-                          <div className="text-[9px] text-cyan-400 font-mono mt-0.5" title={JSON.stringify(ins.customPointValues)}>
-                            +{Object.keys(ins.customPointValues).length} Custom
-                          </div>
-                        )}
                       </td>
                       <td className="p-2.5 text-slate-300">
-                        <div>{ins.inspectorName}</div>
+                        <div className="font-medium">{ins.inspectorName}</div>
                         {ins.shift && <div className="text-[10px] text-cyan-400">Shift: {ins.shift}</div>}
                         <div className="text-[10px] text-slate-500">Op: {ins.employeeName || '-'}</div>
                       </td>
                       <td className="p-2.5 text-center">
                         <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedHistoryDetail(ins)}
+                            className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 transition border border-indigo-500/30 flex items-center gap-1 text-[11px] font-bold"
+                            title={isTh ? "ดูรายละเอียดจุดวัดและสูตรคำนวณ" : "View Record Details"}
+                          >
+                            <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                            <span className="hidden sm:inline">{isTh ? 'ดู' : 'View'}</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleRequestEditHistory(ins)}
@@ -4711,6 +5167,157 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
               >
                 <Save className="w-4 h-4" />
                 <span>{isTh ? 'บันทึกการแก้ไข' : 'Save Changes'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DETAIL MODAL FOR INSPECTION HISTORY RECORD */}
+      {selectedHistoryDetail && (
+        <div className="fixed inset-0 z-[110] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-3xl p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setSelectedHistoryDetail(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-indigo-500/10 text-indigo-400 rounded-2xl border border-indigo-500/20">
+                <Activity className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>{isTh ? 'รายละเอียดบันทึกผลการตรวจสอบขนาด' : 'Inspection Record Details'}</span>
+                  {selectedHistoryDetail.status === 'Pass' ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 border border-emerald-800 text-emerald-300">PASS</span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-950 border border-rose-800 text-rose-300">FAIL</span>
+                  )}
+                </h3>
+                <p className="text-xs text-slate-400 font-mono">
+                  {selectedHistoryDetail.lotNumber} | WO: {selectedHistoryDetail.workOrder || '-'} | {selectedHistoryDetail.timestamp}
+                </p>
+              </div>
+            </div>
+
+            {/* Metadata Summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 text-xs">
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase block font-bold">Profile</span>
+                <span className="text-slate-200 font-semibold">{selectedHistoryDetail.profileName || '-'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase block font-bold">Part No</span>
+                <span className="text-slate-200 font-mono">{selectedHistoryDetail.partId || '-'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase block font-bold">Inspector</span>
+                <span className="text-slate-200">{selectedHistoryDetail.inspectorName || '-'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase block font-bold">Machine / Shift</span>
+                <span className="text-slate-200">{selectedHistoryDetail.machine || '-'} / {selectedHistoryDetail.shift || '-'}</span>
+              </div>
+            </div>
+
+            {/* Standard Dimensions Table */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span>{isTh ? 'ขนาดมาตรฐาน (Standard Dimensions)' : 'Standard Dimensions'}</span>
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                  <div className="text-[10px] text-slate-400">Width (mm)</div>
+                  <div className="text-base font-bold font-mono text-indigo-300">{selectedHistoryDetail.width || '-'}</div>
+                </div>
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                  <div className="text-[10px] text-slate-400">Height (mm)</div>
+                  <div className="text-base font-bold font-mono text-emerald-300">{selectedHistoryDetail.height || selectedHistoryDetail.heightLeft || '-'}</div>
+                </div>
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                  <div className="text-[10px] text-slate-400">Length (mm)</div>
+                  <div className="text-base font-bold font-mono text-purple-300">{selectedHistoryDetail.length || '-'}</div>
+                </div>
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                  <div className="text-[10px] text-slate-400">Bending (mm/m)</div>
+                  <div className="text-base font-bold font-mono text-amber-300">{selectedHistoryDetail.bending || '-'}</div>
+                </div>
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                  <div className="text-[10px] text-slate-400">Camber (mm/m)</div>
+                  <div className="text-base font-bold font-mono text-amber-300">{selectedHistoryDetail.camber || '-'}</div>
+                </div>
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                  <div className="text-[10px] text-slate-400">Twist (mm/m)</div>
+                  <div className="text-base font-bold font-mono text-amber-300">{selectedHistoryDetail.twist || '-'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Control Points & Formulas */}
+            {selectedHistoryDetail.customPointValues && Object.keys(selectedHistoryDetail.customPointValues).length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>{isTh ? 'จุดควบคุมพิเศษและจุดคำนวณจากสูตร (Custom & Formula Points)' : 'Custom & Formula Points'}</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {Object.entries(selectedHistoryDetail.customPointValues).map(([cpKey, cpVal]) => {
+                    const matchedProfile = savedProfiles.find(p => p.name === selectedHistoryDetail.profileName);
+                    const matchedPoint = matchedProfile?.customControlPoints?.find(cp => cp.id === cpKey || cp.name === cpKey);
+                    const isCalc = matchedPoint?.isCalculated;
+
+                    return (
+                      <div key={cpKey} className={`p-3 rounded-xl border ${isCalc ? 'bg-indigo-950/30 border-indigo-800/80' : 'bg-slate-950 border-slate-800'}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-slate-200">
+                            {matchedPoint?.name || cpKey}
+                          </span>
+                          {isCalc && (
+                            <span className="px-1.5 py-0.5 rounded bg-indigo-900/80 text-indigo-300 text-[9px] font-mono border border-indigo-700">
+                              fx: {matchedPoint?.formula}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 flex items-baseline gap-2">
+                          <span className="text-base font-mono font-bold text-cyan-300">
+                            {cpVal || '-'}
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            {matchedPoint?.unit || 'mm'}
+                          </span>
+                        </div>
+                        {matchedPoint && (
+                          <div className="mt-1 text-[10px] text-slate-500 font-mono">
+                            {matchedPoint.evalType === 'target_tol' && `Spec: ${matchedPoint.target} (+${matchedPoint.tolPlus}/-${matchedPoint.tolMinus})`}
+                            {matchedPoint.evalType === 'max_only' && `Spec: ≤ ${matchedPoint.maxLimit}`}
+                            {matchedPoint.evalType === 'min_only' && `Spec: ≥ ${matchedPoint.minLimit}`}
+                            {matchedPoint.evalType === 'min_max' && `Spec: ${matchedPoint.minLimit} - ${matchedPoint.maxLimit}`}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {selectedHistoryDetail.remarks && (
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-400">
+                <span className="font-bold text-slate-300 block mb-0.5">Remarks:</span>
+                {selectedHistoryDetail.remarks}
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedHistoryDetail(null)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-5 py-2.5 rounded-xl transition"
+              >
+                {isTh ? 'ปิดหน้าต่าง' : 'Close'}
               </button>
             </div>
           </div>
