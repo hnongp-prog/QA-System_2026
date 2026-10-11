@@ -121,6 +121,7 @@ export interface NcrRecord {
   sourceModuleCode: string;      // e.g. "IPQA-07", "IQA-01", "IPQA-01", "OQA-01", etc.
   defectCount?: number;
   rootCause?: string;            // 5-Why / Fishbone Cause
+  rootCauseCategories?: string[]; // Check list: "Man", "Method", "Machine", "Materail", "Enviroment"
   immediateAction?: string;      // Containment / Hold Action
   correctiveAction?: string;     // Corrective Action (CAPA)
   preventiveAction?: string;     // Preventive Action

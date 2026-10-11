@@ -1,6 +1,9 @@
 import { NcrRecord, NcrSeverity, NcrStatus } from '../types';
 import { saveCloudData, subscribeToCloudData } from '../services/firestoreSync';
 
+export const ROOT_CAUSE_CATEGORIES = ['Man', 'Method', 'Machine', 'Materail', 'Enviroment'] as const;
+export type RootCauseCategory = typeof ROOT_CAUSE_CATEGORIES[number];
+
 export const INITIAL_NCR_RECORDS: NcrRecord[] = [
   {
     id: 'NCR-2026-001',
@@ -17,6 +20,7 @@ export const INITIAL_NCR_RECORDS: NcrRecord[] = [
     defectCount: 3,
     immediateAction: 'Hold and quarantine Coil #COIL-8802-B at Quarantine Bay Q-2. Red Tag applied.',
     rootCause: 'Extrusion die wear at mandrel tip #2 after 1,450 extrusion runs without calibration.',
+    rootCauseCategories: ['Machine', 'Method'],
     correctiveAction: 'Replace extrusion die #D-8802 with newly polished die; readjust puller tension.',
     preventiveAction: 'Set automated die maintenance alert after 1,200 runs instead of 1,500 runs.',
     assignedTo: 'Wichai T. (Tooling & Die Engineer)',
@@ -39,6 +43,7 @@ export const INITIAL_NCR_RECORDS: NcrRecord[] = [
     defectCount: 2,
     immediateAction: 'Stop slitting line batch. Tag 5 slit coils from Mother Coil B201 under quarantine.',
     rootCause: 'Annealing temperature in furnace zone #3 dropped by 35°C during midnight shift cycle.',
+    rootCauseCategories: ['Machine', 'Enviroment'],
     correctiveAction: 'Recalibrate furnace thermocouple #TC-03 and perform re-annealing test on coil tail sample.',
     preventiveAction: 'Install automated IoT temperature alarm with WhatsApp/SMS notification.',
     assignedTo: 'Nattaporn S. (Metallurgical QA)',
@@ -61,6 +66,7 @@ export const INITIAL_NCR_RECORDS: NcrRecord[] = [
     defectCount: 2,
     immediateAction: 'Rejected incoming shipment of 18 tons. Placed in IQA Quarantine Area.',
     rootCause: 'Supplier scrap sorting error at foundry during melting furnace charge.',
+    rootCauseCategories: ['Materail', 'Man'],
     correctiveAction: 'Return 18 tons to supplier for credit note; request 8D report from supplier.',
     preventiveAction: 'Require Supplier Mill Certificate pre-approval prior to truck dispatch.',
     assignedTo: 'Surasak P. (Supplier Quality Engineer)',
@@ -83,6 +89,7 @@ export const INITIAL_NCR_RECORDS: NcrRecord[] = [
     defectCount: 2,
     immediateAction: 'Tag 20 spools with Yellow Hold Tag. Do not feed to zinc spraying arc booth.',
     rootCause: 'Supplier drawing die undersized during final coil winding.',
+    rootCauseCategories: ['Materail', 'Machine'],
     correctiveAction: 'Supplier replacement spools shipped on express freight.',
     preventiveAction: '100% digital caliper check at incoming receiving gate.',
     assignedTo: 'Prasert L. (IQA Lead)',
@@ -105,6 +112,7 @@ export const INITIAL_NCR_RECORDS: NcrRecord[] = [
     defectCount: 1,
     immediateAction: 'Re-print corrected barcode label and re-attach to packaging box.',
     rootCause: 'Operator used legacy template file from old revision folder.',
+    rootCauseCategories: ['Man', 'Method'],
     correctiveAction: 'Deleted old template files from packaging workstation printer queue.',
     preventiveAction: 'Locked label printing software to pull drawing revisions strictly from ERP database.',
     assignedTo: 'Thanya K. (OQA Lead)',
@@ -252,6 +260,7 @@ export function exportNcrToCsv(records: NcrRecord[]): void {
     'Defect Count',
     'Immediate Action',
     'Root Cause',
+    'Root Cause Categories (5M/4M1E)',
     'Corrective Action (CAPA)',
     'Preventive Action',
     'Assigned To',
@@ -274,6 +283,7 @@ export function exportNcrToCsv(records: NcrRecord[]): void {
     r.defectCount ?? 1,
     r.immediateAction || '',
     r.rootCause || '',
+    (r.rootCauseCategories || []).join('; '),
     r.correctiveAction || '',
     r.preventiveAction || '',
     r.assignedTo || '',

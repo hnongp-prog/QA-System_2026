@@ -35,6 +35,7 @@ import {
   AlertOctagon,
   ArrowUpRight,
   ShieldCheck,
+  CheckSquare,
   X,
   Sun,
   Moon
@@ -46,8 +47,17 @@ import {
   saveNcrRecords, 
   addNcrRecord, 
   exportNcrToCsv,
-  subscribeToNcrRecords
+  subscribeToNcrRecords,
+  ROOT_CAUSE_CATEGORIES
 } from '../utils/ncrStorage';
+
+export const ROOT_CAUSE_CATEGORIES_CONFIG = [
+  { key: 'Man', label: 'Man', labelTh: 'Man (คน/พนักงาน)', descTh: 'ข้อผิดพลาดจากบุคคล ทักษะ ความเหนื่อยล้า การฝึกอบรม' },
+  { key: 'Method', label: 'Method', labelTh: 'Method (วิธีการทำงาน)', descTh: 'ขั้นตอนการผลิต คู่มือการทำงาน พารามิเตอร์ สูตรการทำงาน' },
+  { key: 'Machine', label: 'Machine', labelTh: 'Machine (เครื่องจักร/อุปกรณ์)', descTh: 'ความสึกหรอของเครื่องมือ อุปกรณ์ แม่พิมพ์ การคาลิเบรท' },
+  { key: 'Materail', label: 'Materail', labelTh: 'Materail (วัตถุดิบ/วัสดุ)', descTh: 'คุณภาพวัตถุดิบ ส่วนผสมทางเคมี ข้อบกพร่องจาก Supplier' },
+  { key: 'Enviroment', label: 'Enviroment', labelTh: 'Enviroment (สภาพแวดล้อม)', descTh: 'อุณหภูมิ ความชื้น แสงสว่าง ฝุ่นละออง แรงสั่นสะเทือน' }
+] as const;
 
 interface NcrManagementAppProps {
   onBackToPortal?: () => void;
@@ -124,6 +134,7 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
   const [newStatus, setNewStatus] = useState<NcrStatus>('QUARANTINE');
   const [newImmediateAction, setNewImmediateAction] = useState('');
   const [newRootCause, setNewRootCause] = useState('');
+  const [newRootCauseCategories, setNewRootCauseCategories] = useState<string[]>([]);
   const [newCorrectiveAction, setNewCorrectiveAction] = useState('');
   const [newPreventiveAction, setNewPreventiveAction] = useState('');
   const [newAssignedTo, setNewAssignedTo] = useState('');
@@ -273,6 +284,7 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
       defectCount: 1,
       immediateAction: newImmediateAction.trim() || 'Quarantine and Tag lot for QA disposition.',
       rootCause: newRootCause.trim(),
+      rootCauseCategories: newRootCauseCategories,
       correctiveAction: newCorrectiveAction.trim(),
       preventiveAction: newPreventiveAction.trim(),
       assignedTo: newAssignedTo.trim(),
@@ -309,6 +321,7 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
     setNewInspectionResult('');
     setNewImmediateAction('');
     setNewRootCause('');
+    setNewRootCauseCategories([]);
     setNewCorrectiveAction('');
     setNewPreventiveAction('');
     setNewAssignedTo('');
@@ -796,6 +809,15 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                               <span className="text-amber-400 font-semibold">{isTh ? 'มาตรการ:' : 'Action:'}</span> {item.immediateAction}
                             </div>
                           )}
+                          {item.rootCauseCategories && item.rootCauseCategories.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {item.rootCauseCategories.map((cat) => (
+                                <span key={cat} className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-rose-300 border border-rose-500/30">
+                                  {cat}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </td>
 
                         {/* Status */}
@@ -1029,6 +1051,69 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                 />
               </div>
 
+              {/* D4: Root Cause Analysis & 5M Checklist */}
+              <div className="space-y-3 md:col-span-3 bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                    <Flame className="w-3.5 h-3.5" />
+                    <span>D4: Root Cause Analysis (สาเหตุรากเหง้า 5-Why) & 5M Check list</span>
+                  </label>
+                  <span className="text-[10px] text-slate-500">
+                    {isTh ? 'เลือกหมวดหมู่ปัจจัย 5M' : 'Select 5M Factors'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                  {ROOT_CAUSE_CATEGORIES_CONFIG.map((cat) => {
+                    const isChecked = newRootCauseCategories.includes(cat.key);
+                    const toggle = () => {
+                      setNewRootCauseCategories((prev) =>
+                        prev.includes(cat.key)
+                          ? prev.filter((k) => k !== cat.key)
+                          : [...prev, cat.key]
+                      );
+                    };
+
+                    return (
+                      <div
+                        key={cat.key}
+                        onClick={toggle}
+                        className={`flex flex-col p-2.5 rounded-xl border transition cursor-pointer select-none ${
+                          isChecked
+                            ? 'bg-rose-500/15 border-rose-500/80 text-white ring-1 ring-rose-500/30'
+                            : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={toggle}
+                            className="w-4 h-4 rounded border-slate-600 text-rose-500 focus:ring-rose-500 bg-slate-950 cursor-pointer"
+                          />
+                          <span className={`text-xs font-bold font-mono ${isChecked ? 'text-rose-200' : 'text-slate-300'}`}>
+                            {cat.key}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 mt-1 pl-6">
+                          {cat.labelTh}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="pt-1">
+                  <textarea
+                    rows={2}
+                    value={newRootCause}
+                    onChange={(e) => setNewRootCause(e.target.value)}
+                    placeholder={isTh ? "รายละเอียดสาเหตุรากเหง้า (5-Why Root Cause Details)..." : "Initial 5-Why root cause hypothesis..."}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500 font-mono"
+                  />
+                </div>
+              </div>
+
             </div>
 
             {/* Buttons */}
@@ -1255,19 +1340,106 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                   )}
                 </div>
 
-                {/* D4: Root Cause (5-Why) */}
-                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-1.5">
-                  <span className="text-xs font-bold text-rose-400">D4: Root Cause Analysis (สาเหตุรากเหง้า 5-Why)</span>
-                  {isEditingNcr ? (
-                    <textarea
-                      rows={2}
-                      value={editFormData.rootCause ?? selectedNcr.rootCause ?? ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, rootCause: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
-                    />
-                  ) : (
-                    <p className="text-xs text-slate-300">{selectedNcr.rootCause || 'Root cause investigation in progress.'}</p>
-                  )}
+                {/* D4: Root Cause (5-Why) with 5M Check list */}
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-800/80">
+                    <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                      <Flame className="w-3.5 h-3.5 text-rose-400" />
+                      <span>D4: Root Cause Analysis (สาเหตุรากเหง้า 5-Why)</span>
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      {isTh ? 'Check List ปัจจัย 5M / 4M1E' : '5M Root Cause Checklist'}
+                    </span>
+                  </div>
+
+                  {/* 5M Checklist: "Man", "Method", "Machine", "Materail", "Enviroment" */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                        <CheckSquare className="w-3.5 h-3.5 text-rose-400" />
+                        <span>{isTh ? 'Check List หมวดหมู่สาเหตุ (Root Cause Checklist):' : 'Root Cause Factors Check List:'}</span>
+                      </label>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {isTh ? '(คลิกเพื่อเลือกหรือปลดออก)' : '(Click to toggle)'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                      {ROOT_CAUSE_CATEGORIES_CONFIG.map((cat) => {
+                        const currentCats = isEditingNcr
+                          ? (editFormData.rootCauseCategories || [])
+                          : (selectedNcr.rootCauseCategories || []);
+                        const isChecked = currentCats.some((c) => c.toLowerCase() === cat.key.toLowerCase());
+
+                        const handleToggleCategory = () => {
+                          if (isEditingNcr) {
+                            const next = isChecked
+                              ? currentCats.filter((c) => c.toLowerCase() !== cat.key.toLowerCase())
+                              : [...currentCats, cat.key];
+                            setEditFormData({ ...editFormData, rootCauseCategories: next });
+                          } else {
+                            // Instant toggle in view mode as well
+                            const next = isChecked
+                              ? currentCats.filter((c) => c.toLowerCase() !== cat.key.toLowerCase())
+                              : [...currentCats, cat.key];
+                            const updatedRecord = { ...selectedNcr, rootCauseCategories: next };
+                            const updatedList = ncrList.map((item) => (item.id === selectedNcr.id ? updatedRecord : item));
+                            setNcrList(updatedList);
+                            saveNcrRecords(updatedList);
+                            setSelectedNcr(updatedRecord);
+                            showToast('success', isTh ? `อัปเดต Check list: ${cat.key}` : `Updated Check list: ${cat.key}`);
+                          }
+                        };
+
+                        return (
+                          <div
+                            key={cat.key}
+                            onClick={handleToggleCategory}
+                            className={`flex flex-col p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
+                              isChecked
+                                ? 'bg-rose-500/15 border-rose-500/80 text-white shadow-sm shadow-rose-950/50 ring-1 ring-rose-500/30'
+                                : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={handleToggleCategory}
+                                className="w-4 h-4 rounded border-slate-600 text-rose-500 focus:ring-rose-500 bg-slate-950 cursor-pointer"
+                              />
+                              <span className={`text-xs font-bold font-mono ${isChecked ? 'text-rose-200' : 'text-slate-300'}`}>
+                                {cat.key}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 mt-1 pl-6 leading-tight">
+                              {cat.labelTh}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Root Cause 5-Why Details */}
+                  <div className="space-y-1 pt-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      {isTh ? 'รายละเอียดการวิเคราะห์ 5-Why (Root Cause 5-Why Details):' : '5-Why Root Cause Investigation:'}
+                    </label>
+                    {isEditingNcr ? (
+                      <textarea
+                        rows={3}
+                        value={editFormData.rootCause ?? selectedNcr.rootCause ?? ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, rootCause: e.target.value })}
+                        placeholder={isTh ? 'กรอกรายละเอียดการวิเคราะห์ 5-Why (ทำไม 1, ทำไม 2, ทำไม 3...)' : 'Enter 5-Why analysis details...'}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500 font-mono"
+                      />
+                    ) : (
+                      <p className="text-xs text-slate-300 bg-slate-900/40 p-3 rounded-xl border border-slate-800/80 leading-relaxed font-mono">
+                        {selectedNcr.rootCause || 'Root cause investigation in progress.'}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {/* D5 & D7: Corrective & Preventive */}
@@ -1366,6 +1538,7 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                       setEditFormData({
                         immediateAction: selectedNcr.immediateAction,
                         rootCause: selectedNcr.rootCause,
+                        rootCauseCategories: selectedNcr.rootCauseCategories || [],
                         correctiveAction: selectedNcr.correctiveAction,
                         preventiveAction: selectedNcr.preventiveAction,
                         assignedTo: selectedNcr.assignedTo

@@ -142,6 +142,64 @@ export const isElongPass = (val: number, spec: TensileQualitySpec): boolean => {
   return val >= spec.elong;
 };
 
+// Helper to test if a field is ignored/unmeasured (like '-', 'N/A', empty)
+export const isIgnoredValue = (v?: string | number | null): boolean => {
+  if (v === undefined || v === null) return true;
+  const s = String(v).trim();
+  return s === '' || s === '-' || s === '--' || s === '---' || s === 'N/A' || s === 'n/a' || s === 'none' || s === 'null' || s === 'undefined';
+};
+
+// Helper to evaluate if a single dimension or strength value is Out-of-Spec (NG)
+export const isFieldNg = (
+  field: 'width' | 'h_left' | 'h_right' | 'tensile' | 'yield' | 'yield_val' | 'elong',
+  value: string | number | undefined | null,
+  spec: TensileQualitySpec | null
+): boolean => {
+  if (!spec || value === undefined || value === null) return false;
+  if (isIgnoredValue(value)) return false;
+  const num = typeof value === 'number' ? value : parseFloat(String(value).trim());
+  if (isNaN(num)) return false;
+
+  if (field === 'width') {
+    if (spec.min_w > 0 && num < spec.min_w) return true;
+    if (spec.max_w > 0 && num > spec.max_w) return true;
+    return false;
+  }
+  if (field === 'h_left' || field === 'h_right') {
+    if (spec.min_h > 0 && num < spec.min_h) return true;
+    if (spec.max_h > 0 && num > spec.max_h) return true;
+    return false;
+  }
+  if (field === 'tensile') {
+    return !isTensilePass(num, spec);
+  }
+  if (field === 'yield' || field === 'yield_val') {
+    return !isYieldPass(num, spec);
+  }
+  if (field === 'elong') {
+    return !isElongPass(num, spec);
+  }
+  return false;
+};
+
+// Helper to format field spec limit for title tooltip
+export const getFieldSpecText = (
+  field: 'width' | 'h_left' | 'h_right' | 'tensile' | 'yield' | 'yield_val' | 'elong',
+  spec: TensileQualitySpec | null
+): string => {
+  if (!spec) return '';
+  if (field === 'width') {
+    return spec.min_w > 0 && spec.max_w > 0 ? `${spec.min_w} - ${spec.max_w} mm` : '';
+  }
+  if (field === 'h_left' || field === 'h_right') {
+    return spec.min_h > 0 && spec.max_h > 0 ? `${spec.min_h} - ${spec.max_h} mm` : '';
+  }
+  if (field === 'tensile') return formatTensileSpec(spec);
+  if (field === 'yield' || field === 'yield_val') return formatYieldSpec(spec);
+  if (field === 'elong') return formatElongationSpec(spec);
+  return '';
+};
+
 interface TensileMeasurementAppProps {
   onBackToPortal?: () => void;
   onLogNewActivity?: (activity: InspectionActivity) => void;
@@ -424,13 +482,6 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     setEnteredRows([]);
   };
 
-  // Helper to test if a field is ignored/unmeasured (like '-', 'N/A', empty)
-  const isIgnoredValue = (v?: string | number): boolean => {
-    if (v === undefined || v === null) return true;
-    const s = String(v).trim();
-    return s === '' || s === '-' || s === '--' || s === '---' || s === 'N/A' || s === 'n/a' || s === 'none' || s === 'null' || s === 'undefined';
-  };
-
   // Single Row Evaluator
   const evaluateRow = (row: {
     width: string;
@@ -465,23 +516,23 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
 
     let pass = true;
 
-    if (w !== null && !isNaN(w)) {
-      if (w < matchedSpec.min_w || w > matchedSpec.max_w) pass = false;
+    if (w !== null && !isNaN(w) && isFieldNg('width', row.width, matchedSpec)) {
+      pass = false;
     }
-    if (hl !== null && !isNaN(hl)) {
-      if (hl < matchedSpec.min_h || hl > matchedSpec.max_h) pass = false;
+    if (hl !== null && !isNaN(hl) && isFieldNg('h_left', row.h_left, matchedSpec)) {
+      pass = false;
     }
-    if (hr !== null && !isNaN(hr)) {
-      if (hr < matchedSpec.min_h || hr > matchedSpec.max_h) pass = false;
+    if (hr !== null && !isNaN(hr) && isFieldNg('h_right', row.h_right, matchedSpec)) {
+      pass = false;
     }
-    if (t !== null && !isNaN(t)) {
-      if (!isTensilePass(t, matchedSpec)) pass = false;
+    if (t !== null && !isNaN(t) && isFieldNg('tensile', row.tensile, matchedSpec)) {
+      pass = false;
     }
-    if (y !== null && !isNaN(y)) {
-      if (!isYieldPass(y, matchedSpec)) pass = false;
+    if (y !== null && !isNaN(y) && isFieldNg('yield_val', row.yield_val, matchedSpec)) {
+      pass = false;
     }
-    if (e !== null && !isNaN(e)) {
-      if (!isElongPass(e, matchedSpec)) pass = false;
+    if (e !== null && !isNaN(e) && isFieldNg('elong', row.elong, matchedSpec)) {
+      pass = false;
     }
 
     return pass ? 'PASS' : 'FAIL';
@@ -1335,127 +1386,222 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
               </div>
 
               {/* 10 Inputs Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-2.5">
-                <div>
-                  <label className="text-[9px] font-bold text-cyan-300 block uppercase mb-1">Coil No. *</label>
-                  <input
-                    type="text"
-                    value={topRow.coil_no}
-                    onChange={(e) => setTopRow(prev => ({ ...prev, coil_no: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder="COIL-01"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
-                  />
-                </div>
+              {(() => {
+                const isTopWNg = isFieldNg('width', topRow.width, matchedSpec);
+                const isTopHLNg = isFieldNg('h_left', topRow.h_left, matchedSpec);
+                const isTopHRNg = isFieldNg('h_right', topRow.h_right, matchedSpec);
+                const isTopTensileNg = isFieldNg('tensile', topRow.tensile, matchedSpec);
+                const isTopYieldNg = isFieldNg('yield_val', topRow.yield_val, matchedSpec);
+                const isTopElongNg = isFieldNg('elong', topRow.elong, matchedSpec);
 
-                <div>
-                  <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">Heat No.</label>
-                  <input
-                    type="text"
-                    value={topRow.heat_no}
-                    onChange={(e) => setTopRow(prev => ({ ...prev, heat_no: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder="HEAT-01"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
-                  />
-                </div>
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-2.5">
+                    <div>
+                      <label className="text-[9px] font-bold text-cyan-300 block uppercase mb-1">Coil No. *</label>
+                      <input
+                        type="text"
+                        value={topRow.coil_no}
+                        onChange={(e) => setTopRow(prev => ({ ...prev, coil_no: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                        placeholder="COIL-01"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">Work Order</label>
-                  <input
-                    type="text"
-                    value={topRow.work_order}
-                    onChange={(e) => setTopRow(prev => ({ ...prev, work_order: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder="WO-01"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
-                  />
-                </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">Heat No.</label>
+                      <input
+                        type="text"
+                        value={topRow.heat_no}
+                        onChange={(e) => setTopRow(prev => ({ ...prev, heat_no: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                        placeholder="HEAT-01"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">Sample Name</label>
-                  <input
-                    type="text"
-                    value={topRow.sample_name}
-                    onChange={(e) => setTopRow(prev => ({ ...prev, sample_name: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={`SAMPLE-${String(enteredRows.length + 1).padStart(2, '0')}`}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-bold focus:outline-none focus:border-cyan-400 uppercase"
-                  />
-                </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">Work Order</label>
+                      <input
+                        type="text"
+                        value={topRow.work_order}
+                        onChange={(e) => setTopRow(prev => ({ ...prev, work_order: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                        placeholder="WO-01"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">W (mm)</label>
-                  <input
-                    type="text"
-                    value={topRow.width}
-                    onChange={(e) => setTopRow(prev => ({ ...prev, width: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={matchedSpec ? `${matchedSpec.min_w}` : '0.00 / -'}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">Sample Name</label>
+                      <input
+                        type="text"
+                        value={topRow.sample_name}
+                        onChange={(e) => setTopRow(prev => ({ ...prev, sample_name: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                        placeholder={`SAMPLE-${String(enteredRows.length + 1).padStart(2, '0')}`}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-bold focus:outline-none focus:border-cyan-400 uppercase"
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">H_Left</label>
-                  <input
-                    type="text"
-                    value={topRow.h_left}
-                    onChange={(e) => setTopRow(prev => ({ ...prev, h_left: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={matchedSpec ? `${matchedSpec.min_h}` : '0.00 / -'}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className={`text-[9px] font-bold block uppercase ${isTopWNg ? 'text-rose-400' : 'text-slate-400'}`}>
+                          W (mm)
+                        </label>
+                        {isTopWNg && (
+                          <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 py-0.2 rounded border border-rose-500/40">
+                            NG
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={topRow.width}
+                        onChange={(e) => setTopRow(prev => ({ ...prev, width: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                        placeholder={matchedSpec ? `${matchedSpec.min_w} - ${matchedSpec.max_w}` : '0.00 / -'}
+                        title={isTopWNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('width', matchedSpec)})` : undefined}
+                        className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono transition-colors focus:outline-none ${
+                          isTopWNg
+                            ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400 focus:ring-1 focus:ring-rose-500 shadow-sm shadow-rose-950/50'
+                            : 'bg-slate-900 border border-slate-800 text-slate-100 focus:border-cyan-400'
+                        }`}
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[9px] font-bold text-slate-400 block uppercase mb-1">H_Right</label>
-                  <input
-                    type="text"
-                    value={topRow.h_right}
-                    onChange={(e) => setTopRow(prev => ({ ...prev, h_right: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={matchedSpec ? `${matchedSpec.max_h}` : '0.00 / -'}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className={`text-[9px] font-bold block uppercase ${isTopHLNg ? 'text-rose-400' : 'text-slate-400'}`}>
+                          H_Left
+                        </label>
+                        {isTopHLNg && (
+                          <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 py-0.2 rounded border border-rose-500/40">
+                            NG
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={topRow.h_left}
+                        onChange={(e) => setTopRow(prev => ({ ...prev, h_left: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                        placeholder={matchedSpec ? `${matchedSpec.min_h} - ${matchedSpec.max_h}` : '0.00 / -'}
+                        title={isTopHLNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_left', matchedSpec)})` : undefined}
+                        className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono transition-colors focus:outline-none ${
+                          isTopHLNg
+                            ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400 focus:ring-1 focus:ring-rose-500 shadow-sm shadow-rose-950/50'
+                            : 'bg-slate-900 border border-slate-800 text-slate-100 focus:border-cyan-400'
+                        }`}
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[9px] font-bold text-cyan-400 block uppercase mb-1">Tensile (MPa)</label>
-                  <input
-                    type="text"
-                    value={topRow.tensile}
-                    onChange={(e) => setTopRow(prev => ({ ...prev, tensile: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={matchedSpec ? `≥${matchedSpec.tensile}` : 'MPa / -'}
-                    className="w-full bg-slate-900 border border-cyan-900/80 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className={`text-[9px] font-bold block uppercase ${isTopHRNg ? 'text-rose-400' : 'text-slate-400'}`}>
+                          H_Right
+                        </label>
+                        {isTopHRNg && (
+                          <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 py-0.2 rounded border border-rose-500/40">
+                            NG
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={topRow.h_right}
+                        onChange={(e) => setTopRow(prev => ({ ...prev, h_right: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                        placeholder={matchedSpec ? `${matchedSpec.min_h} - ${matchedSpec.max_h}` : '0.00 / -'}
+                        title={isTopHRNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_right', matchedSpec)})` : undefined}
+                        className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono transition-colors focus:outline-none ${
+                          isTopHRNg
+                            ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400 focus:ring-1 focus:ring-rose-500 shadow-sm shadow-rose-950/50'
+                            : 'bg-slate-900 border border-slate-800 text-slate-100 focus:border-cyan-400'
+                        }`}
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[9px] font-bold text-emerald-400 block uppercase mb-1">Yield (MPa)</label>
-                  <input
-                    type="text"
-                    value={topRow.yield_val}
-                    onChange={(e) => setTopRow(prev => ({ ...prev, yield_val: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={matchedSpec ? `≥${matchedSpec.yield}` : 'MPa / -'}
-                    className="w-full bg-slate-900 border border-emerald-900/80 rounded-lg px-2.5 py-1.5 text-xs text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className={`text-[9px] font-bold block uppercase ${isTopTensileNg ? 'text-rose-400' : 'text-cyan-400'}`}>
+                          Tensile (MPa)
+                        </label>
+                        {isTopTensileNg && (
+                          <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 py-0.2 rounded border border-rose-500/40">
+                            NG
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={topRow.tensile}
+                        onChange={(e) => setTopRow(prev => ({ ...prev, tensile: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                        placeholder={matchedSpec ? formatTensileSpec(matchedSpec) : 'MPa / -'}
+                        title={isTopTensileNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('tensile', matchedSpec)})` : undefined}
+                        className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold transition-colors focus:outline-none ${
+                          isTopTensileNg
+                            ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-500 shadow-sm shadow-rose-950/50'
+                            : 'bg-slate-900 border border-cyan-900/80 text-cyan-300 focus:border-cyan-400'
+                        }`}
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[9px] font-bold text-amber-400 block uppercase mb-1">Elong (%)</label>
-                  <input
-                    type="text"
-                    value={topRow.elong}
-                    onChange={(e) => setTopRow(prev => ({ ...prev, elong: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
-                    placeholder={matchedSpec ? formatElongationSpec(matchedSpec) : '% / -'}
-                    className="w-full bg-slate-900 border border-amber-900/80 rounded-lg px-2.5 py-1.5 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
-                  />
-                </div>
-              </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className={`text-[9px] font-bold block uppercase ${isTopYieldNg ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          Yield (MPa)
+                        </label>
+                        {isTopYieldNg && (
+                          <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 py-0.2 rounded border border-rose-500/40">
+                            NG
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={topRow.yield_val}
+                        onChange={(e) => setTopRow(prev => ({ ...prev, yield_val: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                        placeholder={matchedSpec ? formatYieldSpec(matchedSpec) : 'MPa / -'}
+                        title={isTopYieldNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('yield_val', matchedSpec)})` : undefined}
+                        className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold transition-colors focus:outline-none ${
+                          isTopYieldNg
+                            ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-500 shadow-sm shadow-rose-950/50'
+                            : 'bg-slate-900 border border-emerald-900/80 text-emerald-300 focus:border-emerald-400'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className={`text-[9px] font-bold block uppercase ${isTopElongNg ? 'text-rose-400' : 'text-amber-400'}`}>
+                          Elong (%)
+                        </label>
+                        {isTopElongNg && (
+                          <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 py-0.2 rounded border border-rose-500/40">
+                            NG
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={topRow.elong}
+                        onChange={(e) => setTopRow(prev => ({ ...prev, elong: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                        placeholder={matchedSpec ? formatElongationSpec(matchedSpec) : '% / -'}
+                        title={isTopElongNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('elong', matchedSpec)})` : undefined}
+                        className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold transition-colors focus:outline-none ${
+                          isTopElongNg
+                            ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-500 shadow-sm shadow-rose-950/50'
+                            : 'bg-slate-900 border border-amber-900/80 text-amber-300 focus:border-amber-400'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Action Bar for Top Row */}
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-900">
@@ -1560,107 +1706,166 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         </div>
 
                         {/* Row Editable Fields */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-2">
-                          <div>
-                            <label className="text-[8px] font-bold text-slate-500 block uppercase">Coil No.</label>
-                            <input
-                              type="text"
-                              value={row.coil_no}
-                              onChange={(e) => handleUpdateEnteredRow(row.id, 'coil_no', e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500 uppercase"
-                            />
-                          </div>
+                        {(() => {
+                          const isWNg = isFieldNg('width', row.width, matchedSpec);
+                          const isHLNg = isFieldNg('h_left', row.h_left, matchedSpec);
+                          const isHRNg = isFieldNg('h_right', row.h_right, matchedSpec);
+                          const isTNg = isFieldNg('tensile', row.tensile, matchedSpec);
+                          const isYNg = isFieldNg('yield_val', row.yield_val, matchedSpec);
+                          const isENg = isFieldNg('elong', row.elong, matchedSpec);
 
-                          <div>
-                            <label className="text-[8px] font-bold text-slate-500 block uppercase">Heat No.</label>
-                            <input
-                              type="text"
-                              value={row.heat_no}
-                              onChange={(e) => handleUpdateEnteredRow(row.id, 'heat_no', e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500 uppercase"
-                            />
-                          </div>
+                          return (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-2">
+                              <div>
+                                <label className="text-[8px] font-bold text-slate-500 block uppercase">Coil No.</label>
+                                <input
+                                  type="text"
+                                  value={row.coil_no}
+                                  onChange={(e) => handleUpdateEnteredRow(row.id, 'coil_no', e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500 uppercase"
+                                />
+                              </div>
 
-                          <div>
-                            <label className="text-[8px] font-bold text-slate-500 block uppercase">Work Order</label>
-                            <input
-                              type="text"
-                              value={row.work_order || ''}
-                              onChange={(e) => handleUpdateEnteredRow(row.id, 'work_order', e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500 uppercase"
-                            />
-                          </div>
+                              <div>
+                                <label className="text-[8px] font-bold text-slate-500 block uppercase">Heat No.</label>
+                                <input
+                                  type="text"
+                                  value={row.heat_no}
+                                  onChange={(e) => handleUpdateEnteredRow(row.id, 'heat_no', e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500 uppercase"
+                                />
+                              </div>
 
-                          <div>
-                            <label className="text-[8px] font-bold text-slate-500 block uppercase">Sample</label>
-                            <input
-                              type="text"
-                              value={row.sample_name}
-                              onChange={(e) => handleUpdateEnteredRow(row.id, 'sample_name', e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-bold focus:outline-none focus:border-cyan-500 uppercase"
-                            />
-                          </div>
+                              <div>
+                                <label className="text-[8px] font-bold text-slate-500 block uppercase">Work Order</label>
+                                <input
+                                  type="text"
+                                  value={row.work_order || ''}
+                                  onChange={(e) => handleUpdateEnteredRow(row.id, 'work_order', e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500 uppercase"
+                                />
+                              </div>
 
-                          <div>
-                            <label className="text-[8px] font-bold text-slate-500 block uppercase">W (mm)</label>
-                            <input
-                              type="text"
-                              value={row.width}
-                              onChange={(e) => handleUpdateEnteredRow(row.id, 'width', e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
-                            />
-                          </div>
+                              <div>
+                                <label className="text-[8px] font-bold text-slate-500 block uppercase">Sample</label>
+                                <input
+                                  type="text"
+                                  value={row.sample_name}
+                                  onChange={(e) => handleUpdateEnteredRow(row.id, 'sample_name', e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-bold focus:outline-none focus:border-cyan-500 uppercase"
+                                />
+                              </div>
 
-                          <div>
-                            <label className="text-[8px] font-bold text-slate-500 block uppercase">H_Left</label>
-                            <input
-                              type="text"
-                              value={row.h_left}
-                              onChange={(e) => handleUpdateEnteredRow(row.id, 'h_left', e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
-                            />
-                          </div>
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <label className={`text-[8px] font-bold block uppercase ${isWNg ? 'text-rose-400' : 'text-slate-500'}`}>W (mm)</label>
+                                  {isWNg && <span className="text-[7px] font-bold bg-rose-500/20 text-rose-300 px-0.5 rounded border border-rose-500/40">NG</span>}
+                                </div>
+                                <input
+                                  type="text"
+                                  value={row.width}
+                                  onChange={(e) => handleUpdateEnteredRow(row.id, 'width', e.target.value)}
+                                  title={isWNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('width', matchedSpec)})` : undefined}
+                                  className={`w-full rounded px-2 py-1 text-xs font-mono transition-colors focus:outline-none ${
+                                    isWNg
+                                      ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400 focus:ring-1 focus:ring-rose-500'
+                                      : 'bg-slate-900 border border-slate-800 text-slate-200 focus:border-cyan-500'
+                                  }`}
+                                />
+                              </div>
 
-                          <div>
-                            <label className="text-[8px] font-bold text-slate-500 block uppercase">H_Right</label>
-                            <input
-                              type="text"
-                              value={row.h_right}
-                              onChange={(e) => handleUpdateEnteredRow(row.id, 'h_right', e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
-                            />
-                          </div>
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <label className={`text-[8px] font-bold block uppercase ${isHLNg ? 'text-rose-400' : 'text-slate-500'}`}>H_Left</label>
+                                  {isHLNg && <span className="text-[7px] font-bold bg-rose-500/20 text-rose-300 px-0.5 rounded border border-rose-500/40">NG</span>}
+                                </div>
+                                <input
+                                  type="text"
+                                  value={row.h_left}
+                                  onChange={(e) => handleUpdateEnteredRow(row.id, 'h_left', e.target.value)}
+                                  title={isHLNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_left', matchedSpec)})` : undefined}
+                                  className={`w-full rounded px-2 py-1 text-xs font-mono transition-colors focus:outline-none ${
+                                    isHLNg
+                                      ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400 focus:ring-1 focus:ring-rose-500'
+                                      : 'bg-slate-900 border border-slate-800 text-slate-200 focus:border-cyan-500'
+                                  }`}
+                                />
+                              </div>
 
-                          <div>
-                            <label className="text-[8px] font-bold text-cyan-400 block uppercase">Tensile (MPa)</label>
-                            <input
-                              type="text"
-                              value={row.tensile}
-                              onChange={(e) => handleUpdateEnteredRow(row.id, 'tensile', e.target.value)}
-                              className="w-full bg-slate-900 border border-cyan-900/60 rounded px-2 py-1 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
-                            />
-                          </div>
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <label className={`text-[8px] font-bold block uppercase ${isHRNg ? 'text-rose-400' : 'text-slate-500'}`}>H_Right</label>
+                                  {isHRNg && <span className="text-[7px] font-bold bg-rose-500/20 text-rose-300 px-0.5 rounded border border-rose-500/40">NG</span>}
+                                </div>
+                                <input
+                                  type="text"
+                                  value={row.h_right}
+                                  onChange={(e) => handleUpdateEnteredRow(row.id, 'h_right', e.target.value)}
+                                  title={isHRNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_right', matchedSpec)})` : undefined}
+                                  className={`w-full rounded px-2 py-1 text-xs font-mono transition-colors focus:outline-none ${
+                                    isHRNg
+                                      ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400 focus:ring-1 focus:ring-rose-500'
+                                      : 'bg-slate-900 border border-slate-800 text-slate-200 focus:border-cyan-500'
+                                  }`}
+                                />
+                              </div>
 
-                          <div>
-                            <label className="text-[8px] font-bold text-emerald-400 block uppercase">Yield (MPa)</label>
-                            <input
-                              type="text"
-                              value={row.yield_val}
-                              onChange={(e) => handleUpdateEnteredRow(row.id, 'yield_val', e.target.value)}
-                              className="w-full bg-slate-900 border border-emerald-900/60 rounded px-2 py-1 text-xs text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
-                            />
-                          </div>
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <label className={`text-[8px] font-bold block uppercase ${isTNg ? 'text-rose-400' : 'text-cyan-400'}`}>Tensile (MPa)</label>
+                                  {isTNg && <span className="text-[7px] font-bold bg-rose-500/20 text-rose-300 px-0.5 rounded border border-rose-500/40">NG</span>}
+                                </div>
+                                <input
+                                  type="text"
+                                  value={row.tensile}
+                                  onChange={(e) => handleUpdateEnteredRow(row.id, 'tensile', e.target.value)}
+                                  title={isTNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('tensile', matchedSpec)})` : undefined}
+                                  className={`w-full rounded px-2 py-1 text-xs font-mono font-bold transition-colors focus:outline-none ${
+                                    isTNg
+                                      ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-500'
+                                      : 'bg-slate-900 border border-cyan-900/60 text-cyan-300 focus:border-cyan-400'
+                                  }`}
+                                />
+                              </div>
 
-                          <div>
-                            <label className="text-[8px] font-bold text-amber-400 block uppercase">Elong (%)</label>
-                            <input
-                              type="text"
-                              value={row.elong}
-                              onChange={(e) => handleUpdateEnteredRow(row.id, 'elong', e.target.value)}
-                              className="w-full bg-slate-900 border border-amber-900/60 rounded px-2 py-1 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
-                            />
-                          </div>
-                        </div>
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <label className={`text-[8px] font-bold block uppercase ${isYNg ? 'text-rose-400' : 'text-emerald-400'}`}>Yield (MPa)</label>
+                                  {isYNg && <span className="text-[7px] font-bold bg-rose-500/20 text-rose-300 px-0.5 rounded border border-rose-500/40">NG</span>}
+                                </div>
+                                <input
+                                  type="text"
+                                  value={row.yield_val}
+                                  onChange={(e) => handleUpdateEnteredRow(row.id, 'yield_val', e.target.value)}
+                                  title={isYNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('yield_val', matchedSpec)})` : undefined}
+                                  className={`w-full rounded px-2 py-1 text-xs font-mono font-bold transition-colors focus:outline-none ${
+                                    isYNg
+                                      ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-500'
+                                      : 'bg-slate-900 border border-emerald-900/60 text-emerald-300 focus:border-emerald-400'
+                                  }`}
+                                />
+                              </div>
+
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <label className={`text-[8px] font-bold block uppercase ${isENg ? 'text-rose-400' : 'text-amber-400'}`}>Elong (%)</label>
+                                  {isENg && <span className="text-[7px] font-bold bg-rose-500/20 text-rose-300 px-0.5 rounded border border-rose-500/40">NG</span>}
+                                </div>
+                                <input
+                                  type="text"
+                                  value={row.elong}
+                                  onChange={(e) => handleUpdateEnteredRow(row.id, 'elong', e.target.value)}
+                                  title={isENg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('elong', matchedSpec)})` : undefined}
+                                  className={`w-full rounded px-2 py-1 text-xs font-mono font-bold transition-colors focus:outline-none ${
+                                    isENg
+                                      ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-500'
+                                      : 'bg-slate-900 border border-amber-900/60 text-amber-300 focus:border-amber-400'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })}
@@ -3184,62 +3389,122 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
 
               <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800 space-y-3">
                 <h4 className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">Dimensions & Tensile Values</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Width (mm)</label>
-                    <input
-                      type="number" step="0.1"
-                      value={editingHistoryItem.width || 0}
-                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, width: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">H Left (mm)</label>
-                    <input
-                      type="number" step="0.1"
-                      value={editingHistoryItem.h_left || 0}
-                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, h_left: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">H Right (mm)</label>
-                    <input
-                      type="number" step="0.1"
-                      value={editingHistoryItem.h_right || 0}
-                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, h_right: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tensile (MPa)</label>
-                    <input
-                      type="number" step="1"
-                      value={editingHistoryItem.tensile || 0}
-                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, tensile: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs font-bold text-cyan-300 focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Yield (MPa)</label>
-                    <input
-                      type="number" step="1"
-                      value={editingHistoryItem.yield || 0}
-                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, yield: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs font-bold text-emerald-300 focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Elongation (%)</label>
-                    <input
-                      type="number" step="0.1"
-                      value={editingHistoryItem.elong || 0}
-                      onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, elong: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 font-mono text-xs font-bold text-amber-300 focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
+                {(() => {
+                  const editSpec = specs.find(s => s.profile.toUpperCase() === (editingHistoryItem.profile || '').toUpperCase() && (s.process.toUpperCase() === (editingHistoryItem.process || '').toUpperCase() || !editingHistoryItem.process)) || matchedSpec;
+                  const isEditWNg = isFieldNg('width', editingHistoryItem.width, editSpec);
+                  const isEditHLNg = isFieldNg('h_left', editingHistoryItem.h_left, editSpec);
+                  const isEditHRNg = isFieldNg('h_right', editingHistoryItem.h_right, editSpec);
+                  const isEditTNg = isFieldNg('tensile', editingHistoryItem.tensile, editSpec);
+                  const isEditYNg = isFieldNg('yield', editingHistoryItem.yield, editSpec);
+                  const isEditENg = isFieldNg('elong', editingHistoryItem.elong, editSpec);
+
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className={`text-[10px] font-bold uppercase block ${isEditWNg ? 'text-rose-400' : 'text-slate-500'}`}>Width (mm)</label>
+                          {isEditWNg && <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 rounded border border-rose-500/40">NG</span>}
+                        </div>
+                        <input
+                          type="number" step="0.1"
+                          value={editingHistoryItem.width || 0}
+                          onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, width: parseFloat(e.target.value) || 0 })}
+                          title={isEditWNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('width', editSpec)})` : undefined}
+                          className={`w-full rounded-xl px-2.5 py-1.5 font-mono text-xs transition-colors focus:outline-none ${
+                            isEditWNg
+                              ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400'
+                              : 'bg-slate-900 border border-slate-800 text-slate-200 focus:border-indigo-500'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className={`text-[10px] font-bold uppercase block ${isEditHLNg ? 'text-rose-400' : 'text-slate-500'}`}>H Left (mm)</label>
+                          {isEditHLNg && <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 rounded border border-rose-500/40">NG</span>}
+                        </div>
+                        <input
+                          type="number" step="0.1"
+                          value={editingHistoryItem.h_left || 0}
+                          onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, h_left: parseFloat(e.target.value) || 0 })}
+                          title={isEditHLNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_left', editSpec)})` : undefined}
+                          className={`w-full rounded-xl px-2.5 py-1.5 font-mono text-xs transition-colors focus:outline-none ${
+                            isEditHLNg
+                              ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400'
+                              : 'bg-slate-900 border border-slate-800 text-slate-200 focus:border-indigo-500'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className={`text-[10px] font-bold uppercase block ${isEditHRNg ? 'text-rose-400' : 'text-slate-500'}`}>H Right (mm)</label>
+                          {isEditHRNg && <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 rounded border border-rose-500/40">NG</span>}
+                        </div>
+                        <input
+                          type="number" step="0.1"
+                          value={editingHistoryItem.h_right || 0}
+                          onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, h_right: parseFloat(e.target.value) || 0 })}
+                          title={isEditHRNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_right', editSpec)})` : undefined}
+                          className={`w-full rounded-xl px-2.5 py-1.5 font-mono text-xs transition-colors focus:outline-none ${
+                            isEditHRNg
+                              ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400'
+                              : 'bg-slate-900 border border-slate-800 text-slate-200 focus:border-indigo-500'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className={`text-[10px] font-bold uppercase block ${isEditTNg ? 'text-rose-400' : 'text-slate-500'}`}>Tensile (MPa)</label>
+                          {isEditTNg && <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 rounded border border-rose-500/40">NG</span>}
+                        </div>
+                        <input
+                          type="number" step="1"
+                          value={editingHistoryItem.tensile || 0}
+                          onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, tensile: parseFloat(e.target.value) || 0 })}
+                          title={isEditTNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('tensile', editSpec)})` : undefined}
+                          className={`w-full rounded-xl px-2.5 py-1.5 font-mono text-xs font-bold transition-colors focus:outline-none ${
+                            isEditTNg
+                              ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 focus:border-rose-400'
+                              : 'bg-slate-900 border border-slate-800 text-cyan-300 focus:border-indigo-500'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className={`text-[10px] font-bold uppercase block ${isEditYNg ? 'text-rose-400' : 'text-slate-500'}`}>Yield (MPa)</label>
+                          {isEditYNg && <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 rounded border border-rose-500/40">NG</span>}
+                        </div>
+                        <input
+                          type="number" step="1"
+                          value={editingHistoryItem.yield || 0}
+                          onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, yield: parseFloat(e.target.value) || 0 })}
+                          title={isEditYNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('yield', editSpec)})` : undefined}
+                          className={`w-full rounded-xl px-2.5 py-1.5 font-mono text-xs font-bold transition-colors focus:outline-none ${
+                            isEditYNg
+                              ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 focus:border-rose-400'
+                              : 'bg-slate-900 border border-slate-800 text-emerald-300 focus:border-indigo-500'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className={`text-[10px] font-bold uppercase block ${isEditENg ? 'text-rose-400' : 'text-slate-500'}`}>Elongation (%)</label>
+                          {isEditENg && <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 rounded border border-rose-500/40">NG</span>}
+                        </div>
+                        <input
+                          type="number" step="0.1"
+                          value={editingHistoryItem.elong || 0}
+                          onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, elong: parseFloat(e.target.value) || 0 })}
+                          title={isEditENg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('elong', editSpec)})` : undefined}
+                          className={`w-full rounded-xl px-2.5 py-1.5 font-mono text-xs font-bold transition-colors focus:outline-none ${
+                            isEditENg
+                              ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 focus:border-rose-400'
+                              : 'bg-slate-900 border border-slate-800 text-amber-300 focus:border-indigo-500'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
