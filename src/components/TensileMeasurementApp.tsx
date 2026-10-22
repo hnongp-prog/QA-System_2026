@@ -151,7 +151,7 @@ export const isIgnoredValue = (v?: string | number | null): boolean => {
 
 // Helper to evaluate if a single dimension or strength value is Out-of-Spec (NG)
 export const isFieldNg = (
-  field: 'width' | 'h_left' | 'h_right' | 'tensile' | 'yield' | 'yield_val' | 'elong',
+  field: 'width' | 'h_left' | 'h_middle' | 'h_right' | 'tensile' | 'yield' | 'yield_val' | 'elong',
   value: string | number | undefined | null,
   spec: TensileQualitySpec | null
 ): boolean => {
@@ -165,7 +165,7 @@ export const isFieldNg = (
     if (spec.max_w > 0 && num > spec.max_w) return true;
     return false;
   }
-  if (field === 'h_left' || field === 'h_right') {
+  if (field === 'h_left' || field === 'h_middle' || field === 'h_right') {
     if (spec.min_h > 0 && num < spec.min_h) return true;
     if (spec.max_h > 0 && num > spec.max_h) return true;
     return false;
@@ -184,14 +184,14 @@ export const isFieldNg = (
 
 // Helper to format field spec limit for title tooltip
 export const getFieldSpecText = (
-  field: 'width' | 'h_left' | 'h_right' | 'tensile' | 'yield' | 'yield_val' | 'elong',
+  field: 'width' | 'h_left' | 'h_middle' | 'h_right' | 'tensile' | 'yield' | 'yield_val' | 'elong',
   spec: TensileQualitySpec | null
 ): string => {
   if (!spec) return '';
   if (field === 'width') {
     return spec.min_w > 0 && spec.max_w > 0 ? `${spec.min_w} - ${spec.max_w} mm` : '';
   }
-  if (field === 'h_left' || field === 'h_right') {
+  if (field === 'h_left' || field === 'h_middle' || field === 'h_right') {
     return spec.min_h > 0 && spec.max_h > 0 ? `${spec.min_h} - ${spec.max_h} mm` : '';
   }
   if (field === 'tensile') return formatTensileSpec(spec);
@@ -271,6 +271,7 @@ const INITIAL_RECORDS: TensileRecord[] = [
     sample_name: 'SAMPLE-1A',
     width: 12.5,
     h_left: 3.2,
+    h_middle: 3.2,
     h_right: 3.2,
     tensile: 425.0,
     yield: 265.0,
@@ -291,6 +292,7 @@ const INITIAL_RECORDS: TensileRecord[] = [
     sample_name: 'SAMPLE-1B',
     width: 12.4,
     h_left: 3.1,
+    h_middle: 3.1,
     h_right: 3.1,
     tensile: 418.0,
     yield: 258.0,
@@ -311,6 +313,7 @@ const INITIAL_RECORDS: TensileRecord[] = [
     sample_name: 'SAMPLE-2A',
     width: 20.0,
     h_left: 2.2,
+    h_middle: 2.2,
     h_right: 2.2,
     tensile: 430.0,
     yield: 280.0,
@@ -353,6 +356,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     sample_name: string;
     width: string;
     h_left: string;
+    h_middle: string;
     h_right: string;
     tensile: string;
     yield_val: string;
@@ -364,6 +368,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     sample_name: '',
     width: '',
     h_left: '',
+    h_middle: '',
     h_right: '',
     tensile: '',
     yield_val: '',
@@ -379,6 +384,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     sample_name: string;
     width: string;
     h_left: string;
+    h_middle: string;
     h_right: string;
     tensile: string;
     yield_val: string;
@@ -465,6 +471,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       sample_name: '',
       width: '',
       h_left: '',
+      h_middle: '',
       h_right: '',
       tensile: '',
       yield_val: '',
@@ -486,32 +493,34 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   const evaluateRow = (row: {
     width: string;
     h_left: string;
+    h_middle?: string;
     h_right: string;
     tensile: string;
     yield_val: string;
     elong: string;
   }): 'PASS' | 'FAIL' | 'PENDING' => {
     if (!matchedSpec) return 'PENDING';
-    const parseVal = (v: string) => {
-      if (isIgnoredValue(v)) return null;
+    const parseVal = (v?: string) => {
+      if (v === undefined || isIgnoredValue(v)) return null;
       const num = parseFloat(String(v).trim());
       return isNaN(num) ? NaN : num;
     };
 
     const w = parseVal(row.width);
     const hl = parseVal(row.h_left);
+    const hm = parseVal(row.h_middle);
     const hr = parseVal(row.h_right);
     const t = parseVal(row.tensile);
     const y = parseVal(row.yield_val);
     const e = parseVal(row.elong);
 
     // If any field has invalid NaN (non-numeric text other than '-' or blank), return PENDING
-    if ([w, hl, hr, t, y, e].some(v => typeof v === 'number' && isNaN(v))) {
+    if ([w, hl, hm, hr, t, y, e].some(v => typeof v === 'number' && isNaN(v))) {
       return 'PENDING';
     }
 
     // Check if at least one field has been measured with a valid number
-    const numericFields = [w, hl, hr, t, y, e].filter((v): v is number => v !== null && !isNaN(v));
+    const numericFields = [w, hl, hm, hr, t, y, e].filter((v): v is number => v !== null && !isNaN(v));
     if (numericFields.length === 0) return 'PENDING';
 
     let pass = true;
@@ -520,6 +529,9 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       pass = false;
     }
     if (hl !== null && !isNaN(hl) && isFieldNg('h_left', row.h_left, matchedSpec)) {
+      pass = false;
+    }
+    if (hm !== null && !isNaN(hm) && isFieldNg('h_middle', row.h_middle, matchedSpec)) {
       pass = false;
     }
     if (hr !== null && !isNaN(hr) && isFieldNg('h_right', row.h_right, matchedSpec)) {
@@ -543,7 +555,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     if (e) e.preventDefault();
 
     // Check if at least some key values are typed
-    const hasValues = topRow.tensile.trim() || topRow.width.trim() || topRow.h_left.trim() || topRow.h_right.trim() || topRow.yield_val.trim() || topRow.elong.trim() || topRow.coil_no.trim() || topRow.heat_no.trim() || topRow.work_order.trim() || topRow.sample_name.trim();
+    const hasValues = topRow.tensile.trim() || topRow.width.trim() || topRow.h_left.trim() || topRow.h_middle.trim() || topRow.h_right.trim() || topRow.yield_val.trim() || topRow.elong.trim() || topRow.coil_no.trim() || topRow.heat_no.trim() || topRow.work_order.trim() || topRow.sample_name.trim();
     if (!hasValues) {
       alert(isTh ? 'กรุณากรอกข้อมูลในฟิลด์แถวด้านบนก่อนกดเพิ่มรายการ' : 'Please enter measurement values in the top row before adding');
       return;
@@ -563,6 +575,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       sample_name: cleanSample,
       width: topRow.width.trim() || '-',
       h_left: topRow.h_left.trim() || '-',
+      h_middle: topRow.h_middle.trim() || '-',
       h_right: topRow.h_right.trim() || '-',
       tensile: topRow.tensile.trim() || '-',
       yield_val: topRow.yield_val.trim() || '-',
@@ -580,6 +593,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       sample_name: '',
       width: '',
       h_left: '',
+      h_middle: '',
       h_right: '',
       tensile: '',
       yield_val: '',
@@ -626,6 +640,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
         sample_name: topRow.sample_name.trim().toUpperCase() || `SAMPLE-${rowsToProcess.length + 1}`,
         width: topRow.width.trim() || '-',
         h_left: topRow.h_left.trim() || '-',
+        h_middle: topRow.h_middle.trim() || '-',
         h_right: topRow.h_right.trim() || '-',
         tensile: topRow.tensile.trim() || '-',
         yield_val: topRow.yield_val.trim() || '-',
@@ -651,13 +666,14 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     rowsToProcess.forEach((row, i) => {
       const w = parseOrDash(row.width);
       const hl = parseOrDash(row.h_left);
+      const hm = parseOrDash(row.h_middle);
       const hr = parseOrDash(row.h_right);
       const t = parseOrDash(row.tensile);
       const y = parseOrDash(row.yield_val);
       const e = parseOrDash(row.elong);
 
       // Check if at least one field has been entered
-      if ([w, hl, hr, t, y, e].every(v => v === '-')) return;
+      if ([w, hl, hm, hr, t, y, e].every(v => v === '-')) return;
 
       const evalResult = evaluateRow(row);
       const decision = evalResult === 'FAIL' ? 'FAIL' : 'PASS';
@@ -676,6 +692,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
         sample_name: row.sample_name.trim().toUpperCase() || `SAMPLE-${i+1}`,
         width: w,
         h_left: hl,
+        h_middle: hm,
         h_right: hr,
         tensile: t,
         yield: y,
@@ -966,9 +983,9 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   // Export CSV
   const exportHistoryCSV = () => {
     if (records.length === 0) return;
-    let csv = "\uFEFFCoil No,Heat No,Work Order,Profile,Process,Machine,Inspector,Sample,Width,H_Left,H_Right,Tensile(MPa),Yield(MPa),Elong(%),Decision,Timestamp\n";
+    let csv = "\uFEFFCoil No,Heat No,Work Order,Profile,Process,Machine,Inspector,Sample,Width,H_Left,H_Middle,H_Right,Tensile(MPa),Yield(MPa),Elong(%),Decision,Timestamp\n";
     records.forEach(r => {
-      csv += `"${r.coil_no}","${r.heat_no}","${r.work_order || ''}","${r.profile}","${r.process}","${r.machine}","${r.inspector}","${r.sample_name}","${r.width}","${r.h_left}","${r.h_right}","${r.tensile}","${r.yield}","${r.elong}","${r.decision}","${r.timestamp}"\n`;
+      csv += `"${r.coil_no}","${r.heat_no}","${r.work_order || ''}","${r.profile}","${r.process}","${r.machine}","${r.inspector}","${r.sample_name}","${r.width}","${r.h_left}","${r.h_middle !== undefined && r.h_middle !== null ? r.h_middle : '-'}","${r.h_right}","${r.tensile}","${r.yield}","${r.elong}","${r.decision}","${r.timestamp}"\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -1385,17 +1402,18 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 })()}
               </div>
 
-              {/* 10 Inputs Grid */}
+              {/* 11 Inputs Grid */}
               {(() => {
                 const isTopWNg = isFieldNg('width', topRow.width, matchedSpec);
                 const isTopHLNg = isFieldNg('h_left', topRow.h_left, matchedSpec);
+                const isTopHMNg = isFieldNg('h_middle', topRow.h_middle, matchedSpec);
                 const isTopHRNg = isFieldNg('h_right', topRow.h_right, matchedSpec);
                 const isTopTensileNg = isFieldNg('tensile', topRow.tensile, matchedSpec);
                 const isTopYieldNg = isFieldNg('yield_val', topRow.yield_val, matchedSpec);
                 const isTopElongNg = isFieldNg('elong', topRow.elong, matchedSpec);
 
                 return (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-2.5">
                     <div>
                       <label className="text-[9px] font-bold text-cyan-300 block uppercase mb-1">Coil No. *</label>
                       <input
@@ -1490,6 +1508,32 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         title={isTopHLNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_left', matchedSpec)})` : undefined}
                         className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono transition-colors focus:outline-none ${
                           isTopHLNg
+                            ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400 focus:ring-1 focus:ring-rose-500 shadow-sm shadow-rose-950/50'
+                            : 'bg-slate-900 border border-slate-800 text-slate-100 focus:border-cyan-400'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className={`text-[9px] font-bold block uppercase ${isTopHMNg ? 'text-rose-400' : 'text-slate-400'}`}>
+                          H_Middle
+                        </label>
+                        {isTopHMNg && (
+                          <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 py-0.2 rounded border border-rose-500/40">
+                            NG
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={topRow.h_middle}
+                        onChange={(e) => setTopRow(prev => ({ ...prev, h_middle: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
+                        placeholder={matchedSpec ? `${matchedSpec.min_h} - ${matchedSpec.max_h}` : '0.00 / -'}
+                        title={isTopHMNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_middle', matchedSpec)})` : undefined}
+                        className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono transition-colors focus:outline-none ${
+                          isTopHMNg
                             ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400 focus:ring-1 focus:ring-rose-500 shadow-sm shadow-rose-950/50'
                             : 'bg-slate-900 border border-slate-800 text-slate-100 focus:border-cyan-400'
                         }`}
@@ -1709,13 +1753,14 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         {(() => {
                           const isWNg = isFieldNg('width', row.width, matchedSpec);
                           const isHLNg = isFieldNg('h_left', row.h_left, matchedSpec);
+                          const isHMNg = isFieldNg('h_middle', row.h_middle, matchedSpec);
                           const isHRNg = isFieldNg('h_right', row.h_right, matchedSpec);
                           const isTNg = isFieldNg('tensile', row.tensile, matchedSpec);
                           const isYNg = isFieldNg('yield_val', row.yield_val, matchedSpec);
                           const isENg = isFieldNg('elong', row.elong, matchedSpec);
 
                           return (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-2">
                               <div>
                                 <label className="text-[8px] font-bold text-slate-500 block uppercase">Coil No.</label>
                                 <input
@@ -1786,6 +1831,24 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                                   title={isHLNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_left', matchedSpec)})` : undefined}
                                   className={`w-full rounded px-2 py-1 text-xs font-mono transition-colors focus:outline-none ${
                                     isHLNg
+                                      ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400 focus:ring-1 focus:ring-rose-500'
+                                      : 'bg-slate-900 border border-slate-800 text-slate-200 focus:border-cyan-500'
+                                  }`}
+                                />
+                              </div>
+
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <label className={`text-[8px] font-bold block uppercase ${isHMNg ? 'text-rose-400' : 'text-slate-500'}`}>H_Middle</label>
+                                  {isHMNg && <span className="text-[7px] font-bold bg-rose-500/20 text-rose-300 px-0.5 rounded border border-rose-500/40">NG</span>}
+                                </div>
+                                <input
+                                  type="text"
+                                  value={row.h_middle}
+                                  onChange={(e) => handleUpdateEnteredRow(row.id, 'h_middle', e.target.value)}
+                                  title={isHMNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_middle', matchedSpec)})` : undefined}
+                                  className={`w-full rounded px-2 py-1 text-xs font-mono transition-colors focus:outline-none ${
+                                    isHMNg
                                       ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400 focus:ring-1 focus:ring-rose-500'
                                       : 'bg-slate-900 border border-slate-800 text-slate-200 focus:border-cyan-500'
                                   }`}
@@ -1957,7 +2020,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                   <tr>
                     <th className="px-4 py-3">Batch Info</th>
                     <th className="px-4 py-3">Sample Details</th>
-                    <th className="px-4 py-3">Dimension (W / HL / HR)</th>
+                    <th className="px-4 py-3">Dimension (W / HL / HM / HR)</th>
                     <th className="px-4 py-3">Test Result (T / Y / E)</th>
                     <th className="px-4 py-3 text-center">Judgment</th>
                     <th className="px-4 py-3 text-right">Actions</th>
@@ -1981,7 +2044,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         <span className="text-[10px] text-slate-400">{r.profile} ({r.process})</span>
                       </td>
                       <td className="px-4 py-3 font-mono text-slate-300">
-                        {r.width} / {r.h_left} / {r.h_right} mm
+                        {r.width} / {r.h_left} / {r.h_middle !== undefined && r.h_middle !== null ? r.h_middle : '-'} / {r.h_right} mm
                       </td>
                       <td className="px-4 py-3 font-mono">
                         <span className="text-cyan-300 font-bold">{r.tensile}</span> / <span className="text-emerald-300 font-bold">{r.yield}</span> / <span className="text-amber-300 font-bold">{r.elong}%</span>
@@ -3393,6 +3456,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                   const editSpec = specs.find(s => s.profile.toUpperCase() === (editingHistoryItem.profile || '').toUpperCase() && (s.process.toUpperCase() === (editingHistoryItem.process || '').toUpperCase() || !editingHistoryItem.process)) || matchedSpec;
                   const isEditWNg = isFieldNg('width', editingHistoryItem.width, editSpec);
                   const isEditHLNg = isFieldNg('h_left', editingHistoryItem.h_left, editSpec);
+                  const isEditHMNg = isFieldNg('h_middle', editingHistoryItem.h_middle, editSpec);
                   const isEditHRNg = isFieldNg('h_right', editingHistoryItem.h_right, editSpec);
                   const isEditTNg = isFieldNg('tensile', editingHistoryItem.tensile, editSpec);
                   const isEditYNg = isFieldNg('yield', editingHistoryItem.yield, editSpec);
@@ -3429,6 +3493,23 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                           title={isEditHLNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_left', editSpec)})` : undefined}
                           className={`w-full rounded-xl px-2.5 py-1.5 font-mono text-xs transition-colors focus:outline-none ${
                             isEditHLNg
+                              ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400'
+                              : 'bg-slate-900 border border-slate-800 text-slate-200 focus:border-indigo-500'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className={`text-[10px] font-bold uppercase block ${isEditHMNg ? 'text-rose-400' : 'text-slate-500'}`}>H Middle (mm)</label>
+                          {isEditHMNg && <span className="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1 rounded border border-rose-500/40">NG</span>}
+                        </div>
+                        <input
+                          type="number" step="0.1"
+                          value={editingHistoryItem.h_middle !== undefined && editingHistoryItem.h_middle !== null ? editingHistoryItem.h_middle : 0}
+                          onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, h_middle: parseFloat(e.target.value) || 0 })}
+                          title={isEditHMNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_middle', editSpec)})` : undefined}
+                          className={`w-full rounded-xl px-2.5 py-1.5 font-mono text-xs transition-colors focus:outline-none ${
+                            isEditHMNg
                               ? 'bg-rose-950/40 border-2 border-rose-500 text-rose-300 font-bold focus:border-rose-400'
                               : 'bg-slate-900 border border-slate-800 text-slate-200 focus:border-indigo-500'
                           }`}

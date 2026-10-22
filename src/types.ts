@@ -279,6 +279,7 @@ export interface TensileRecord {
   sample_name: string;
   width: number | string;
   h_left: number | string;
+  h_middle?: number | string;
   h_right: number | string;
   tensile: number | string;
   yield: number | string;
