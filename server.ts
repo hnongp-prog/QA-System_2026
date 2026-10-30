@@ -39,10 +39,11 @@ async function generateVisionContent(
     });
   }
 
-  const models = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3-flash-preview"];
+  const models = ["gemini-3.8-flash", "gemini-3-flash-preview"];
   let lastError: any = null;
 
   for (const model of models) {
+    let timerId: any = null;
     try {
       const generatePromise = ai.models.generateContent({
         model,
@@ -57,17 +58,19 @@ async function generateVisionContent(
         },
       });
 
-      // Allow 7s for the attempt before falling back to next available model
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`Timeout waiting for model ${model}`)), 7000)
-      );
+      // Allow 45s for document vision OCR before attempting fallback
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timerId = setTimeout(() => reject(new Error(`Timeout waiting for model ${model}`)), 45000);
+      });
 
       const response = await Promise.race([generatePromise, timeoutPromise]);
+      clearTimeout(timerId);
 
       if (response && response.text) {
         return response.text;
       }
     } catch (err: any) {
+      if (timerId) clearTimeout(timerId);
       lastError = err;
       console.warn(`[Server Gemini] Attempt with model ${model} failed:`, err?.message || err);
     }

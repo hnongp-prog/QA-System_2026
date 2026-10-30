@@ -550,40 +550,53 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     return pass ? 'PASS' : 'FAIL';
   };
 
-  // Add Item from Top Row into List (Pushes down previous items)
-  const handleAddFromTopRow = (e?: React.FormEvent) => {
+  // Add Item(s) into List (Supports 1, 4, or 6 items at once)
+  const handleAddFromTopRow = (count: number = 1, e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    // Check if at least some key values are typed
-    const hasValues = topRow.tensile.trim() || topRow.width.trim() || topRow.h_left.trim() || topRow.h_middle.trim() || topRow.h_right.trim() || topRow.yield_val.trim() || topRow.elong.trim() || topRow.coil_no.trim() || topRow.heat_no.trim() || topRow.work_order.trim() || topRow.sample_name.trim();
-    if (!hasValues) {
-      alert(isTh ? 'กรุณากรอกข้อมูลในฟิลด์แถวด้านบนก่อนกดเพิ่มรายการ' : 'Please enter measurement values in the top row before adding');
-      return;
+    const lastItem = enteredRows[enteredRows.length - 1];
+    const cleanCoil = topRow.coil_no.trim().toUpperCase() || (lastItem?.coil_no || 'COIL-01');
+    const cleanHeat = topRow.heat_no.trim().toUpperCase() || (lastItem?.heat_no || 'HEAT-01');
+    const cleanWorkOrder = topRow.work_order.trim().toUpperCase() || (lastItem?.work_order || '');
+
+    const newItems: typeof enteredRows = [];
+    const baseCount = enteredRows.length;
+
+    for (let i = 0; i < count; i++) {
+      const sampleIndex = baseCount + i + 1;
+      const sampleLabel = (i === 0 && topRow.sample_name.trim())
+        ? topRow.sample_name.trim().toUpperCase()
+        : `SAMPLE-${String(sampleIndex).padStart(2, '0')}`;
+
+      // If width or height were entered in topRow, copy them across the batch; else check lastItem
+      const wVal = topRow.width.trim() || (lastItem?.width && lastItem.width !== '-' ? lastItem.width : '-');
+      const hlVal = topRow.h_left.trim() || (lastItem?.h_left && lastItem.h_left !== '-' ? lastItem.h_left : '-');
+      const hmVal = topRow.h_middle.trim() || (lastItem?.h_middle && lastItem.h_middle !== '-' ? lastItem.h_middle : '-');
+      const hrVal = topRow.h_right.trim() || (lastItem?.h_right && lastItem.h_right !== '-' ? lastItem.h_right : '-');
+
+      // For first item, take tensile, yield, elong from topRow if available; for subsequent batch items, default to '-' ready for keying
+      const tVal = (i === 0 && topRow.tensile.trim()) ? topRow.tensile.trim() : '-';
+      const yVal = (i === 0 && topRow.yield_val.trim()) ? topRow.yield_val.trim() : '-';
+      const eVal = (i === 0 && topRow.elong.trim()) ? topRow.elong.trim() : '-';
+
+      newItems.push({
+        id: `entry-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`,
+        coil_no: cleanCoil,
+        heat_no: cleanHeat,
+        work_order: cleanWorkOrder,
+        sample_name: sampleLabel,
+        width: wVal,
+        h_left: hlVal,
+        h_middle: hmVal,
+        h_right: hrVal,
+        tensile: tVal,
+        yield_val: yVal,
+        elong: eVal
+      });
     }
 
-    const currentCount = enteredRows.length + 1;
-    const cleanCoil = topRow.coil_no.trim().toUpperCase() || (enteredRows[0]?.coil_no || 'COIL-01');
-    const cleanHeat = topRow.heat_no.trim().toUpperCase() || (enteredRows[0]?.heat_no || 'HEAT-01');
-    const cleanWorkOrder = topRow.work_order.trim().toUpperCase() || (enteredRows[0]?.work_order || '');
-    const cleanSample = topRow.sample_name.trim().toUpperCase() || `SAMPLE-${String(currentCount).padStart(2, '0')}`;
-
-    const newEntryItem = {
-      id: `entry-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      coil_no: cleanCoil,
-      heat_no: cleanHeat,
-      work_order: cleanWorkOrder,
-      sample_name: cleanSample,
-      width: topRow.width.trim() || '-',
-      h_left: topRow.h_left.trim() || '-',
-      h_middle: topRow.h_middle.trim() || '-',
-      h_right: topRow.h_right.trim() || '-',
-      tensile: topRow.tensile.trim() || '-',
-      yield_val: topRow.yield_val.trim() || '-',
-      elong: topRow.elong.trim() || '-'
-    };
-
-    // Prepend to enteredRows so previous rows shift downward
-    setEnteredRows(prev => [newEntryItem, ...prev]);
+    // Append newItems so records sequence naturally in order (1, 2, 3...) like IPQA-02
+    setEnteredRows(prev => [...prev, ...newItems]);
 
     // Keep coil_no, heat_no, and work_order for continuous entry of same batch, clear numerical fields
     setTopRow({
@@ -600,8 +613,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
       elong: ''
     });
 
-    setEntrySuccessToast(isTh ? `✓ เพิ่ม ${cleanSample} สำเร็จ (เลื่อนลงสู่รายการด้านล่าง)` : `✓ Added ${cleanSample} successfully`);
-    setTimeout(() => setEntrySuccessToast(''), 3000);
+    const toastMsg = count === 1
+      ? (isTh ? `✓ เพิ่ม ${newItems[0]?.sample_name || '1 ชิ้นงาน'} เรียบร้อยแล้ว (เรียงต่อท้ายในตาราง)` : `✓ Added 1 sample successfully (appended in order)`)
+      : (isTh ? `✓ เพิ่มชุดชิ้นงาน ${count} ชิ้นเรียบร้อยแล้ว (${newItems[0]?.sample_name} ถึง ${newItems[newItems.length - 1]?.sample_name})` : `✓ Added batch of ${count} samples (${newItems[0]?.sample_name} - ${newItems[newItems.length - 1]?.sample_name})`);
+
+    setEntrySuccessToast(toastMsg);
+    setTimeout(() => setEntrySuccessToast(''), 3500);
   };
 
   const handleUpdateEnteredRow = (id: string, field: string, value: string) => {
@@ -622,17 +639,18 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
   // Save All Entry Rows
   const handleSaveAllRows = () => {
     if (!matchedSpec) {
-      alert(isTh ? 'กรุณาระบุ Profile & Process ที่มีเกณฑ์ Spec ในระบบ' : 'Please specify a profile & process matching registered specs');
+      setEntrySuccessToast(isTh ? '⚠️ กรุณาระบุ Profile & Process ที่มีเกณฑ์ Spec ในระบบ' : '⚠️ Please specify a profile & process matching registered specs');
+      setTimeout(() => setEntrySuccessToast(''), 3500);
       return;
     }
 
     // Collect all entered rows
     const rowsToProcess = [...enteredRows];
 
-    // If operator has filled numbers in the top row without clicking Add, include it too
+    // If operator has filled numbers in the top row without clicking Add, include it too (appended at end)
     const hasTopRowData = (topRow.width.trim() && topRow.width.trim() !== '-') || (topRow.tensile.trim() && topRow.tensile.trim() !== '-');
     if (hasTopRowData) {
-      rowsToProcess.unshift({
+      rowsToProcess.push({
         id: `entry-top-${Date.now()}`,
         coil_no: topRow.coil_no.trim().toUpperCase() || 'COIL-01',
         heat_no: topRow.heat_no.trim().toUpperCase() || 'HEAT-01',
@@ -649,7 +667,8 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
     }
 
     if (rowsToProcess.length === 0) {
-      alert(isTh ? 'กรุณากรอกผลการทดสอบอย่างน้อย 1 รายการก่อนบันทึก' : 'Please enter at least 1 test measurement before saving');
+      setEntrySuccessToast(isTh ? '⚠️ กรุณากรอกผลการทดสอบอย่างน้อย 1 รายการก่อนบันทึก' : '⚠️ Please enter at least 1 test measurement before saving');
+      setTimeout(() => setEntrySuccessToast(''), 3500);
       return;
     }
 
@@ -1336,12 +1355,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   {isTh 
-                    ? 'ฟิลด์กรอกข้อมูลว่างอยู่ด้านบนสุดตลอดเวลาเพื่อการ Key ข้อมูลต่อเนื่อง — เมื่อกดเพิ่มรายการจะเลื่อนลงไปในตารางด้านล่าง'
-                    : 'Blank input row stays at the very top for seamless continuous data entry — added items shift downward below'}
+                    ? 'เพิ่มรายการแบบ +1, +4 หรือ +6 ชิ้นงาน และกรอกผลการทดสอบเรียงตามลำดับได้ต่อเนื่อง'
+                    : 'Add samples by +1, +4, or +6 batch and record test measurements in sequential order'}
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={handleResetForm}
@@ -1351,6 +1370,46 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                   <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
                   <span>{isTh ? 'ล้างฟอร์ม' : 'Reset'}</span>
                 </button>
+
+                {/* Option to Add 1, 4, or 6 sample rows on the top row with ล้างฟอร์ม like IPQA-02 */}
+                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  <span className="text-[10px] text-slate-400 font-bold px-1.5 uppercase hidden sm:inline">
+                    {isTh ? 'เพิ่มรายการ:' : 'Add Rows:'}
+                  </span>
+
+                  {/* Add 1 by 1 */}
+                  <button
+                    type="button"
+                    onClick={() => handleAddFromTopRow(1)}
+                    title={isTh ? 'เพิ่มรายการทีละ 1 ชิ้นงาน' : 'Add 1 sample'}
+                    className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-sm shadow-cyan-500/20 active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{isTh ? '+ เพิ่มทีละ 1' : '+ 1 Row'}</span>
+                  </button>
+
+                  {/* Add 4 at once */}
+                  <button
+                    type="button"
+                    onClick={() => handleAddFromTopRow(4)}
+                    title={isTh ? 'เพิ่มชุดชิ้นงาน 4 รายการภายในครั้งเดียว' : 'Add 4 samples batch at once'}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 border border-indigo-500/30 active:scale-95"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-indigo-300" />
+                    <span>{isTh ? '+ เพิ่มชุด 4 ชิ้น' : '+ 4 Rows'}</span>
+                  </button>
+
+                  {/* Add 6 at once */}
+                  <button
+                    type="button"
+                    onClick={() => handleAddFromTopRow(6)}
+                    title={isTh ? 'เพิ่มชุดชิ้นงาน 6 รายการภายในครั้งเดียว' : 'Add 6 samples batch at once'}
+                    className="bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm shadow-teal-600/20 border border-teal-500/30 active:scale-95"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-teal-300" />
+                    <span>{isTh ? '+ เพิ่มชุด 6 ชิ้น' : '+ 6 Rows'}</span>
+                  </button>
+                </div>
 
                 <button
                   onClick={handleSaveAllRows}
@@ -1651,10 +1710,10 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-900">
                 <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
                   <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 font-mono text-[10px] text-cyan-300">Tip:</span>
-                  <span>{isTh ? 'กด Enter หรือคลิกปุ่มด้านขวา เพื่อเพิ่มรายการแล้วฟิลด์ด้านบนจะพร้อมกรอกตัวอย่างถัดไปทันที' : 'Press Enter or click Add to append row downwards & continue typing'}</span>
+                  <span>{isTh ? 'กด Enter หรือคลิก "+ เพิ่มลงตาราง" เพื่อนำข้อมูลลงในตาราง (เรียงต่อท้ายตามลำดับ 1, 2, 3...)' : 'Press Enter or click Add to append row in order (1, 2, 3...)'}</span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={handleResetTopRow}
@@ -1665,38 +1724,71 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => handleAddFromTopRow()}
-                    className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs px-4 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-md shadow-cyan-500/20"
+                    onClick={() => handleAddFromTopRow(1)}
+                    className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs px-4 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm shadow-cyan-500/20 active:scale-95"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>{isTh ? '+ เพิ่มลงรายการ (เลื่อนลงด้านล่าง)' : '+ Add to List (Push Down)'}</span>
+                    <span>{isTh ? '+ เพิ่มลงตาราง' : '+ Add to Table'}</span>
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* LIST OF ENTERED ROWS (เลื่อนลงไปเรื่อยๆ ด้านล่าง) */}
+            {/* LIST OF ENTERED ROWS (เรียงลำดับต่อเนื่องเหมือน IPQA-02) */}
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                   <FileText className="w-3.5 h-3.5 text-cyan-400" />
                   <span>
                     {isTh 
-                      ? `รายการที่เพิ่มแล้ว (${enteredRows.length} รายการ - รายการล่าสุดอยู่บนสุด / เลื่อนลงด้านล่าง)` 
-                      : `Entered Samples (${enteredRows.length} items - Latest on Top)`}
+                      ? `รายการที่เพิ่มแล้ว (${enteredRows.length} รายการ - เรียงลำดับ 1, 2, 3...)` 
+                      : `Entered Samples (${enteredRows.length} items - Sequential Order)`}
                   </span>
                 </h4>
 
-                {enteredRows.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleClearAllEnteredRows}
-                    className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1 transition"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    <span>{isTh ? 'ล้างรายการทั้งหมด' : 'Clear All'}</span>
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  <div className="hidden sm:flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[10px]">
+                    <span className="text-slate-500 px-1 font-semibold">{isTh ? 'เพิ่มด่วน:' : 'Quick Add:'}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleAddFromTopRow(1)}
+                      title={isTh ? 'เพิ่มทีละ 1' : '+1'}
+                      className="bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold px-2 py-0.5 rounded transition flex items-center gap-0.5"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>1</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddFromTopRow(4)}
+                      title={isTh ? 'เพิ่ม 4 ชิ้น' : '+4'}
+                      className="bg-slate-800 hover:bg-slate-700 text-indigo-300 font-bold px-2 py-0.5 rounded transition flex items-center gap-0.5"
+                    >
+                      <Layers className="w-3 h-3" />
+                      <span>4</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddFromTopRow(6)}
+                      title={isTh ? 'เพิ่ม 6 ชิ้น' : '+6'}
+                      className="bg-slate-800 hover:bg-slate-700 text-teal-300 font-bold px-2 py-0.5 rounded transition flex items-center gap-0.5"
+                    >
+                      <Layers className="w-3 h-3" />
+                      <span>6</span>
+                    </button>
+                  </div>
+
+                  {enteredRows.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearAllEnteredRows}
+                      className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1 transition"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>{isTh ? 'ล้างรายการทั้งหมด' : 'Clear All'}</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {enteredRows.length === 0 ? (

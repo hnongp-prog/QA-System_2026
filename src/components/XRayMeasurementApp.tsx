@@ -931,24 +931,37 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
     }]);
   };
 
-  const addRow = () => {
+  // Add Sample Rows (Supports adding 1, 3, or 5 items at once for Coil)
+  const addRows = (count: number = 1) => {
     const lastItem = batchItems[batchItems.length - 1];
-    setBatchItems(prev => [...prev, { 
-      id: Date.now() + Math.random(), 
-      stage: (lastItem?.stage || 'SETTING') as 'SETTING' | 'MASS',
-      partId: lastItem ? lastItem.partId : '', 
-      lotNumber: lastItem ? lastItem.lotNumber : '', 
-      process: lastItem ? lastItem.process : '', 
-      raUp: createEmptyPointArray(znPointCount), 
-      raLo: createEmptyPointArray(znPointCount), 
-      rzUp: createEmptyPointArray(fluxPointCount), 
-      rzLo: createEmptyPointArray(fluxPointCount), 
-      rtUp: createEmptyPointArray(coveragePointCount), 
-      rtLo: createEmptyPointArray(coveragePointCount), 
-      status: 'Pending', 
-      remarks: '' 
-    }]);
+    const newItems: typeof batchItems = [];
+    for (let i = 0; i < count; i++) {
+      newItems.push({ 
+        id: Date.now() + Math.random() + i, 
+        stage: (lastItem?.stage || 'SETTING') as 'SETTING' | 'MASS',
+        partId: lastItem ? lastItem.partId : '', 
+        lotNumber: lastItem ? lastItem.lotNumber : '', 
+        process: lastItem ? lastItem.process : '', 
+        raUp: createEmptyPointArray(znPointCount), 
+        raLo: createEmptyPointArray(znPointCount), 
+        rzUp: createEmptyPointArray(fluxPointCount), 
+        rzLo: createEmptyPointArray(fluxPointCount), 
+        rtUp: createEmptyPointArray(coveragePointCount), 
+        rtLo: createEmptyPointArray(coveragePointCount), 
+        status: 'Pending', 
+        remarks: '' 
+      });
+    }
+    setBatchItems(prev => [...prev, ...newItems]);
+    showNotification(
+      count === 1
+        ? (isTh ? '✓ เพิ่มรายการ Coil 1 รายการ' : '✓ Added 1 Coil row')
+        : (isTh ? `✓ เพิ่มชุด Coil ${count} รายการเรียบร้อยแล้ว` : `✓ Added batch of ${count} Coil rows`),
+      'success'
+    );
   };
+
+  const addRow = () => addRows(1);
 
   const handleHeaderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -1606,14 +1619,45 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                   <span>{isTh ? '↺ ล้างฟอร์ม' : 'Reset'}</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={addRow}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-3 py-2 rounded-xl border border-slate-700 flex items-center gap-1.5 transition"
-                >
-                  <Plus className="w-4 h-4 text-indigo-400" />
-                  <span>{isTh ? '+ เพิ่มรายการ' : 'Add Row'}</span>
-                </button>
+                {/* Option to Add 1, 3, or 5 sample rows for Coil No. */}
+                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  <span className="text-[10px] text-slate-400 font-bold px-1.5 uppercase hidden sm:inline">
+                    {isTh ? 'เพิ่ม Coil:' : 'Add Coil:'}
+                  </span>
+
+                  {/* Add 1 by 1 */}
+                  <button
+                    type="button"
+                    onClick={() => addRows(1)}
+                    title={isTh ? 'เพิ่มรายการชิ้นงานทีละ 1 Coil' : 'Add 1 Coil row'}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-sm shadow-indigo-600/20 active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{isTh ? '+ เพิ่มทีละ 1' : '+ 1 Coil'}</span>
+                  </button>
+
+                  {/* Add 3 at once */}
+                  <button
+                    type="button"
+                    onClick={() => addRows(3)}
+                    title={isTh ? 'เพิ่มชุดชิ้นงาน 3 Coil พร้อมกันในครั้งเดียว' : 'Add 3 Coil rows at once'}
+                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm shadow-purple-600/20 border border-purple-500/30 active:scale-95"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-purple-300" />
+                    <span>{isTh ? '+ เพิ่มชุด 3 Coil' : '+ 3 Coils'}</span>
+                  </button>
+
+                  {/* Add 5 at once */}
+                  <button
+                    type="button"
+                    onClick={() => addRows(5)}
+                    title={isTh ? 'เพิ่มชุดชิ้นงาน 5 Coil พร้อมกันในครั้งเดียว' : 'Add 5 Coil rows at once'}
+                    className="bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm shadow-teal-600/20 border border-teal-500/30 active:scale-95"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-teal-300" />
+                    <span>{isTh ? '+ เพิ่มชุด 5 Coil' : '+ 5 Coils'}</span>
+                  </button>
+                </div>
 
                 <button
                   type="button"
@@ -2127,6 +2171,53 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                   </tbody>
                 </table>
               </form>
+            </div>
+
+            {/* Bottom Quick-Add Bar for Coil Rows */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-400 font-bold uppercase">
+                  {isTh ? 'เพิ่ม Coil:' : 'Add Coil:'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => addRows(1)}
+                  className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold text-xs px-2.5 py-1 rounded-lg transition flex items-center gap-1 active:scale-95"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>{isTh ? '+1 Coil' : '+1 Coil'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addRows(3)}
+                  className="bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold text-xs px-2.5 py-1 rounded-lg transition flex items-center gap-1 active:scale-95"
+                >
+                  <Layers className="w-3 h-3 text-purple-400" />
+                  <span>{isTh ? '+3 Coil' : '+3 Coils'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addRows(5)}
+                  className="bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold text-xs px-2.5 py-1 rounded-lg transition flex items-center gap-1 active:scale-95"
+                >
+                  <Layers className="w-3 h-3 text-teal-400" />
+                  <span>{isTh ? '+5 Coil' : '+5 Coils'}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {isTh ? `รวมทั้งหมด: ${batchItems.length} รายการ` : `Total: ${batchItems.length} items`}
+                </span>
+                <button
+                  type="button"
+                  onClick={saveBatch}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs px-4 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isTh ? 'บันทึกทั้งหมด' : 'Save'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

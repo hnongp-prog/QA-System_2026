@@ -539,12 +539,15 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   // Extract via Client-side Gemini API (Frontend Direct)
   const extractData = async () => {
     if (!base64Image) {
-      alert(isTh ? 'กรุณาอัปโหลดรูปภาพหรือไฟล์เอกสาร Certificate ก่อนทำการสแกน' : 'Please upload a Certificate document before analyzing.');
+      setStatus({
+        type: 'error',
+        message: isTh ? 'กรุณาอัปโหลดรูปภาพหรือไฟล์เอกสาร Certificate ก่อนทำการสแกน' : 'Please upload a Certificate document before analyzing.'
+      });
       return;
     }
 
     setIsProcessing(true);
-    setStatus({ type: 'info', message: isTh ? 'AI (Client-side) กำลังวิเคราะห์เอกสาร Certificate...' : 'AI (Client-side) analyzing Mill Test Certificate...' });
+    setStatus({ type: 'info', message: isTh ? 'AI กำลังวิเคราะห์เอกสาร Certificate...' : 'AI analyzing Mill Test Certificate...' });
 
     try {
       const sanitizedItems = await analyzeBilletCertClient(base64Image, imageMimeType);
@@ -554,18 +557,17 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
         setSelectedIndices(sanitizedItems.map((_, i) => i));
         setStatus({
           type: 'success',
-          message: isTh ? `สกัดข้อมูลสำเร็จ (Client-side) พบ Heat Numbers ทั้งหมด ${sanitizedItems.length} รายการ` : `Successfully extracted ${sanitizedItems.length} Heat Numbers (Client-side)`
+          message: isTh ? `สกัดข้อมูลสำเร็จ พบ Heat Numbers ทั้งหมด ${sanitizedItems.length} รายการ` : `Successfully extracted ${sanitizedItems.length} Heat Numbers`
         });
       } else {
         throw new Error(isTh ? 'ไม่พบข้อมูล Heat Number ในเอกสารนี้' : 'No Heat Number items detected in this document');
       }
     } catch (err: any) {
-      console.error('Client-side API extraction error:', err);
+      console.error('API extraction error:', err);
       setStatus({
         type: 'error',
         message: isTh ? `เกิดข้อผิดพลาดในการสกัดข้อมูล: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}` : `Extraction error: ${err.message || 'Please try again'}`
       });
-      alert(isTh ? `ไม่สามารถสกัดข้อมูลจากเอกสารได้: ${err.message || 'โปรดตรวจสอบความชัดเจนของไฟล์เอกสาร หรือตรวจสอบ API Key'}` : `Could not extract data: ${err.message}`);
     } finally {
       setIsProcessing(false);
     }

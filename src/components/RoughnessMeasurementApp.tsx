@@ -29,7 +29,8 @@ import {
   Edit3,
   RotateCcw,
   Sun,
-  Moon
+  Moon,
+  Layers
 } from 'lucide-react';
 
 import { 
@@ -428,28 +429,35 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     return ['All', ...Array.from(new Set(months))].sort((a, b) => b.localeCompare(a));
   }, [inspections]);
 
-  // Point Addition Handler
-  const addPoint = (type: 'ra' | 'rz' | 'rt' | 'ry' | 'unZnSpray') => {
+  // Point Addition Handler (Supports adding count: 1, 3, or 5 points)
+  const addPoint = (type: 'ra' | 'rz' | 'rt' | 'ry' | 'unZnSpray', count: number = 1) => {
     setPointConfig(prev => {
-      const newCount = prev[type] + 1;
+      const newCount = prev[type] + count;
+      const emptyArr = Array(count).fill('');
       setBatchItems(prevItems => prevItems.map(item => {
         if (type === 'unZnSpray') {
           return {
             ...item,
-            unZnSprayRaUp: [...item.unZnSprayRaUp, ''],
-            unZnSprayRaLo: [...item.unZnSprayRaLo, ''],
-            unZnSprayRzUp: [...item.unZnSprayRzUp, ''],
-            unZnSprayRzLo: [...item.unZnSprayRzLo, '']
+            unZnSprayRaUp: [...item.unZnSprayRaUp, ...emptyArr],
+            unZnSprayRaLo: [...item.unZnSprayRaLo, ...emptyArr],
+            unZnSprayRzUp: [...item.unZnSprayRzUp, ...emptyArr],
+            unZnSprayRzLo: [...item.unZnSprayRzLo, ...emptyArr]
           };
         }
         return {
           ...item,
-          [`${type}Up`]: [...(item[`${type}Up` as keyof typeof item] as string[]), ''],
-          [`${type}Lo`]: [...(item[`${type}Lo` as keyof typeof item] as string[]), '']
+          [`${type}Up`]: [...(item[`${type}Up` as keyof typeof item] as string[]), ...emptyArr],
+          [`${type}Lo`]: [...(item[`${type}Lo` as keyof typeof item] as string[]), ...emptyArr]
         };
       }));
       return { ...prev, [type]: newCount };
     });
+    showNotification(
+      count === 1
+        ? (isTh ? `✓ เพิ่มจุดวัด ${type.toUpperCase()} 1 จุด` : `✓ Added 1 ${type.toUpperCase()} point`)
+        : (isTh ? `✓ เพิ่มจุดวัด ${type.toUpperCase()} ชุด ${count} จุด` : `✓ Added ${count} ${type.toUpperCase()} points`),
+      'success'
+    );
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, index?: number, field?: string) => {
@@ -941,28 +949,42 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     }]);
   };
 
-  const addRow = () => {
+  // Add Sample Rows (Supports adding 1, 4, or 6 items at once for Coil No.)
+  const addRows = (count: number = 1) => {
     const lastItem = batchItems[batchItems.length - 1];
-    setBatchItems(prev => [...prev, { 
-      id: Date.now() + Math.random(), 
-      partId: lastItem ? lastItem.partId : '', 
-      lotNumber: lastItem ? lastItem.lotNumber : '', 
-      process: lastItem ? lastItem.process : '', 
-      raUp: createEmptyPointArray(pointConfig.ra), 
-      raLo: createEmptyPointArray(pointConfig.ra), 
-      rzUp: createEmptyPointArray(pointConfig.rz), 
-      rzLo: createEmptyPointArray(pointConfig.rz), 
-      rtUp: createEmptyPointArray(pointConfig.rt), 
-      rtLo: createEmptyPointArray(pointConfig.rt), 
-      ryUp: createEmptyPointArray(pointConfig.ry),
-      ryLo: createEmptyPointArray(pointConfig.ry),
-      unZnSprayRaUp: createEmptyPointArray(pointConfig.unZnSpray),
-      unZnSprayRaLo: createEmptyPointArray(pointConfig.unZnSpray),
-      unZnSprayRzUp: createEmptyPointArray(pointConfig.unZnSpray),
-      unZnSprayRzLo: createEmptyPointArray(pointConfig.unZnSpray),
-      status: 'Pending', remarks: '' 
-    }]);
+    const newItems: typeof batchItems = [];
+    for (let i = 0; i < count; i++) {
+      newItems.push({ 
+        id: Date.now() + Math.random() + i, 
+        partId: lastItem ? lastItem.partId : '', 
+        lotNumber: lastItem ? lastItem.lotNumber : '', 
+        process: lastItem ? lastItem.process : (headerInfo.process || ''), 
+        raUp: createEmptyPointArray(pointConfig.ra), 
+        raLo: createEmptyPointArray(pointConfig.ra), 
+        rzUp: createEmptyPointArray(pointConfig.rz), 
+        rzLo: createEmptyPointArray(pointConfig.rz), 
+        rtUp: createEmptyPointArray(pointConfig.rt), 
+        rtLo: createEmptyPointArray(pointConfig.rt), 
+        ryUp: createEmptyPointArray(pointConfig.ry),
+        ryLo: createEmptyPointArray(pointConfig.ry),
+        unZnSprayRaUp: createEmptyPointArray(pointConfig.unZnSpray),
+        unZnSprayRaLo: createEmptyPointArray(pointConfig.unZnSpray),
+        unZnSprayRzUp: createEmptyPointArray(pointConfig.unZnSpray),
+        unZnSprayRzLo: createEmptyPointArray(pointConfig.unZnSpray),
+        status: 'Pending', 
+        remarks: '' 
+      });
+    }
+    setBatchItems(prev => [...prev, ...newItems]);
+    showNotification(
+      count === 1
+        ? (isTh ? '✓ เพิ่มรายการ Coil No. 1 รายการ' : '✓ Added 1 Coil row')
+        : (isTh ? `✓ เพิ่มชุด Coil No. ${count} รายการเรียบร้อยแล้ว` : `✓ Added batch of ${count} Coil rows`),
+      'success'
+    );
   };
+
+  const addRow = () => addRows(1);
 
   const handleHeaderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -1611,7 +1633,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                 {isTh ? '2. ตารางบันทึกค่าความเรียบผิว (Roughness Points Entry)' : '2. Surface Points Entry'}
               </h3>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={handleResetForm}
@@ -1622,14 +1644,45 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                   <span>{isTh ? '↺ ล้างฟอร์ม' : 'Reset'}</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={addRow}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-3 py-2 rounded-xl border border-slate-700 flex items-center gap-1.5 transition"
-                >
-                  <Plus className="w-4 h-4 text-cyan-400" />
-                  <span>{isTh ? '+ เพิ่มรายการชิ้นงาน' : 'Add Row'}</span>
-                </button>
+                {/* Option to Add 1, 4, or 6 sample rows for Coil No. */}
+                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  <span className="text-[10px] text-slate-400 font-bold px-1.5 uppercase hidden sm:inline">
+                    {isTh ? 'เพิ่ม Coil No.:' : 'Add Coil No.:'}
+                  </span>
+
+                  {/* Add 1 by 1 */}
+                  <button
+                    type="button"
+                    onClick={() => addRows(1)}
+                    title={isTh ? 'เพิ่มรายการชิ้นงานทีละ 1 Coil' : 'Add 1 Coil row'}
+                    className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-sm shadow-cyan-500/20 active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{isTh ? '+ เพิ่มทีละ 1' : '+ 1 Coil'}</span>
+                  </button>
+
+                  {/* Add 4 at once (changed from 3 -> 4) */}
+                  <button
+                    type="button"
+                    onClick={() => addRows(4)}
+                    title={isTh ? 'เพิ่มชุดชิ้นงาน 4 Coil พร้อมกันในครั้งเดียว' : 'Add 4 Coil rows at once'}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 border border-indigo-500/30 active:scale-95"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-indigo-300" />
+                    <span>{isTh ? '+ เพิ่มชุด 4 Coil' : '+ 4 Coils'}</span>
+                  </button>
+
+                  {/* Add 6 at once (changed from 5 -> 6) */}
+                  <button
+                    type="button"
+                    onClick={() => addRows(6)}
+                    title={isTh ? 'เพิ่มชุดชิ้นงาน 6 Coil พร้อมกันในครั้งเดียว' : 'Add 6 Coil rows at once'}
+                    className="bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm shadow-teal-600/20 border border-teal-500/30 active:scale-95"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-teal-300" />
+                    <span>{isTh ? '+ เพิ่มชุด 6 Coil' : '+ 6 Coils'}</span>
+                  </button>
+                </div>
 
                 <button
                   type="button"
@@ -1651,9 +1704,14 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                       {isRaActive && (
                         <th className="px-3 py-3 text-center bg-cyan-950/30 text-cyan-300 border-l border-slate-800" colSpan={pointConfig.ra * 2}>
                           <div className="flex items-center justify-center gap-2">
-                            Ra (Up / Lo) 
-                            <button type="button" onClick={() => addPoint('ra')} className="p-0.5 bg-cyan-600 text-slate-950 rounded hover:bg-cyan-500 transition">
-                              <Plus className="w-3 h-3" />
+                            <span>Ra (Up / Lo) [{pointConfig.ra} pt]</span>
+                            <button
+                              type="button"
+                              onClick={() => addPoint('ra', 1)}
+                              title={isTh ? 'เพิ่มจุดวัด Ra (Up / Lo) +1 จุด' : '+1 Ra point (Up / Lo)'}
+                              className="px-2 py-0.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
+                            >
+                              +1
                             </button>
                           </div>
                         </th>
@@ -1661,9 +1719,14 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                       {isRzActive && (
                         <th className="px-3 py-3 text-center bg-emerald-950/30 text-emerald-300 border-l border-slate-800" colSpan={pointConfig.rz * 2}>
                           <div className="flex items-center justify-center gap-2">
-                            Rz (Up / Lo) 
-                            <button type="button" onClick={() => addPoint('rz')} className="p-0.5 bg-emerald-600 text-slate-950 rounded hover:bg-emerald-500 transition">
-                              <Plus className="w-3 h-3" />
+                            <span>Rz (Up / Lo) [{pointConfig.rz} pt]</span>
+                            <button
+                              type="button"
+                              onClick={() => addPoint('rz', 1)}
+                              title={isTh ? 'เพิ่มจุดวัด Rz (Up / Lo) +1 จุด' : '+1 Rz point (Up / Lo)'}
+                              className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
+                            >
+                              +1
                             </button>
                           </div>
                         </th>
@@ -1676,9 +1739,14 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                       {isRtActive && (
                         <th className="px-3 py-3 text-center bg-amber-950/30 text-amber-300 border-l border-slate-800" colSpan={pointConfig.rt * 2}>
                           <div className="flex items-center justify-center gap-2">
-                            Rt (Up / Lo) 
-                            <button type="button" onClick={() => addPoint('rt')} className="p-0.5 bg-amber-600 text-slate-950 rounded hover:bg-amber-500 transition">
-                              <Plus className="w-3 h-3" />
+                            <span>Rt (Up / Lo) [{pointConfig.rt} pt]</span>
+                            <button
+                              type="button"
+                              onClick={() => addPoint('rt', 1)}
+                              title={isTh ? 'เพิ่มจุดวัด Rt (Up / Lo) +1 จุด' : '+1 Rt point (Up / Lo)'}
+                              className="px-2 py-0.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
+                            >
+                              +1
                             </button>
                           </div>
                         </th>
@@ -1686,9 +1754,14 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                       {isRyActive && (
                         <th className="px-3 py-3 text-center bg-indigo-950/30 text-indigo-300 border-l border-slate-800" colSpan={pointConfig.ry * 2}>
                           <div className="flex items-center justify-center gap-2">
-                            Ry (Up / Lo) 
-                            <button type="button" onClick={() => addPoint('ry')} className="p-0.5 bg-indigo-600 text-slate-950 rounded hover:bg-indigo-500 transition">
-                              <Plus className="w-3 h-3" />
+                            <span>Ry (Up / Lo) [{pointConfig.ry} pt]</span>
+                            <button
+                              type="button"
+                              onClick={() => addPoint('ry', 1)}
+                              title={isTh ? 'เพิ่มจุดวัด Ry (Up / Lo) +1 จุด' : '+1 Ry point (Up / Lo)'}
+                              className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
+                            >
+                              +1
                             </button>
                           </div>
                         </th>
@@ -1698,15 +1771,15 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                           <div className="flex items-center justify-center gap-2">
                             <span className="font-bold flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
-                              Un Zn Spray (Ra & Rz)
+                              Un Zn Spray [{pointConfig.unZnSpray} pt]
                             </span>
-                            <button 
-                              type="button" 
-                              onClick={() => addPoint('unZnSpray')} 
-                              className="p-0.5 bg-teal-600 text-slate-950 rounded hover:bg-teal-500 transition"
-                              title="Add Un Zn Spray Point"
+                            <button
+                              type="button"
+                              onClick={() => addPoint('unZnSpray', 1)}
+                              title={isTh ? 'เพิ่มจุดวัด Un Zn Spray (Up / Lo) +1 จุด' : '+1 Un Zn point (Up / Lo)'}
+                              className="px-2 py-0.5 bg-teal-600 hover:bg-teal-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
                             >
-                              <Plus className="w-3 h-3" />
+                              +1
                             </button>
                           </div>
                         </th>
@@ -2022,6 +2095,53 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                   </tbody>
                 </table>
               </form>
+            </div>
+
+            {/* Bottom Quick-Add Bar for Coil Rows */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-400 font-bold uppercase">
+                  {isTh ? 'เพิ่ม Coil No.:' : 'Add Coil No.:'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => addRows(1)}
+                  className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold text-xs px-2.5 py-1 rounded-lg transition flex items-center gap-1 active:scale-95"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>{isTh ? '+1 Coil' : '+1 Coil'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addRows(4)}
+                  className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold text-xs px-2.5 py-1 rounded-lg transition flex items-center gap-1 active:scale-95"
+                >
+                  <Layers className="w-3 h-3 text-indigo-400" />
+                  <span>{isTh ? '+4 Coil' : '+4 Coils'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addRows(6)}
+                  className="bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold text-xs px-2.5 py-1 rounded-lg transition flex items-center gap-1 active:scale-95"
+                >
+                  <Layers className="w-3 h-3 text-teal-400" />
+                  <span>{isTh ? '+6 Coil' : '+6 Coils'}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {isTh ? `รวมทั้งหมด: ${batchItems.length} รายการ` : `Total: ${batchItems.length} items`}
+                </span>
+                <button
+                  type="button"
+                  onClick={saveBatch}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isTh ? 'บันทึกข้อมูล' : 'Save'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

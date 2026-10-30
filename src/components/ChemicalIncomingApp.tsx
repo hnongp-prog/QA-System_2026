@@ -406,17 +406,20 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     });
   };
 
-  // Process Document via Gemini AI (Client-side)
+  // Process Document via Gemini AI (Server-Side Vision)
   const processDocument = async () => {
     if (!base64Image) {
-      alert(isTh ? 'กรุณาอัปโหลดรูปภาพหรือไฟล์เอกสาร Certificate ก่อนทำการสแกน' : 'Please upload a Certificate document before analyzing.');
+      setStatus({
+        type: 'error',
+        message: isTh ? 'กรุณาอัปโหลดรูปภาพหรือไฟล์เอกสาร Certificate ก่อนทำการสแกน' : 'Please upload a Certificate document before analyzing.'
+      });
       return;
     }
 
     setIsProcessing(true);
     setStatus({
       type: 'info',
-      message: isTh ? 'กำลังสแกนวิเคราะห์เอกสาร Chemical Certificate ด้วย AI (Client-side)...' : 'Scanning & analyzing Chemical Certificate document with AI (Client-side)...'
+      message: isTh ? 'กำลังสแกนวิเคราะห์เอกสาร Chemical Certificate ด้วย AI...' : 'Scanning & analyzing Chemical Certificate document with AI...'
     });
 
     try {
@@ -455,7 +458,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
 
         setStatus({
           type: 'success',
-          message: isTh ? `สกัดข้อมูล Chemical COA สำเร็จ! (Client-side) พบ ${tableList.length} รายการวิเคราะห์` : `Successfully extracted Chemical COA data (Client-side) with ${tableList.length} parameters`
+          message: isTh ? `สกัดข้อมูล Chemical COA สำเร็จ! พบ ${tableList.length} รายการวิเคราะห์` : `Successfully extracted Chemical COA data with ${tableList.length} parameters`
         });
       } else {
         throw new Error(isTh ? 'ไม่พบข้อมูลในเอกสารนี้' : 'No valid data extracted from document');
@@ -466,7 +469,6 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
         type: 'error',
         message: isTh ? `เกิดข้อผิดพลาดในการสกัดข้อมูล: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}` : `Extraction failed: ${err.message || 'Please try again'}`
       });
-      alert(isTh ? `เกิดข้อผิดพลาดในการสกัดข้อมูล: ${err.message}` : `Extraction error: ${err.message}`);
     } finally {
       setIsProcessing(false);
     }
@@ -581,7 +583,10 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
       result: overallResult
     };
     navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-    alert(isTh ? 'คัดลอกข้อมูล JSON เรียบร้อยแล้ว' : 'Copied JSON to clipboard!');
+    setStatus({
+      type: 'success',
+      message: isTh ? 'คัดลอกข้อมูล JSON เรียบร้อยแล้ว' : 'Copied JSON to clipboard!'
+    });
   };
 
   // Reset form

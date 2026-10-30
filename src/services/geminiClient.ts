@@ -409,32 +409,37 @@ Each object must have the following keys:
     if (Array.isArray(parsedData.items)) rawArray = parsedData.items;
     else if (Array.isArray(parsedData.data)) rawArray = parsedData.data;
     else if (Array.isArray(parsedData.results)) rawArray = parsedData.results;
+    else if (Array.isArray(parsedData.records)) rawArray = parsedData.records;
+    else if (Array.isArray(parsedData.lots)) rawArray = parsedData.lots;
+    else if (Array.isArray(parsedData.heats)) rawArray = parsedData.heats;
+    else if (Array.isArray(parsedData.heat_numbers)) rawArray = parsedData.heat_numbers;
     else rawArray = [parsedData];
   }
 
-  const finalArray = rawArray.map((item: any) => {
+  const finalArray = rawArray.map((item: any, idx: number) => {
     if (!item || typeof item !== "object") return null;
+    const rawChem = item.chemical_composition || item.chemical || item.chemistry || {};
     return {
-      heat_number: String(item.heat_number || item.heatNo || item.lot || "H-ZN-01").trim(),
-      grade: String(item.grade || "ZN-99.99").trim(),
-      supplier: String(item.supplier || item.supplier_name || "").trim(),
-      inspector_name: String(item.inspector_name || "").trim(),
-      drum: String(item.drum || "DRUM-01").trim(),
-      batch_no: String(item.batch_no || "").trim(),
-      po_no: String(item.po_no || "").trim(),
+      heat_number: String(item.heat_number || item.heatNo || item.heat_no || item.lot_no || item.lot || `H2026-ZN-${901 + idx}`).trim(),
+      grade: String(item.grade || item.alloy || "ZN-99.99").trim(),
+      supplier: String(item.supplier || item.supplier_name || item.manufacturer || "").trim(),
+      inspector_name: String(item.inspector_name || item.inspector || "").trim(),
+      drum: String(item.drum || item.drum_no || `DRUM-0${idx + 1}`).trim(),
+      batch_no: String(item.batch_no || item.batchNo || item.batch || "").trim(),
+      po_no: String(item.po_no || item.poNo || item.invoice_no || "").trim(),
       diameter: String(item.diameter || "2.0 mm").trim(),
       appearance: String(item.appearance || "Clean & Bright Surface").trim(),
-      quantity_pcs: String(item.quantity_pcs || "10"),
-      weight_kg: String(item.weight_kg || "200"),
-      tensile_strength: String(item.tensile_strength || ""),
-      elongation: String(item.elongation || ""),
+      quantity_pcs: String(item.quantity_pcs || item.quantity || item.qty || "10"),
+      weight_kg: String(item.weight_kg || item.weight || "200"),
+      tensile_strength: String(item.tensile_strength ?? item.tensile ?? ""),
+      elongation: String(item.elongation ?? ""),
       chemical_composition: {
-        Pb: String(item.chemical_composition?.Pb ?? "").replace(/,/g, "."),
-        Fe: String(item.chemical_composition?.Fe ?? "").replace(/,/g, "."),
-        Cd: String(item.chemical_composition?.Cd ?? "").replace(/,/g, "."),
-        Sn: String(item.chemical_composition?.Sn ?? "").replace(/,/g, "."),
-        Cu: String(item.chemical_composition?.Cu ?? "").replace(/,/g, "."),
-        Zn: String(item.chemical_composition?.Zn ?? "").replace(/,/g, ".")
+        Pb: String(rawChem.Pb ?? rawChem.pb ?? "").replace(/,/g, "."),
+        Fe: String(rawChem.Fe ?? rawChem.fe ?? "").replace(/,/g, "."),
+        Cd: String(rawChem.Cd ?? rawChem.cd ?? "").replace(/,/g, "."),
+        Sn: String(rawChem.Sn ?? rawChem.sn ?? "").replace(/,/g, "."),
+        Cu: String(rawChem.Cu ?? rawChem.cu ?? "").replace(/,/g, "."),
+        Zn: String(rawChem.Zn ?? rawChem.zn ?? "").replace(/,/g, ".")
       }
     };
   }).filter(Boolean);
@@ -565,6 +570,67 @@ Key Instructions:
 5. Return strictly valid JSON with top-level keys "header" and "table".`;
 
   const rawText = await callGeminiVisionClientSide(prompt, [{ base64: fileBase64, mimeType }]);
-  const jsonRes = cleanAndParseJson(rawText);
-  return jsonRes;
+  const parsedData = cleanAndParseJson(rawText);
+
+  let rawHeader: any = {};
+  let rawTable: any[] = [];
+
+  if (parsedData && typeof parsedData === "object") {
+    if (parsedData.header && typeof parsedData.header === "object") {
+      rawHeader = parsedData.header;
+    } else if (parsedData.metadata && typeof parsedData.metadata === "object") {
+      rawHeader = parsedData.metadata;
+    } else if (parsedData.report && typeof parsedData.report === "object") {
+      rawHeader = parsedData.report.header || parsedData.report;
+    } else {
+      rawHeader = parsedData;
+    }
+
+    const tableArray = parsedData.table ||
+      parsedData.items ||
+      parsedData.measurements ||
+      parsedData.results ||
+      parsedData.dimensions ||
+      parsedData.rows ||
+      parsedData.details ||
+      (parsedData.report && (parsedData.report.table || parsedData.report.items)) ||
+      (Array.isArray(parsedData) ? parsedData : []);
+
+    if (Array.isArray(tableArray)) {
+      rawTable = tableArray;
+    }
+  }
+
+  const cleanHeader = {
+    inspector_name: String(rawHeader.inspector_name || rawHeader.inspector || rawHeader.qc_inspector || rawHeader.operator || "").trim(),
+    coil_no: String(rawHeader.coil_no || rawHeader.coil || rawHeader.lot_no || rawHeader.batch_no || rawHeader.coil_number || "").trim(),
+    profile: String(rawHeader.profile || rawHeader.profile_no || rawHeader.profile_code || rawHeader.item_code || "").trim(),
+    sample_name: String(rawHeader.sample_name || rawHeader.sample || rawHeader.sample_id || "").trim(),
+    process: String(rawHeader.process || rawHeader.process_name || rawHeader.line || rawHeader.machine || "").trim()
+  };
+
+  const cleanTable = rawTable.map((row: any) => {
+    if (!row) return null;
+    if (typeof row === "object") {
+      let desc = String(row.description || row.item || row.name || row.parameter || row.point || row.label || row.code || "").trim();
+      let val = row.total ?? row.value ?? row.val ?? row.reading ?? row.measurement ?? "";
+      if (typeof val === "string") {
+        val = val.replace(/,/g, ".").replace(/[^\d.-]/g, "").trim();
+      }
+      return {
+        description: desc || "ITEM",
+        total: String(val)
+      };
+    } else {
+      return {
+        description: "ITEM",
+        total: String(row).replace(/,/g, ".").trim()
+      };
+    }
+  }).filter((item: any) => item && item.description);
+
+  return {
+    header: cleanHeader,
+    table: cleanTable
+  };
 }
