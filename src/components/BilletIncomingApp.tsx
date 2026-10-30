@@ -57,7 +57,7 @@ import {
   InspectionActivity,
   ThemeMode
 } from '../types';
-import { analyzeBilletCertClient, getGeminiApiKey } from '../services/geminiClient';
+import { analyzeBilletCertClient } from '../services/geminiClient';
 import { BilletWeightAnalyticsChart } from './billetIncoming/BilletWeightAnalyticsChart';
 import { generateQrSvgString, QRCodeView, getBilletQrPayload, QrDataMode, QrZoomModal } from '../utils/qrCodeHelper';
 

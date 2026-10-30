@@ -27,7 +27,9 @@ import {
   ChevronRight,
   ShieldCheck,
   Box,
-  Cloud
+  Cloud,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 import { 
@@ -35,7 +37,8 @@ import {
   FgCoilItem, 
   FgProfileSpec, 
   Language, 
-  InspectionActivity 
+  InspectionActivity,
+  ThemeMode
 } from '../types';
 import { analyzeFgPreShipmentLabelClient } from '../services/geminiClient';
 import { 
@@ -49,6 +52,8 @@ interface FgPreShipmentAppProps {
   onBackToPortal?: () => void;
   onLogNewActivity?: (activity: InspectionActivity) => void;
   language?: Language;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 const ADMIN_PASS = 'admin2026';
@@ -163,9 +168,12 @@ const INITIAL_HISTORY: FgPreShipmentRecord[] = [
 export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
   onBackToPortal,
   onLogNewActivity,
-  language = 'th'
+  language = 'th',
+  theme = 'dark',
+  onToggleTheme
 }) => {
   const isTh = language === 'th';
+  const isLight = theme === 'light';
 
   // Navigation State
   const [activeTab, setActiveTab] = useState<'checker' | 'history' | 'dashboard' | 'profile'>('checker');
@@ -894,7 +902,9 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
   }, [historyList, dashFilterProfile, dashFilterMonth, dashFilterYear]);
 
   return (
-    <div className="min-h-screen bg-slate-950 font-sans text-slate-100 p-4 sm:p-6 space-y-6">
+    <div className={`min-h-screen font-sans p-4 sm:p-6 space-y-6 transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
+    }`}>
 
       {/* Admin Password Modal */}
       {passModalVisible && (
@@ -1008,32 +1018,43 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
       )}
 
       {/* Top Header Bar */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b transition-colors ${
+        isLight ? 'border-slate-200' : 'border-slate-800'
+      }`}>
         <div className="flex items-center gap-3">
           {onBackToPortal && (
             <button
               onClick={onBackToPortal}
-              className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition flex items-center gap-1.5 text-xs font-semibold"
+              className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-xs font-semibold ${
+                isLight
+                  ? 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-xs'
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800'
+              }`}
+              title="Return to QA Portal"
             >
-              <ArrowLeft className="w-4 h-4 text-cyan-400" />
+              <ArrowLeft className="w-4 h-4 text-blue-600" />
               <span>{isTh ? 'กลับสู่เมนูหลัก QA' : 'Back to Portal'}</span>
             </button>
           )}
 
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-to-br from-indigo-600 to-cyan-600 rounded-xl text-white shadow-lg shadow-indigo-600/20">
+            <div className={`p-2.5 rounded-xl shadow-md ${
+              isLight ? 'bg-indigo-600 text-white' : 'bg-gradient-to-br from-indigo-500 to-cyan-500 text-slate-950 shadow-indigo-500/20'
+            }`}>
               <Truck className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                  isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-950 text-indigo-300 border-indigo-800'
+                }`}>
                   OQA-01
                 </span>
-                <h1 className="text-xl font-bold text-white tracking-tight">
+                <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? 'ตรวจสินค้าก่อนจัดส่ง FG Pre-Shipment (Tag Label Checker)' : 'FG Pre-Shipment Tag Label Checker & AI Comparison'}
                 </h1>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh 
                   ? 'ระบบวิเคราะห์ป้ายฉลากสินค้าด้วย AI 2-Step (Auto-Fill Extraction & Reference vs Test Comparison)' 
                   : 'AI 2-Step Label Analysis System for pre-shipment quality audit'}
@@ -1042,49 +1063,117 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
           </div>
         </div>
 
-        {/* Tab Navigation Buttons */}
-        <div className="flex items-center gap-1.5 overflow-x-auto bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
-          <button
-            onClick={() => handleSwitchTab('checker')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'checker' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span>📸 {isTh ? 'ตรวจสอบป้าย (Inspection)' : 'Inspection'}</span>
-          </button>
+        {/* Status indicator & Theme Toggle on Right */}
+        <div className="flex items-center gap-2.5">
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition ${
+                isLight
+                  ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 shadow-xs'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}
+            >
+              {isLight ? <Moon className="w-3.5 h-3.5 text-indigo-600" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
+              <span>{isLight ? (isTh ? 'สว่าง' : 'Light') : (isTh ? 'มืด' : 'Dark')}</span>
+            </button>
+          )}
 
           <button
-            onClick={() => handleSwitchTab('history')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'history' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200'
+            onClick={handleForceSyncCloud}
+            disabled={isSyncingCloud}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border transition ${
+              isLight
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 shadow-xs'
+                : 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/40'
             }`}
+            title="Real-time Cloud Sync"
           >
-            <History className="w-3.5 h-3.5" />
-            <span>📂 {isTh ? 'ประวัติ (History)' : 'History'}</span>
-          </button>
-
-          <button
-            onClick={() => handleSwitchTab('dashboard')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>📊 {isTh ? 'แดชบอร์ด (Dashboard)' : 'Dashboard'}</span>
-          </button>
-
-          <button
-            onClick={() => handleSwitchTab('profile')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'profile' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span>⚙️ {isTh ? 'Master Spec' : 'Spec Setting'}</span>
+            <span className={`w-2 h-2 rounded-full bg-emerald-500 ${isSyncingCloud ? 'animate-ping' : 'animate-pulse'}`}></span>
+            <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{isSyncingCloud ? (isTh ? 'กำลังซิงค์...' : 'Syncing...') : (isTh ? 'Firestore Cloud เชื่อมต่อแล้ว' : 'Firestore DB Connected')}</span>
+            <RefreshCw className={`w-3 h-3 ml-1 ${isSyncingCloud ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </header>
+
+      {/* Navigation Tabs - Top-aligned, styled identical to IPQA-02 */}
+      <div className={`flex space-x-2 border-b pb-2 overflow-x-auto ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
+        <button
+          onClick={() => handleSwitchTab('checker')}
+          className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
+            activeTab === 'checker'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+          }`}
+        >
+          <Camera className="w-4 h-4" />
+          <span>{isTh ? '📸 ตรวจสอบป้าย (Inspection)' : 'Tag Inspection'}</span>
+        </button>
+
+        <button
+          onClick={() => handleSwitchTab('profile')}
+          className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
+            activeTab === 'profile'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+          }`}
+        >
+          <Settings className="w-4 h-4" />
+          <span>{isTh ? '⚙️ Master Spec' : 'Master Spec'}</span>
+          {isSpecAuthenticated && (
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          )}
+        </button>
+
+        <button
+          onClick={() => handleSwitchTab('dashboard')}
+          className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
+            activeTab === 'dashboard'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>{isTh ? '📊 Dashboard' : 'Dashboard'}</span>
+        </button>
+
+        <button
+          onClick={() => handleSwitchTab('history')}
+          className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border ${
+            activeTab === 'history'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          <span>{isTh ? '📜 ประวัติ (History)' : 'History Log'}</span>
+          {historyList.length > 0 && (
+            <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+              isLight ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-slate-950 text-cyan-300 border-cyan-800'
+            }`}>
+              {historyList.length}
+            </span>
+          )}
+        </button>
+      </div>
 
       {/* Cloud Sync Status Banner */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-inner">

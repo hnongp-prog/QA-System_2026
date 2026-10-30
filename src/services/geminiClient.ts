@@ -1,55 +1,10 @@
-import { GoogleGenAI } from "@google/genai";
-
-// Retrieve API key from various client-side sources
+// API keys and Gemini SDK operations are now managed on the server
 export function getGeminiApiKey(): string {
-  // 1. import.meta.env.VITE_GEMINI_API_KEY
-  const viteKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
-  if (viteKey && viteKey.trim() && !viteKey.includes("MY_GEMINI_API_KEY")) {
-    return viteKey.trim();
-  }
-
-  // 2. import.meta.env.GEMINI_API_KEY
-  const metaKey = (import.meta as any).env?.GEMINI_API_KEY;
-  if (metaKey && metaKey.trim() && !metaKey.includes("MY_GEMINI_API_KEY")) {
-    return metaKey.trim();
-  }
-
-  // 3. process.env (fallback if injected by bundler)
-  try {
-    if (typeof process !== "undefined" && process.env) {
-      const pKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-      if (pKey && pKey.trim() && !pKey.includes("MY_GEMINI_API_KEY")) {
-        return pKey.trim();
-      }
-    }
-  } catch (e) {}
-
-  // 4. LocalStorage (custom key set by user in UI / Vercel deployment)
-  try {
-    const localKey = localStorage.getItem("VITE_GEMINI_API_KEY") || localStorage.getItem("user_gemini_api_key") || localStorage.getItem("GEMINI_API_KEY");
-    if (localKey && localKey.trim()) {
-      return localKey.trim();
-    }
-  } catch (e) {}
-
-  // 5. Window global
-  if (typeof window !== "undefined" && (window as any).__GEMINI_API_KEY__) {
-    return (window as any).__GEMINI_API_KEY__;
-  }
-
-  return "";
+  return "SERVER_MANAGED";
 }
 
-export function setCustomGeminiApiKey(key: string) {
-  try {
-    if (key && key.trim()) {
-      localStorage.setItem("VITE_GEMINI_API_KEY", key.trim());
-      localStorage.setItem("user_gemini_api_key", key.trim());
-    } else {
-      localStorage.removeItem("VITE_GEMINI_API_KEY");
-      localStorage.removeItem("user_gemini_api_key");
-    }
-  } catch (e) {}
+export function setCustomGeminiApiKey(_key: string) {
+  // Managed on server
 }
 
 export function tryExtractValidJson(str: string): any {
@@ -197,113 +152,36 @@ export function cleanAndParseJson(textResponse: string): any {
   throw new Error("Could not parse valid JSON from AI response: " + cleaned.slice(0, 150));
 }
 
-// Client-side execution helper with multiple model fallback & REST fallback
+// Client execution helper that calls the server-side /api/gemini/vision endpoint
 export async function callGeminiVisionClientSide(
   prompt: string,
   images: { base64: string; mimeType: string }[]
 ): Promise<string> {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    throw new Error(
-      "GEMINI_API_KEY is not configured. Please set VITE_GEMINI_API_KEY in your .env file or deployment settings."
-    );
+  const response = await fetch("/api/gemini/vision", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      prompt,
+      images,
+    }),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.error || `Server error: ${response.status} ${response.statusText}`);
   }
 
-  // Clean model names without any 'models/' prefix (Supports current Gemini API versions)
-  const models = ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-1.5-flash"];
-  let lastError: any = null;
-
-  // 1. Try with GoogleGenAI SDK
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    for (const rawModel of models) {
-      const model = rawModel.replace(/^models\//, '');
-      try {
-        const parts: any[] = [{ text: prompt }];
-        for (const img of images) {
-          parts.push({
-            inlineData: {
-              mimeType: img.mimeType || "image/png",
-              data: img.base64
-            }
-          });
-        }
-
-        const res = await ai.models.generateContent({
-          model,
-          contents: [
-            {
-              role: "user",
-              parts
-            }
-          ],
-          config: {
-            responseMimeType: "application/json"
-          }
-        });
-
-        if (res && res.text) {
-          return res.text;
-        }
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`SDK model ${model} attempt failed:`, err?.message || err);
-      }
-    }
-  } catch (sdkInitErr) {
-    console.warn("GoogleGenAI SDK init error, switching to direct REST fetch:", sdkInitErr);
+  const data = await response.json();
+  if (!data || typeof data.text !== "string") {
+    throw new Error("Invalid response format received from AI server");
   }
 
-  // 2. Direct REST API Fallback (Guaranteed to work in pure browser/Vercel SPA)
-  for (const rawModel of models) {
-    const model = rawModel.replace(/^models\//, '');
-    try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const parts: any[] = [{ text: prompt }];
-      for (const img of images) {
-        parts.push({
-          inline_data: {
-            mime_type: img.mimeType || "image/png",
-            data: img.base64
-          }
-        });
-      }
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts
-            }
-          ],
-          generationConfig: {
-            responseMimeType: "application/json"
-          }
-        })
-      });
-
-      if (!response.ok) {
-        const errBody = await response.json().catch(() => ({}));
-        throw new Error(errBody.error?.message || `HTTP ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) {
-        return text;
-      }
-    } catch (restErr: any) {
-      lastError = restErr;
-      console.warn(`REST API model ${model} attempt failed:`, restErr?.message || restErr);
-    }
-  }
-
-  throw lastError || new Error("All Gemini API attempts failed.");
+  return data.text;
 }
+
+export const callGeminiVision = callGeminiVisionClientSide;
 
 /**
  * IQA-01: Billet Incoming Inspection Cert Analysis (Client-side)
