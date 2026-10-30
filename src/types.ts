@@ -695,7 +695,7 @@ export interface InstrumentRecord {
   entryDate?: string;
   startDate?: string;
   lastCalDate?: string;
-  frequency: number; // Months e.g. 12
+  frequency: number | string; // Months or custom frequency text e.g. 12, "3 ปี"
   lastResult?: 'PASS' | 'FAIL' | 'NEW' | 'PENDING';
   lastError?: number;
   isRepairing?: boolean;

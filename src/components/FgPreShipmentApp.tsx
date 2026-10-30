@@ -26,7 +26,8 @@ import {
   AlertTriangle,
   ChevronRight,
   ShieldCheck,
-  Box
+  Box,
+  Cloud
 } from 'lucide-react';
 
 import { 
@@ -37,7 +38,12 @@ import {
   InspectionActivity 
 } from '../types';
 import { analyzeFgPreShipmentLabelClient } from '../services/geminiClient';
-import { useCloudState } from '../services/firestoreSync';
+import { 
+  useCloudState, 
+  forceRefreshCloudData, 
+  saveOqaInspectionToCollection, 
+  saveCloudData 
+} from '../services/firestoreSync';
 
 interface FgPreShipmentAppProps {
   onBackToPortal?: () => void;
@@ -167,6 +173,45 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
   // Master Specs & History State with Real-time Cloud Sync
   const [profileSpecs, setProfileSpecs] = useCloudState<FgProfileSpec[]>('fg_profile_specs', INITIAL_PROFILES);
   const [historyList, setHistoryList] = useCloudState<FgPreShipmentRecord[]>('fg_inspection_history', INITIAL_HISTORY);
+
+  // Cloud Sync & Deletion States
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Force sync from Cloud to ensure all devices display identical dataset
+  const handleForceSyncCloud = async () => {
+    setIsSyncingCloud(true);
+    try {
+      const refreshedHistory = await forceRefreshCloudData<FgPreShipmentRecord[]>('fg_inspection_history');
+      const refreshedSpecs = await forceRefreshCloudData<FgProfileSpec[]>('fg_profile_specs');
+      if (refreshedHistory) setHistoryList(refreshedHistory);
+      if (refreshedSpecs) setProfileSpecs(refreshedSpecs);
+      setStatusMsg({
+        type: 'success',
+        message: isTh 
+          ? 'ซิงค์ข้อมูลกับคลาวด์ Firestore สำเร็จ (แสดงข้อมูลชุดเดียวกันทุกเครื่องแล้ว)' 
+          : 'Cloud Firestore synced successfully (shared dataset updated across all devices)'
+      });
+    } catch (e: any) {
+      setStatusMsg({
+        type: 'error',
+        message: isTh ? `ซิงค์คลาวด์ไม่สำเร็จ: ${e.message || 'Error'}` : `Cloud sync failed: ${e.message || 'Error'}`
+      });
+    } finally {
+      setTimeout(() => setIsSyncingCloud(false), 500);
+    }
+  };
+
+  const handleDeleteRecord = (id: string) => {
+    const updated = historyList.filter(item => item.id !== id && item.docId !== id);
+    setHistoryList(updated);
+    saveCloudData('fg_inspection_history', updated);
+    setDeleteConfirmId(null);
+    setStatusMsg({
+      type: 'info',
+      message: isTh ? `ลบรายการตรวจ ${id} และอัปเดตไปยังคลาวด์แล้ว` : `Deleted record ${id} and synced to Cloud`
+    });
+  };
 
   // Image & AI State
   const [refImage, setRefImage] = useState<string | null>(null);
@@ -676,12 +721,14 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
         dimL,
         result: resultText,
         reason: aiResult?.reason || 'ผ่านการตรวจสอบ 2-Step AI Analysis',
-        coils: coils || [],
-        refImage: undefined, // Pure text mode - Do not store image payload to save storage & increase speed
-        testImage: undefined
+        coils: coils || []
       };
 
-      setHistoryList(prev => [newRecord, ...prev]);
+      const updatedHistory = [newRecord, ...historyList];
+      setHistoryList(updatedHistory);
+      // Guarantee cloud synchronization across all devices
+      saveCloudData('fg_inspection_history', updatedHistory);
+      saveOqaInspectionToCollection(newRecord);
 
       if (onLogNewActivity) {
         try {
@@ -792,7 +839,9 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
       dimL: specForm.dimL.trim()
     };
 
-    setProfileSpecs(prev => [newSpec, ...prev]);
+    const updated = [newSpec, ...profileSpecs];
+    setProfileSpecs(updated);
+    saveCloudData('fg_profile_specs', updated);
     setSpecForm({
       profileName: '',
       partNo: '',
@@ -812,7 +861,9 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
 
   const handleDeleteProfileSpec = (id: string) => {
     const prof = profileSpecs.find(p => p.id === id);
-    setProfileSpecs(prev => prev.filter(p => p.id !== id));
+    const updated = profileSpecs.filter(p => p.id !== id);
+    setProfileSpecs(updated);
+    saveCloudData('fg_profile_specs', updated);
     setStatusMsg({
       type: 'success',
       message: isTh ? `ลบ Master Spec ${prof?.profileName || ''} เรียบร้อยแล้ว` : `Deleted Master Profile ${prof?.profileName || ''}`
@@ -887,6 +938,43 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Record Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="w-12 h-12 bg-rose-500/10 text-rose-400 rounded-2xl border border-rose-500/20 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-bold text-white">
+                {isTh ? 'ยืนยันลบรายการตรวจ?' : 'Confirm Delete Record'}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {isTh 
+                  ? `ต้องการลบรายการ ${deleteConfirmId} ออกจากฐานข้อมูลคลาวด์ Firestore หรือไม่? (ข้อมูลจะอัปเดตตรงกันทุกเครื่อง)` 
+                  : `Are you sure you want to delete ${deleteConfirmId} from Firestore Cloud?`}
+              </p>
+            </div>
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-2.5 rounded-xl transition"
+              >
+                {isTh ? 'ยกเลิก' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteRecord(deleteConfirmId)}
+                className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-lg shadow-rose-600/20"
+              >
+                {isTh ? 'ยืนยันลบ' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -997,6 +1085,41 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
           </button>
         </div>
       </header>
+
+      {/* Cloud Sync Status Banner */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-inner">
+        <div className="flex items-center gap-2.5">
+          <div className="relative flex items-center justify-center">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <span className="absolute w-4 h-4 rounded-full bg-emerald-400/30 animate-ping"></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Cloud className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-bold text-slate-200">
+              {isTh ? 'ระบบจัดเก็บข้อมูลบนคลาวด์ Firestore (Real-Time Cloud Database)' : 'Firestore Cloud Database Connected (Real-Time Sync)'}
+            </span>
+            <span className="hidden sm:inline-block text-[11px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2.5 py-0.5 rounded-full font-semibold">
+              {isTh ? 'ทุกเครื่องแสดงข้อมูลชุดเดียวกันอัตโนมัติ' : 'All devices show identical dataset'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="text-[11px] text-slate-400">
+            {isTh ? 'ข้อมูลในคลาวด์:' : 'Cloud Logs:'} <b className="text-white font-mono">{historyList.length}</b> {isTh ? 'รายการ' : 'records'}
+          </div>
+          <button
+            type="button"
+            onClick={handleForceSyncCloud}
+            disabled={isSyncingCloud}
+            className="px-3 py-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-cyan-300 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
+            title={isTh ? 'คลิกเพื่อรีเฟรชหรือดึงข้อมูลล่าสุดจาก Cloud ทันที' : 'Click to force sync with Cloud'}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin text-cyan-400' : ''}`} />
+            <span>{isSyncingCloud ? (isTh ? 'กำลังซิงค์...' : 'Syncing...') : (isTh ? 'ซิงค์ข้อมูลกับคลาวด์' : 'Sync Cloud')}</span>
+          </button>
+        </div>
+      </div>
 
       {/* Global Status Message Bar */}
       <div className={`p-3 rounded-xl flex items-center gap-2 text-xs font-bold border transition ${
@@ -1483,13 +1606,26 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
               </h2>
             </div>
 
-            <button
-              onClick={handleExportExcel}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-md shadow-emerald-600/20 flex items-center gap-2"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>EXPORT EXCEL</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleForceSyncCloud}
+                disabled={isSyncingCloud}
+                className="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title={isTh ? 'ดึงข้อมูลล่าสุดจาก Cloud Firestore' : 'Sync data from Cloud Firestore'}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin text-cyan-400' : ''}`} />
+                <span>{isSyncingCloud ? (isTh ? 'กำลังซิงค์...' : 'Syncing...') : (isTh ? 'ซิงค์คลาวด์' : 'Sync Cloud')}</span>
+              </button>
+
+              <button
+                onClick={handleExportExcel}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>EXPORT EXCEL</span>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -1551,16 +1687,26 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
                     )}
                   </div>
 
-                  <div className="flex flex-col items-end justify-between min-w-[140px] border-t md:border-t-0 md:border-l border-slate-800 pt-2 md:pt-0 md:pl-4">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${
-                      rec.result === 'ถูกต้อง'
-                        ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                        : 'bg-rose-950 text-rose-300 border-rose-800'
-                    }`}>
-                      {rec.result}
-                    </span>
+                  <div className="flex flex-col items-end justify-between min-w-[140px] border-t md:border-t-0 md:border-l border-slate-800 pt-2 md:pt-0 md:pl-4 gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${
+                        rec.result === 'ถูกต้อง'
+                          ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                          : 'bg-rose-950 text-rose-300 border-rose-800'
+                      }`}>
+                        {rec.result}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirmId(rec.id)}
+                        className="p-1.5 bg-slate-900 hover:bg-rose-950 text-slate-500 hover:text-rose-400 border border-slate-800 hover:border-rose-800 rounded-lg transition cursor-pointer"
+                        title={isTh ? 'ลบรายการตรวจนี้ออกจากระบบคลาวด์' : 'Delete record from Cloud'}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
 
-                    <span className="text-[10px] font-mono text-slate-500 mt-2">
+                    <span className="text-[10px] font-mono text-slate-500">
                       {rec.timestamp || '-'}
                     </span>
                   </div>

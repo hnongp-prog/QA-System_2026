@@ -217,7 +217,9 @@ export function subscribeToCloudData<T>(
  * This triggers real-time updates to all other devices listening to this key.
  */
 export async function saveCloudData<T>(key: string, data: T): Promise<void> {
-  const jsonStr = JSON.stringify(data);
+  // Strip any undefined properties, functions, or circular references
+  const cleanData = JSON.parse(JSON.stringify(data));
+  const jsonStr = JSON.stringify(cleanData);
   
   // Skip redundant network writes if data is unchanged
   if (cloudPayloadJsonCache.get(key) === jsonStr) {
@@ -236,11 +238,69 @@ export async function saveCloudData<T>(key: string, data: T): Promise<void> {
   try {
     const docRef = doc(db, 'qa_master_data', key);
     await setDoc(docRef, {
-      payload: data,
+      payload: cleanData,
       updatedAt: new Date().toISOString()
     });
+    console.info(`[FirestoreSync] Synced ${key} to Cloud Firestore successfully.`);
   } catch (error) {
     console.error(`[FirestoreSync] Failed to save cloud data for ${key}:`, error);
+  }
+}
+
+/**
+ * Force fetch fresh dataset directly from Cloud Firestore to guarantee cross-device consistency.
+ */
+export async function forceRefreshCloudData<T>(key: string): Promise<T | null> {
+  try {
+    const docRef = doc(db, 'qa_master_data', key);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const d = snap.data();
+      if (d && d.payload !== undefined) {
+        const payload = d.payload as T;
+        const jsonStr = JSON.stringify(payload);
+        cloudPayloadJsonCache.set(key, jsonStr);
+        try {
+          localStorage.setItem(key, jsonStr);
+        } catch (e) {
+          console.warn(`[FirestoreSync] Local storage update error for ${key}:`, e);
+        }
+        // Broadcast to listeners
+        const listenerSet = activeListeners.get(key);
+        if (listenerSet) {
+          listenerSet.forEach(cb => {
+            try {
+              cb(payload);
+            } catch (err) {
+              console.error(`[FirestoreSync] Callback error:`, err);
+            }
+          });
+        }
+        return payload;
+      }
+    }
+  } catch (err) {
+    console.error(`[FirestoreSync] forceRefreshCloudData error for ${key}:`, err);
+  }
+  return null;
+}
+
+/**
+ * Save dedicated OQA inspection log document to 'oqa_inspections' Firestore collection
+ */
+export async function saveOqaInspectionToCollection(record: any): Promise<void> {
+  try {
+    const cleanRecord = JSON.parse(JSON.stringify(record));
+    const docId = cleanRecord.id || cleanRecord.docId || `OQA-${Date.now()}`;
+    const docRef = doc(db, 'oqa_inspections', docId);
+    await setDoc(docRef, {
+      ...cleanRecord,
+      savedAt: serverTimestamp(),
+      cloudSynced: true
+    }, { merge: true });
+    console.info(`[FirestoreSync] Saved OQA inspection ${docId} to dedicated cloud collection.`);
+  } catch (err) {
+    console.warn('[FirestoreSync] Failed to save OQA inspection to collection:', err);
   }
 }
 
@@ -249,9 +309,10 @@ export async function saveCloudData<T>(key: string, data: T): Promise<void> {
  */
 export async function logCloudInspectionActivity(activity: any): Promise<void> {
   try {
+    const cleanActivity = JSON.parse(JSON.stringify(activity));
     const colRef = collection(db, 'inspection_activities');
     await addDoc(colRef, {
-      ...activity,
+      ...cleanActivity,
       timestamp: serverTimestamp(),
       createdAt: new Date().toISOString()
     });

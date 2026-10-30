@@ -70,6 +70,24 @@
         "overallJudgement": { "type": "string", "enum": ["PASS", "FAIL"] }
       },
       "required": ["id", "timestamp", "shift", "inspectorName", "lotNo", "overallJudgement"]
+    },
+    "FgPreShipmentRecord": {
+      "title": "FG Pre-Shipment Inspection Record",
+      "description": "OQA-01 Finished Goods Pre-Shipment Label and Packaging Inspection Log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "docId": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "inspectorName": { "type": "string" },
+        "destinationTo": { "type": "string" },
+        "profileName": { "type": "string" },
+        "partNo": { "type": "string" },
+        "boxNo": { "type": "string" },
+        "result": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "required": ["id", "inspectorName", "partNo", "result"]
     }
   },
   "firestore": {
@@ -88,6 +106,10 @@
     "/instruments/{instrumentId}": {
       "schema": { "$ref": "#/entities/InstrumentRecord" },
       "description": "Collection of calibration instruments and tools"
+    },
+    "/oqa_inspections/{recordId}": {
+      "schema": { "$ref": "#/entities/FgPreShipmentRecord" },
+      "description": "Collection of OQA-01 pre-shipment inspection logs"
     }
   }
 }

@@ -268,10 +268,66 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
     cost: ''
   });
 
+  // Helper function to parse frequency text (e.g. "3 ปี", "36", "6 เดือน", "1 ปี") into months
+  const parseFrequencyToMonths = (freq: number | string | undefined | null): number => {
+    if (freq === undefined || freq === null) return 12;
+    if (typeof freq === 'number') return freq > 0 ? freq : 12;
+    const str = String(freq).trim();
+    if (!str) return 12;
+
+    // Direct numeric string e.g. "36", "12", "3"
+    const directNum = parseFloat(str);
+    if (!isNaN(directNum) && /^\d+(\.\d+)?$/.test(str)) {
+      return directNum;
+    }
+
+    // Matches e.g. "3 ปี", "3ปี", "3 years", "3 yr", "3y"
+    const yearMatch = str.match(/(\d+(\.\d+)?)\s*(ปี|year|years|yr|yrs|y)/i);
+    if (yearMatch) {
+      return Math.round(parseFloat(yearMatch[1]) * 12);
+    }
+
+    // Matches e.g. "6 เดือน", "6เดือน", "6 months", "6 mo", "6m"
+    const monthMatch = str.match(/(\d+(\.\d+)?)\s*(เดือน|month|months|mo|m)/i);
+    if (monthMatch) {
+      return Math.round(parseFloat(monthMatch[1]));
+    }
+
+    // Matches e.g. "90 วัน", "90 days"
+    const dayMatch = str.match(/(\d+(\.\d+)?)\s*(วัน|day|days|d)/i);
+    if (dayMatch) {
+      return Math.max(1, Math.round(parseFloat(dayMatch[1]) / 30));
+    }
+
+    if (!isNaN(directNum) && directNum > 0) {
+      return directNum;
+    }
+
+    return 12;
+  };
+
+  // Helper function to format frequency display label
+  const formatFrequencyDisplay = (freq: number | string | undefined | null): string => {
+    if (freq === undefined || freq === null) return '-';
+    if (typeof freq === 'number') {
+      if (freq === 12) return '1 ปี (12M)';
+      if (freq === 24) return '2 ปี (24M)';
+      if (freq === 36) return '3 ปี (36M)';
+      return `${freq} เดือน`;
+    }
+    const str = String(freq).trim();
+    if (str === '36' || str === '3 ปี' || str === '3ปี') return '3 ปี (36M)';
+    if (str === '12' || str === '1 ปี' || str === '1ปี') return '1 ปี (12M)';
+    if (str === '24' || str === '2 ปี' || str === '2ปี') return '2 ปี (24M)';
+    return str;
+  };
+
   // Helper function to calculate Next Cal Date
-  const calculateNextCal = (lastCalDate?: string, months: number = 12): string | null => {
+  const calculateNextCal = (lastCalDate?: string, freq: number | string = 12): string | null => {
     if (!lastCalDate) return null;
+    const months = parseFrequencyToMonths(freq);
     const date = new Date(lastCalDate);
+    if (isNaN(date.getTime())) return null;
     date.setMonth(date.getMonth() + Number(months));
     return date.toISOString().split('T')[0];
   };
@@ -368,6 +424,15 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
     e.preventDefault();
     if (!formData.id.trim() || !formData.name.trim()) return;
 
+    const cleanFrequency: number | string = (() => {
+      const trimmed = (formData.frequency || '').trim();
+      if (!trimmed) return '1 ปี';
+      if (/^\d+$/.test(trimmed)) {
+        return parseInt(trimmed, 10);
+      }
+      return trimmed;
+    })();
+
     if (editingInst) {
       // Edit mode
       setInstruments(prev => prev.map(item => {
@@ -384,7 +449,7 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
             spec: parseFloat(formData.spec) || 0.02,
             entryDate: formData.entryDate,
             startDate: formData.startDate,
-            frequency: parseInt(formData.frequency) || 12
+            frequency: cleanFrequency
           };
         }
         return item;
@@ -409,7 +474,7 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
         entryDate: formData.entryDate,
         startDate: formData.startDate,
         lastCalDate: formData.startDate,
-        frequency: parseInt(formData.frequency) || 12,
+        frequency: cleanFrequency,
         lastResult: 'NEW',
         lastError: 0,
         isRepairing: false,
@@ -1045,7 +1110,7 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
 
                       <td className="px-4 py-3.5 font-mono text-slate-300">
                         {inst.lastCalDate || '-'}
-                        <div className="text-[10px] text-slate-500">Freq: {inst.frequency} M</div>
+                        <div className="text-[10px] text-slate-500">Freq: {formatFrequencyDisplay(inst.frequency)}</div>
                       </td>
 
                       <td className="px-4 py-3.5 font-mono font-bold text-slate-200">
@@ -1337,18 +1402,117 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
                 />
               </div>
 
-              <div className="md:col-span-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">ความถี่ในการสอบเทียบ (Cal Frequency - Months)</label>
-                <select
-                  value={formData.frequency}
-                  onChange={(e) => setFormData(prev => ({ ...prev, frequency: e.target.value }))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold text-indigo-300 focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="3">3 เดือน (3 Months)</option>
-                  <option value="6">6 เดือน (6 Months)</option>
-                  <option value="12">12 เดือน / 1 ปี (1 Year)</option>
-                  <option value="24">24 เดือน / 2 ปี (2 Years)</option>
-                </select>
+              <div className="md:col-span-2 space-y-2 bg-slate-950/70 p-3 rounded-2xl border border-slate-800/80">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-slate-300 uppercase flex items-center gap-1.5">
+                    <span>{isTh ? 'ความถี่ในการสอบเทียบ (Calibration Frequency)' : 'Calibration Frequency'} *</span>
+                    <span className="text-[9px] text-indigo-400 bg-indigo-950/80 border border-indigo-800/80 px-1.5 py-0.5 rounded font-normal">
+                      {isTh ? 'มีตัวเลือก 3 ปี และพิมพ์ระบุได้เอง' : 'Option 3 Years & custom text enabled'}
+                    </span>
+                  </label>
+                  <span className="text-[10px] font-mono text-cyan-400 font-semibold">
+                    {isTh ? `รอบคำนวณ: +${parseFrequencyToMonths(formData.frequency)} เดือน` : `Cycle: +${parseFrequencyToMonths(formData.frequency)} mo`}
+                  </span>
+                </div>
+
+                {/* Quick preset selector buttons including '3 ปี' */}
+                <div>
+                  <span className="text-[9px] text-slate-500 font-semibold block mb-1.5">
+                    {isTh ? 'ปุ่มลัดเลือกความถี่ด่วน (Quick Presets):' : 'Quick Presets:'}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[
+                      { label: '3 เดือน', val: '3 เดือน' },
+                      { label: '6 เดือน', val: '6 เดือน' },
+                      { label: '1 ปี', val: '1 ปี' },
+                      { label: '2 ปี', val: '2 ปี' },
+                      { label: '3 ปี', val: '3 ปี' }
+                    ].map(preset => {
+                      const isSelected = 
+                        formData.frequency === preset.val || 
+                        (preset.val === '3 ปี' && (formData.frequency === '36' || formData.frequency === '36 เดือน' || formData.frequency === '3 ปี')) ||
+                        (preset.val === '1 ปี' && (formData.frequency === '12' || formData.frequency === '12 เดือน' || formData.frequency === '1 ปี')) ||
+                        (preset.val === '2 ปี' && (formData.frequency === '24' || formData.frequency === '24 เดือน' || formData.frequency === '2 ปี')) ||
+                        (preset.val === '6 เดือน' && (formData.frequency === '6' || formData.frequency === '6 เดือน')) ||
+                        (preset.val === '3 เดือน' && (formData.frequency === '3' || formData.frequency === '3 เดือน'));
+
+                      return (
+                        <button
+                          key={preset.val}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, frequency: preset.val }))}
+                          className={`px-3 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 cursor-pointer ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
+                              : 'bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-700'
+                          }`}
+                        >
+                          {preset.val === '3 ปี' && <Sparkles className="w-3 h-3 text-amber-300" />}
+                          <span>{preset.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Combined dropdown selector & custom free-text input */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <label className="text-[9px] text-slate-400 block mb-1">
+                      {isTh ? 'เลือกจากเมนูมาตรฐาน (Preset List)' : 'Select from Standard List'}
+                    </label>
+                    <select
+                      value={
+                        ['3 เดือน', '6 เดือน', '1 ปี', '2 ปี', '3 ปี'].includes(formData.frequency)
+                          ? formData.frequency
+                          : formData.frequency === '3' ? '3 เดือน'
+                          : formData.frequency === '6' ? '6 เดือน'
+                          : formData.frequency === '12' ? '1 ปี'
+                          : formData.frequency === '24' ? '2 ปี'
+                          : formData.frequency === '36' ? '3 ปี'
+                          : 'CUSTOM'
+                      }
+                      onChange={(e) => {
+                        if (e.target.value !== 'CUSTOM') {
+                          setFormData(prev => ({ ...prev, frequency: e.target.value }));
+                        }
+                      }}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-indigo-300 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="3 เดือน">3 เดือน (3 Months)</option>
+                      <option value="6 เดือน">6 เดือน (6 Months)</option>
+                      <option value="1 ปี">1 ปี / 12 เดือน (1 Year)</option>
+                      <option value="2 ปี">2 ปี / 24 เดือน (2 Years)</option>
+                      <option value="3 ปี">3 ปี / 36 เดือน (3 Years)</option>
+                      <option value="CUSTOM">{isTh ? '✍️ กำหนดเอง / พิมพ์ข้อความเอง...' : '✍️ Custom text entry...'}</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] text-slate-400 block mb-1">
+                      {isTh ? 'หรือพิมพ์ข้อความได้เองอิสระ (Type Custom Frequency)' : 'Or Type Custom Frequency'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.frequency}
+                      onChange={(e) => setFormData(prev => ({ ...prev, frequency: e.target.value }))}
+                      placeholder={isTh ? "พิมพ์ความถี่เอง เช่น 3 ปี, 18 เดือน, ทุก 500 ชม." : "e.g. 3 ปี, 18 Months, Custom"}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-white focus:outline-none focus:border-indigo-500 placeholder:text-slate-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-900">
+                  <span className="text-slate-400">
+                    {isTh ? '💡 สามารถกดเลือก "3 ปี" หรือพิมพ์ข้อความความถี่ที่ต้องการได้โดยตรง' : '💡 Select "3 ปี" or enter custom frequency freely'}
+                  </span>
+                  {formData.startDate && (
+                    <span className="text-emerald-400 font-mono text-[10px]">
+                      {isTh ? 'วันครบกำหนดถัดไป:' : 'Next Cal:'} <b>{calculateNextCal(formData.startDate, formData.frequency) || '-'}</b>
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="md:col-span-2 flex justify-end gap-3 pt-4 border-t border-slate-800">
@@ -1400,7 +1564,7 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
               </div>
               <div>
                 <span className="text-[10px] text-slate-500 uppercase font-bold block">Frequency</span>
-                <span className="font-mono font-bold text-indigo-300 text-sm">{calModalItem.frequency} Months</span>
+                <span className="font-mono font-bold text-indigo-300 text-sm">{formatFrequencyDisplay(calModalItem.frequency)}</span>
               </div>
             </div>
 
