@@ -1966,14 +1966,43 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                                   onChange={(e) => handleItemChange(item.id, 'lotNumber', e.target.value)} 
                                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs font-semibold text-slate-200 uppercase focus:outline-none focus:border-indigo-500" 
                                 />
-                                <div className="flex gap-1">
-                                  <input 
-                                    type="text" 
-                                    placeholder="Side" 
-                                    value={item.partId} 
-                                    onChange={(e) => handleItemChange(item.id, 'partId', e.target.value)} 
-                                    className="w-16 bg-slate-950 border border-slate-800 rounded-md px-1.5 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-indigo-500" 
-                                  />
+                                <div className="flex gap-1 items-center">
+                                  <div className="relative w-28 flex items-center">
+                                    <input 
+                                      type="text" 
+                                      list="xray-side-options"
+                                      placeholder="Side (H/T)" 
+                                      value={item.partId} 
+                                      onChange={(e) => handleItemChange(item.id, 'partId', e.target.value.toUpperCase())} 
+                                      className="w-full bg-slate-950 border border-slate-800 rounded-md px-1.5 py-0.5 pr-12 text-[10px] text-slate-200 font-bold uppercase focus:outline-none focus:border-indigo-500" 
+                                    />
+                                    <div className="absolute right-0.5 flex items-center gap-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleItemChange(item.id, 'partId', 'H')}
+                                        title="Head (H)"
+                                        className={`px-1 py-0.2 rounded text-[8px] font-bold border transition ${
+                                          item.partId === 'H'
+                                            ? 'bg-indigo-500 text-white border-indigo-400 font-black'
+                                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                                        }`}
+                                      >
+                                        H
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleItemChange(item.id, 'partId', 'T')}
+                                        title="Tail (T)"
+                                        className={`px-1 py-0.2 rounded text-[8px] font-bold border transition ${
+                                          item.partId === 'T'
+                                            ? 'bg-purple-500 text-white border-purple-400 font-black'
+                                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                                        }`}
+                                      >
+                                        T
+                                      </button>
+                                    </div>
+                                  </div>
                                   <input 
                                     type="text" 
                                     placeholder="Process" 
@@ -1981,6 +2010,12 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                                     onChange={(e) => handleItemChange(item.id, 'process', e.target.value)} 
                                     className="flex-1 bg-slate-950 border border-slate-800 rounded-md px-1.5 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-indigo-500" 
                                   />
+                                  <datalist id="xray-side-options">
+                                    <option value="H">H (Head / หัวคอยล์)</option>
+                                    <option value="T">T (Tail / ท้ายคอยล์)</option>
+                                    <option value="UP">UP (Upper Side)</option>
+                                    <option value="LO">LO (Lower Side)</option>
+                                  </datalist>
                                 </div>
                               </div>
                             </div>
@@ -2951,11 +2986,30 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Side / Part ID</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Side / Part ID (H/T)</label>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setEditingHistoryItem({ ...editingHistoryItem, partId: 'H' })}
+                        className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${editingHistoryItem.partId === 'H' ? 'bg-indigo-500 text-white border-indigo-400' : 'bg-slate-900 text-slate-400 border-slate-800'}`}
+                      >
+                        H
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingHistoryItem({ ...editingHistoryItem, partId: 'T' })}
+                        className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${editingHistoryItem.partId === 'T' ? 'bg-purple-500 text-white border-purple-400' : 'bg-slate-900 text-slate-400 border-slate-800'}`}
+                      >
+                        T
+                      </button>
+                    </div>
+                  </div>
                   <input
                     type="text"
+                    list="xray-side-options"
                     value={editingHistoryItem.partId || ''}
-                    onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, partId: e.target.value })}
+                    onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, partId: e.target.value.toUpperCase() })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500 uppercase"
                   />
                 </div>

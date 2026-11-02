@@ -1,10 +1,29 @@
-// API keys and Gemini SDK operations are now managed on the server
+import { GoogleGenAI } from '@google/genai';
+
+// API keys support both Server-managed mode and Client-managed mode for GitHub Pages / Vercel
 export function getGeminiApiKey(): string {
-  return "SERVER_MANAGED";
+  if (typeof window !== 'undefined') {
+    const local = localStorage.getItem('gemini_api_key') || localStorage.getItem('VITE_GEMINI_API_KEY');
+    if (local && local.trim()) return local.trim();
+  }
+  const metaEnvKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  if (metaEnvKey && typeof metaEnvKey === 'string' && metaEnvKey.trim()) return metaEnvKey.trim();
+
+  const procEnvKey = (process.env as any)?.GEMINI_API_KEY || (process.env as any)?.VITE_GEMINI_API_KEY;
+  if (procEnvKey && typeof procEnvKey === 'string' && procEnvKey.trim()) return procEnvKey.trim();
+
+  return '';
 }
 
-export function setCustomGeminiApiKey(_key: string) {
-  // Managed on server
+export function setCustomGeminiApiKey(key: string) {
+  if (typeof window !== 'undefined') {
+    if (key && key.trim()) {
+      localStorage.setItem('gemini_api_key', key.trim());
+    } else {
+      localStorage.removeItem('gemini_api_key');
+      localStorage.removeItem('VITE_GEMINI_API_KEY');
+    }
+  }
 }
 
 export function tryExtractValidJson(str: string): any {
@@ -152,33 +171,125 @@ export function cleanAndParseJson(textResponse: string): any {
   throw new Error("Could not parse valid JSON from AI response: " + cleaned.slice(0, 150));
 }
 
-// Client execution helper that calls the server-side /api/gemini/vision endpoint
+// Dual-engine Gemini Vision caller:
+// 1. Tries server backend /api/gemini/vision (AI Studio environment / Vercel Serverless)
+// 2. Automatically falls back to Client-Side GoogleGenAI SDK (GitHub Pages / static Vercel)
 export async function callGeminiVisionClientSide(
   prompt: string,
   images: { base64: string; mimeType: string }[]
 ): Promise<string> {
-  const response = await fetch("/api/gemini/vision", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      prompt,
-      images,
-    }),
-  });
+  let serverFailure = false;
+  let serverStatus = 0;
 
-  if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.error || `Server error: ${response.status} ${response.statusText}`);
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+    const response = await fetch("/api/gemini/vision", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt,
+        images,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    serverStatus = response.status;
+    const contentType = response.headers.get("content-type") || "";
+
+    // If server responded with valid JSON and HTTP 200
+    if (response.ok && contentType.includes("application/json")) {
+      const data = await response.json();
+      if (data && typeof data.text === "string" && data.text.trim()) {
+        return data.text;
+      }
+    } else {
+      // 404, 405 (static host / missing endpoint), or non-JSON response
+      serverFailure = true;
+    }
+  } catch (err: any) {
+    serverFailure = true;
   }
 
-  const data = await response.json();
-  if (!data || typeof data.text !== "string") {
-    throw new Error("Invalid response format received from AI server");
+  // If server-side endpoint is unavailable or returned an error (e.g. GitHub Pages static or Vercel static),
+  // immediately execute in the browser using client-side GoogleGenAI SDK!
+  if (serverFailure || serverStatus !== 200) {
+    console.info("[Gemini Vision] Backend server returned status " + serverStatus + ". Executing client-side fallback for GitHub Pages / Vercel.");
+    
+    const clientApiKey = getGeminiApiKey();
+
+    if (!clientApiKey) {
+      throw new Error(
+        "ไม่พบ Gemini API Key ใน Environment สำหรับ Vercel/GitHub (Server Status: " + (serverStatus || "Offline") + ") กรุณาตั้งค่า GEMINI_API_KEY หรือ VITE_GEMINI_API_KEY ใน Vercel Environment Variables"
+      );
+    }
+
+    const ai = new GoogleGenAI({
+      apiKey: clientApiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build-client",
+        },
+      },
+    });
+
+    const parts: any[] = [{ text: prompt }];
+
+    for (const img of images) {
+      let cleanBase64 = img.base64 || "";
+      let mimeType = img.mimeType || "image/png";
+
+      if (cleanBase64.startsWith("data:")) {
+        const match = cleanBase64.match(/^data:([^;]+);base64,(.*)$/);
+        if (match) {
+          mimeType = match[1];
+          cleanBase64 = match[2];
+        }
+      }
+
+      parts.push({
+        inlineData: {
+          mimeType,
+          data: cleanBase64,
+        },
+      });
+    }
+
+    const models = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3-flash-preview"];
+    let lastClientErr: any = null;
+
+    for (const model of models) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: [
+            {
+              role: "user",
+              parts,
+            },
+          ],
+          config: {
+            responseMimeType: "application/json",
+          },
+        });
+
+        if (response && response.text) {
+          return response.text;
+        }
+      } catch (err: any) {
+        lastClientErr = err;
+        console.warn(`[Client-side Gemini] Attempt with model ${model} failed:`, err?.message || err);
+      }
+    }
+
+    throw lastClientErr || new Error("Failed to extract data using client-side Gemini API on GitHub / Vercel");
   }
 
-  return data.text;
+  throw new Error("Unable to extract data from document image");
 }
 
 export const callGeminiVision = callGeminiVisionClientSide;
