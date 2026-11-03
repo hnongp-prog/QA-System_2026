@@ -21,7 +21,9 @@ import {
   Zap,
   HelpCircle,
   Copy,
-  ChevronRight
+  ChevronRight,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { 
   BilletCuttingRecord, 
@@ -41,6 +43,7 @@ interface BilletCuttingAppProps {
   onBack: () => void;
   language?: Language;
   theme?: ThemeMode;
+  onToggleTheme?: () => void;
   userRole?: string;
   userName?: string;
 }
@@ -49,10 +52,12 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
   onBack,
   language = 'th',
   theme = 'light',
+  onToggleTheme,
   userRole = 'Inspector',
   userName = 'Somchai Prasert'
 }) => {
   const isTh = language === 'th';
+  const isLight = theme === 'light';
 
   // Active Tab: 'ENTRY' (บันทึก), 'DASHBOARD' (แดชบอร์ด), 'HISTORY' (ประวัติ)
   const [activeTab, setActiveTab] = useState<'ENTRY' | 'DASHBOARD' | 'HISTORY'>('ENTRY');
@@ -456,6 +461,22 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
               <Sliders className="w-3.5 h-3.5" />
               <span>{isTh ? 'Billet Spec' : 'Spec Profile'}</span>
             </button>
+
+            {onToggleTheme && (
+              <button
+                type="button"
+                onClick={onToggleTheme}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition shrink-0 ml-1 ${
+                  isLight
+                    ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 shadow-xs'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                }`}
+                title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}
+              >
+                {isLight ? <Moon className="w-3.5 h-3.5 text-indigo-600" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
+                <span>{isLight ? (isTh ? 'สว่าง' : 'Light') : (isTh ? 'มืด' : 'Dark')}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -562,8 +583,6 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                     <option value="Shift A (เช้า)">Shift A (เช้า 08:00 - 16:00)</option>
                     <option value="Shift B (บ่าย)">Shift B (บ่าย 16:00 - 24:00)</option>
                     <option value="Shift C (ดึก)">Shift C (ดึก 24:00 - 08:00)</option>
-                    <option value="Day Shift">Day Shift (กะกลางวัน)</option>
-                    <option value="Night Shift">Night Shift (กะกลางคืน)</option>
                   </select>
                 </div>
 

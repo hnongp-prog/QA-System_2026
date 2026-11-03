@@ -1322,12 +1322,10 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                   type="text"
                   value={mainShift}
                   onChange={(e) => setMainShift(e.target.value)}
-                  placeholder="e.g. Day / Night / Shift A..."
+                  placeholder="e.g. Shift A, Shift B, Shift C..."
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500"
                 />
                 <datalist id="tensile-shift-options">
-                  <option value="Day (กะกลางวัน / A)" />
-                  <option value="Night (กะกลางคืน / B)" />
                   <option value="Shift A" />
                   <option value="Shift B" />
                   <option value="Shift C" />
@@ -3515,14 +3513,12 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                   <input
                     list="edit-tensile-shift-options"
                     type="text"
-                    placeholder="e.g. Day / Night / Shift A..."
+                    placeholder="e.g. Shift A, Shift B, Shift C..."
                     value={editingHistoryItem.shift || ''}
                     onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, shift: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
                   />
                   <datalist id="edit-tensile-shift-options">
-                    <option value="Day (กะกลางวัน / A)" />
-                    <option value="Night (กะกลางคืน / B)" />
                     <option value="Shift A" />
                     <option value="Shift B" />
                     <option value="Shift C" />

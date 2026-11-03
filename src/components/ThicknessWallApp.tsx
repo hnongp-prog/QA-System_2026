@@ -26,7 +26,9 @@ import {
   Info,
   Edit3,
   X,
-  AlertCircle
+  AlertCircle,
+  Moon,
+  Sun
 } from 'lucide-react';
 
 import { 
@@ -34,7 +36,8 @@ import {
   ThicknessWallProfileSpec, 
   ThicknessWallProfileItemSpec, 
   Language, 
-  InspectionActivity 
+  InspectionActivity,
+  ThemeMode
 } from '../types';
 import { extractThicknessWallClient } from '../services/geminiClient';
 import { useCloudState } from '../services/firestoreSync';
@@ -45,6 +48,8 @@ interface ThicknessWallAppProps {
   onBackToPortal?: () => void;
   onLogNewActivity?: (activity: InspectionActivity) => void;
   language?: Language;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 const ADMIN_PASS = 'admin2026';
@@ -133,9 +138,12 @@ const INITIAL_RECORDS: ThicknessWallRecord[] = [
 export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
   onBackToPortal,
   onLogNewActivity,
-  language = 'th'
+  language = 'th',
+  theme = 'light',
+  onToggleTheme
 }) => {
   const isTh = language === 'th';
+  const isLight = theme === 'light';
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'extraction' | 'dashboard' | 'settings'>('extraction');
@@ -717,7 +725,9 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
   const latestRecord = filteredDashboardRecords.length > 0 ? filteredDashboardRecords[0] : null;
 
   return (
-    <div className="min-h-screen bg-slate-950 font-sans text-slate-100 p-4 sm:p-6 space-y-6">
+    <div className={`min-h-screen font-sans p-4 sm:p-6 space-y-6 transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
+    }`}>
 
       {/* Admin Security Auth Modal */}
       {authModalVisible && (
@@ -834,6 +844,21 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
             <Settings className="w-3.5 h-3.5" />
             <span>{isTh ? 'Profile Spec Setting' : 'Spec Setting'}</span>
           </button>
+
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition ml-1 ${
+                isLight
+                  ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 shadow-xs'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}
+            >
+              {isLight ? <Moon className="w-3.5 h-3.5 text-indigo-600" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
+              <span>{isLight ? (isTh ? 'สว่าง' : 'Light') : (isTh ? 'มืด' : 'Dark')}</span>
+            </button>
+          )}
         </div>
       </header>
 

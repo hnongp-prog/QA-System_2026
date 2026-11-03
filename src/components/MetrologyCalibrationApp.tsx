@@ -24,8 +24,10 @@ import {
   ChevronRight,
   ShieldCheck,
   Building2,
+  Filter,
   X,
-  Filter
+  Moon,
+  Sun
 } from 'lucide-react';
 
 import { 
@@ -33,7 +35,8 @@ import {
   InstrumentCalHistoryItem, 
   InstrumentRepairLog, 
   Language, 
-  InspectionActivity 
+  InspectionActivity,
+  ThemeMode
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
 
@@ -41,6 +44,8 @@ interface MetrologyCalibrationAppProps {
   onBackToPortal?: () => void;
   onLogNewActivity?: (activity: InspectionActivity) => void;
   language?: Language;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 const INITIAL_INSTRUMENTS: InstrumentRecord[] = [
@@ -192,9 +197,12 @@ const ADMIN_PASS = 'admin2026';
 export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = ({
   onBackToPortal,
   onLogNewActivity,
-  language = 'th'
+  language = 'th',
+  theme = 'light',
+  onToggleTheme
 }) => {
   const isTh = language === 'th';
+  const isLight = theme === 'light';
 
   // State with Real-time Cloud Sync
   const [instruments, setInstruments] = useCloudState<InstrumentRecord[]>('metrology_instruments', INITIAL_INSTRUMENTS);
@@ -811,7 +819,9 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 font-sans text-slate-100 p-4 sm:p-6 space-y-6">
+    <div className={`min-h-screen font-sans p-4 sm:p-6 space-y-6 transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
+    }`}>
 
       {/* Admin Verification Modal */}
       {securityModal.show && (
@@ -929,6 +939,21 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
         </div>
 
         <div className="flex items-center gap-2">
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`px-3 py-2.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition ${
+                isLight
+                  ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 shadow-xs'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}
+            >
+              {isLight ? <Moon className="w-3.5 h-3.5 text-indigo-600" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
+              <span>{isLight ? (isTh ? 'สว่าง' : 'Light') : (isTh ? 'มืด' : 'Dark')}</span>
+            </button>
+          )}
+
           <button
             onClick={exportToExcel}
             className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl transition shadow-md shadow-emerald-600/20 flex items-center gap-2 text-xs font-bold"

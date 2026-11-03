@@ -113,7 +113,7 @@ export interface NcrRecord {
   profile: string;               // Profile Name / Part No. / Spec
   inspectionDate: string;        // Inspection Date & Time
   inspector: string;             // Inspector name
-  shift?: string;                // Shift (e.g. Day / Night / A / B / C)
+  shift?: string;                // Shift (e.g. Shift A / Shift B / Shift C)
   process: string;               // Process station / Module
   inspectionResult: string;      // Out of spec / NG defect details
   status: NcrStatus;             // Quarantine / Open / CAPA / Closed

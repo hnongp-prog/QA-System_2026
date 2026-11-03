@@ -1,1 +1,414 @@
 @import "tailwindcss";
+
+/* ==========================================================
+   Universal Light Clean Industrial Theme for All QA Sub-Apps
+   High Contrast & Sharp Readability for Industrial Operators
+   ========================================================== */
+
+html.theme-light,
+body.theme-light {
+  color-scheme: light;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* Base surface containers */
+html.theme-light .bg-slate-950 {
+  background-color: #f8fafc !important;
+}
+
+html.theme-light .bg-slate-900 {
+  background-color: #ffffff !important;
+}
+
+html.theme-light [class*="bg-slate-900/"] {
+  background-color: #ffffff !important;
+}
+
+html.theme-light [class*="bg-slate-950/"] {
+  background-color: #f1f5f9 !important;
+}
+
+html.theme-light .bg-slate-800 {
+  background-color: #f1f5f9 !important;
+}
+
+html.theme-light [class*="bg-slate-800/"] {
+  background-color: #f1f5f9 !important;
+}
+
+/* Tinted Dark Containers converted to soft, clean light backgrounds */
+html.theme-light .bg-cyan-950,
+html.theme-light [class*="bg-cyan-950/"] {
+  background-color: #ecfeff !important;
+  border-color: #a5f3fc !important;
+}
+
+html.theme-light .bg-teal-950,
+html.theme-light [class*="bg-teal-950/"] {
+  background-color: #f0fdfa !important;
+  border-color: #99f6e4 !important;
+}
+
+html.theme-light .bg-indigo-950,
+html.theme-light [class*="bg-indigo-950/"] {
+  background-color: #eef2ff !important;
+  border-color: #c7d2fe !important;
+}
+
+html.theme-light .bg-amber-950,
+html.theme-light [class*="bg-amber-950/"] {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+
+html.theme-light .bg-emerald-950,
+html.theme-light [class*="bg-emerald-950/"] {
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+}
+
+html.theme-light .bg-rose-950,
+html.theme-light [class*="bg-rose-950/"] {
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+}
+
+html.theme-light .bg-purple-950,
+html.theme-light [class*="bg-purple-950/"] {
+  background-color: #faf5ff !important;
+  border-color: #e9d5ff !important;
+}
+
+html.theme-light .bg-blue-950,
+html.theme-light [class*="bg-blue-950/"] {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+
+/* Clean Borders across Light Theme */
+html.theme-light .border-slate-800,
+html.theme-light .border-slate-700,
+html.theme-light [class*="border-slate-800/"],
+html.theme-light [class*="border-slate-700/"] {
+  border-color: #e2e8f0 !important;
+}
+
+html.theme-light .border-slate-900 {
+  border-color: #cbd5e1 !important;
+}
+
+html.theme-light .border-cyan-900,
+html.theme-light .border-cyan-800,
+html.theme-light [class*="border-cyan-900/"],
+html.theme-light [class*="border-cyan-800/"] {
+  border-color: #a5f3fc !important;
+}
+
+html.theme-light .border-teal-900,
+html.theme-light .border-teal-800,
+html.theme-light [class*="border-teal-900/"],
+html.theme-light [class*="border-teal-800/"] {
+  border-color: #99f6e4 !important;
+}
+
+html.theme-light .border-indigo-900,
+html.theme-light .border-indigo-800,
+html.theme-light [class*="border-indigo-900/"],
+html.theme-light [class*="border-indigo-800/"] {
+  border-color: #c7d2fe !important;
+}
+
+html.theme-light .border-amber-900,
+html.theme-light .border-amber-800,
+html.theme-light [class*="border-amber-900/"],
+html.theme-light [class*="border-amber-800/"] {
+  border-color: #fde68a !important;
+}
+
+html.theme-light .border-emerald-900,
+html.theme-light .border-emerald-800,
+html.theme-light [class*="border-emerald-900/"],
+html.theme-light [class*="border-emerald-800/"] {
+  border-color: #a7f3d0 !important;
+}
+
+html.theme-light .border-rose-900,
+html.theme-light .border-rose-800,
+html.theme-light [class*="border-rose-900/"],
+html.theme-light [class*="border-rose-800/"] {
+  border-color: #fecdd3 !important;
+}
+
+/* Dividing lines in tables and flex lists */
+html.theme-light [class*="divide-slate-800"] {
+  border-color: #e2e8f0 !important;
+}
+
+/* ==========================================================
+   Typography Hierarchy & Deep Contrast in Light Clean Mode
+   Replaces dark-mode faded pastels with dark, crisp tones
+   ========================================================== */
+
+/* Primary and Neutral Text */
+html.theme-light .text-slate-100,
+html.theme-light .text-slate-200,
+html.theme-light .text-white {
+  color: #0f172a !important;
+}
+
+html.theme-light .text-slate-300 {
+  color: #1e293b !important;
+}
+
+html.theme-light .text-slate-400 {
+  color: #334155 !important;
+}
+
+html.theme-light .text-slate-500 {
+  color: #334155 !important;
+}
+
+html.theme-light .text-slate-600 {
+  color: #1e293b !important;
+}
+
+html.theme-light .text-gray-100,
+html.theme-light .text-gray-200,
+html.theme-light .text-gray-300,
+html.theme-light .text-gray-400,
+html.theme-light .text-gray-500,
+html.theme-light .text-zinc-100,
+html.theme-light .text-zinc-200,
+html.theme-light .text-zinc-300,
+html.theme-light .text-zinc-400,
+html.theme-light .text-zinc-500 {
+  color: #1e293b !important;
+}
+
+/* Form Labels - High Contrast & Crisp */
+html.theme-light label {
+  color: #1e293b !important;
+  font-weight: 700 !important;
+}
+
+/* Deep High-Contrast Colored Accents for Light Mode */
+/* Cyan: Replace neon pastels with rich deep cyan (cyan-800) */
+html.theme-light .text-cyan-200,
+html.theme-light .text-cyan-300,
+html.theme-light .text-cyan-400,
+html.theme-light .text-cyan-500 {
+  color: #155e75 !important;
+}
+
+/* Teal: Replace pale pastels with rich deep teal (teal-800) */
+html.theme-light .text-teal-200,
+html.theme-light .text-teal-300,
+html.theme-light .text-teal-400,
+html.theme-light .text-teal-500 {
+  color: #115e59 !important;
+}
+
+/* Amber / Yellow: Replace faint yellow with dark warm amber-brown (amber-800) */
+html.theme-light .text-amber-200,
+html.theme-light .text-amber-300,
+html.theme-light .text-amber-400,
+html.theme-light .text-yellow-200,
+html.theme-light .text-yellow-300,
+html.theme-light .text-yellow-400 {
+  color: #92400e !important;
+}
+
+html.theme-light .text-amber-500,
+html.theme-light .text-amber-600 {
+  color: #b45309 !important;
+}
+
+html.theme-light .text-orange-200,
+html.theme-light .text-orange-300,
+html.theme-light .text-orange-400 {
+  color: #c2410c !important;
+}
+
+/* Emerald / Green: Replace washed out green with deep forest emerald (emerald-800) */
+html.theme-light .text-emerald-200,
+html.theme-light .text-emerald-300,
+html.theme-light .text-emerald-400,
+html.theme-light .text-green-200,
+html.theme-light .text-green-300,
+html.theme-light .text-green-400 {
+  color: #065f46 !important;
+}
+
+html.theme-light .text-emerald-500,
+html.theme-light .text-green-500 {
+  color: #047857 !important;
+}
+
+/* Indigo: Replace pale violet with deep royal indigo (indigo-800) */
+html.theme-light .text-indigo-200,
+html.theme-light .text-indigo-300,
+html.theme-light .text-indigo-400 {
+  color: #3730a3 !important;
+}
+
+html.theme-light .text-indigo-500 {
+  color: #4338ca !important;
+}
+
+/* Blue & Sky: Replace pale blue with deep navy (blue-800) */
+html.theme-light .text-blue-200,
+html.theme-light .text-blue-300,
+html.theme-light .text-blue-400,
+html.theme-light .text-sky-200,
+html.theme-light .text-sky-300,
+html.theme-light .text-sky-400 {
+  color: #1e40af !important;
+}
+
+html.theme-light .text-blue-500,
+html.theme-light .text-sky-500 {
+  color: #1d4ed8 !important;
+}
+
+/* Rose & Red: Replace pale pink with rich burgundy / crimson (rose-800 / red-800) */
+html.theme-light .text-rose-200,
+html.theme-light .text-rose-300,
+html.theme-light .text-rose-400 {
+  color: #9f1239 !important;
+}
+
+html.theme-light .text-red-200,
+html.theme-light .text-red-300,
+html.theme-light .text-red-400 {
+  color: #991b1b !important;
+}
+
+/* Purple & Violet: Replace pale lilac with rich deep purple (purple-800) */
+html.theme-light .text-purple-200,
+html.theme-light .text-purple-300,
+html.theme-light .text-purple-400,
+html.theme-light .text-violet-200,
+html.theme-light .text-violet-300,
+html.theme-light .text-violet-400 {
+  color: #5b21b6 !important;
+}
+
+/* Form Inputs, Selects & Textareas in Light Mode */
+html.theme-light input:not([type="checkbox"]):not([type="radio"]),
+html.theme-light select,
+html.theme-light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  font-weight: 600;
+}
+
+html.theme-light input:not([type="checkbox"]):not([type="radio"]):focus,
+html.theme-light select:focus,
+html.theme-light textarea:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 1px #3b82f6 !important;
+}
+
+html.theme-light input:disabled,
+html.theme-light input[readonly],
+html.theme-light select:disabled,
+html.theme-light textarea:disabled {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+  border-color: #e2e8f0 !important;
+  opacity: 1 !important;
+}
+
+html.theme-light input::placeholder,
+html.theme-light textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Interactive Hovers */
+html.theme-light .hover\:bg-slate-800:hover,
+html.theme-light .hover\:bg-slate-700:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html.theme-light .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+
+/* Modal Backdrops in Light Mode */
+html.theme-light .bg-slate-950\/80,
+html.theme-light .bg-slate-950\/70,
+html.theme-light [class*="bg-slate-950/"][class*="backdrop-blur"] {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+}
+
+/* Table Clean Formatting */
+html.theme-light table {
+  background-color: #ffffff;
+}
+
+html.theme-light thead th {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  font-weight: 800 !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.theme-light tbody td {
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.theme-light tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+
+/* CRITICAL: Preserve crisp white text on colored buttons, badges and gradients */
+html.theme-light [class*="bg-indigo-600"],
+html.theme-light [class*="bg-indigo-500"],
+html.theme-light [class*="bg-blue-600"],
+html.theme-light [class*="bg-blue-500"],
+html.theme-light [class*="bg-emerald-600"],
+html.theme-light [class*="bg-emerald-500"],
+html.theme-light [class*="bg-rose-600"],
+html.theme-light [class*="bg-rose-500"],
+html.theme-light [class*="bg-red-600"],
+html.theme-light [class*="bg-red-500"],
+html.theme-light [class*="bg-amber-600"],
+html.theme-light [class*="bg-cyan-600"],
+html.theme-light [class*="bg-teal-600"],
+html.theme-light [class*="bg-teal-500"],
+html.theme-light [class*="bg-violet-600"],
+html.theme-light [class*="bg-purple-600"],
+html.theme-light [class*="bg-gradient-to-"] {
+  color: #ffffff !important;
+}
+
+html.theme-light [class*="bg-indigo-600"] *,
+html.theme-light [class*="bg-indigo-500"] *,
+html.theme-light [class*="bg-blue-600"] *,
+html.theme-light [class*="bg-blue-500"] *,
+html.theme-light [class*="bg-emerald-600"] *,
+html.theme-light [class*="bg-emerald-500"] *,
+html.theme-light [class*="bg-rose-600"] *,
+html.theme-light [class*="bg-rose-500"] *,
+html.theme-light [class*="bg-red-600"] *,
+html.theme-light [class*="bg-red-500"] *,
+html.theme-light [class*="bg-amber-600"] *,
+html.theme-light [class*="bg-cyan-600"] *,
+html.theme-light [class*="bg-teal-600"] *,
+html.theme-light [class*="bg-teal-500"] *,
+html.theme-light [class*="bg-violet-600"] *,
+html.theme-light [class*="bg-purple-600"] *,
+html.theme-light [class*="bg-gradient-to-"] * {
+  color: #ffffff !important;
+}
+
+/* Subtle Card Box Shadows for Light Theme */
+html.theme-light .bg-slate-900.rounded-3xl,
+html.theme-light .bg-slate-900.rounded-2xl,
+html.theme-light .bg-slate-900.rounded-xl {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+}

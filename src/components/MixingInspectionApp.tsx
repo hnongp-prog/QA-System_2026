@@ -22,14 +22,17 @@ import {
   Edit3,
   X,
   FileSpreadsheet,
-  RotateCcw
+  RotateCcw,
+  Moon,
+  Sun
 } from 'lucide-react';
 
 import { 
   MixingCoatingSpec, 
   MixingInspectionRecord, 
   Language, 
-  InspectionActivity 
+  InspectionActivity,
+  ThemeMode
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
 import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
@@ -38,6 +41,8 @@ interface MixingInspectionAppProps {
   onBackToPortal?: () => void;
   onLogNewActivity?: (activity: InspectionActivity) => void;
   language?: Language;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 // Sparkline Component
@@ -177,9 +182,12 @@ const INITIAL_INSPECTIONS: MixingInspectionRecord[] = [
 export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
   onBackToPortal,
   onLogNewActivity,
-  language = 'th'
+  language = 'th',
+  theme = 'light',
+  onToggleTheme
 }) => {
   const isTh = language === 'th';
+  const isLight = theme === 'light';
   const [activeTab, setActiveTab] = useState<'new-batch' | 'settings' | 'dashboard' | 'history'>('new-batch');
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -493,29 +501,46 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const addRow = () => {
-    const nextNum = batchItems.length + 1;
-    setBatchItems(prev => [
-      ...prev,
-      {
-        id: Date.now() + Math.random(),
-        lotNumber: `CUP-${nextNum}`,
-        cupWeight: '',
-        coatingWeight: '',
-        cupCoatingWeight: '',
-        wtAfterDry105: '',
-        wtAfterDry430: '',
-        weightOfBinder: '',
-        totalCoatingWeight: '',
-        binderPercent: '',
-        solidParticlePercent: '',
-        grindometer: '',
-        viscosity: '',
-        judgment: 'PENDING' as 'PASS' | 'FAIL' | 'PENDING',
-        remarks: ''
-      }
-    ]);
+  const addCups = (count: number = 1) => {
+    setBatchItems(prev => {
+      // Find the next cup number
+      const cupNumbers = prev.map(item => {
+        const match = item.lotNumber.match(/(\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      });
+      const maxCupNum = cupNumbers.length > 0 ? Math.max(...cupNumbers) : 0;
+      const startNum = maxCupNum >= prev.length ? maxCupNum + 1 : prev.length + 1;
+
+      const newItems: typeof prev = Array.from({ length: count }, (_, i) => {
+        const num = startNum + i;
+        return {
+          id: Date.now() + i * 23 + Math.random(),
+          lotNumber: `CUP-${num}`,
+          cupWeight: '',
+          coatingWeight: '',
+          cupCoatingWeight: '',
+          wtAfterDry105: '',
+          wtAfterDry430: '',
+          weightOfBinder: '',
+          totalCoatingWeight: '',
+          binderPercent: '',
+          solidParticlePercent: '',
+          grindometer: '',
+          viscosity: '',
+          judgment: 'PENDING' as 'PASS' | 'FAIL' | 'PENDING',
+          remarks: ''
+        };
+      });
+
+      return [...prev, ...newItems];
+    });
+
+    if (count > 1) {
+      showNotification(isTh ? `เพิ่ม ${count} ถ้วย (CUP) ภายในครั้งเดียวเรียบร้อยแล้ว` : `Added ${count} cups batch at once successfully`);
+    }
   };
+
+  const addRow = () => addCups(1);
 
   const handleHeaderChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -820,7 +845,9 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
   }, [inspections, historySearchTerm]);
 
   return (
-    <div className="min-h-screen bg-slate-950 font-sans text-slate-100 p-4 sm:p-6 space-y-6">
+    <div className={`min-h-screen font-sans p-4 sm:p-6 space-y-6 transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
+    }`}>
 
       {/* Admin Security Modal */}
       {showAdminModal && (
@@ -942,6 +969,21 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition ${
+                isLight
+                  ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 shadow-xs'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}
+            >
+              {isLight ? <Moon className="w-3.5 h-3.5 text-indigo-600" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
+              <span>{isLight ? (isTh ? 'สว่าง' : 'Light') : (isTh ? 'มืด' : 'Dark')}</span>
+            </button>
+          )}
+
           <div className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>Cloud Sync Active</span>
@@ -1121,12 +1163,10 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                   name="shift"
                   value={headerInfo.shift}
                   onChange={handleHeaderChange}
-                  placeholder="e.g. Day / Night / Shift A..."
+                  placeholder="e.g. Shift A, Shift B, Shift C..."
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
                 />
                 <datalist id="mixing-shift-options">
-                  <option value="Day (กะกลางวัน / A)" />
-                  <option value="Night (กะกลางคืน / B)" />
                   <option value="Shift A" />
                   <option value="Shift B" />
                   <option value="Shift C" />
@@ -1169,23 +1209,46 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                   type="button"
                   onClick={handleResetForm}
                   title={isTh ? 'ล้างฟอร์มทั้งหมด' : 'Reset Form'}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs px-3 py-2 rounded-xl border border-slate-700 flex items-center gap-1.5 transition"
+                  className={`font-semibold text-xs px-3 py-2 rounded-xl border flex items-center gap-1.5 transition ${
+                    isLight
+                      ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300 shadow-xs'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
+                  }`}
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
                   <span>{isTh ? 'ล้างฟอร์ม' : 'Reset'}</span>
                 </button>
 
+                {/* +1 Cup button */}
                 <button
-                  onClick={addRow}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-3 py-2 rounded-xl border border-slate-700 flex items-center gap-1.5 transition"
+                  type="button"
+                  onClick={() => addCups(1)}
+                  className={`font-bold text-xs px-3 py-2 rounded-xl border flex items-center gap-1.5 transition active:scale-95 ${
+                    isLight
+                      ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300 shadow-xs'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  }`}
+                  title={isTh ? 'เพิ่มถ้วยทดสอบทีละ 1 ถ้วย' : 'Add 1 cup'}
                 >
                   <Plus className="w-4 h-4 text-indigo-400" />
                   <span>{isTh ? '+ เพิ่มถ้วย (Cup)' : 'Add Cup'}</span>
                 </button>
 
+                {/* +6 Cups bulk button */}
                 <button
+                  type="button"
+                  onClick={() => addCups(6)}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl border border-indigo-500/40 flex items-center gap-1.5 transition shadow-sm shadow-indigo-600/30 active:scale-95"
+                  title={isTh ? 'เพิ่มถ้วยทดสอบ 6 ถ้วยพร้อมกันในครั้งเดียว (CUP ต่อเนื่อง)' : 'Add 6 cups batch at once'}
+                >
+                  <Layers className="w-4 h-4 text-indigo-200" />
+                  <span className="font-extrabold">{isTh ? '+ เพิ่ม 6 ถ้วย (+6 Cups)' : '+ 6 Cups'}</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={saveBatch}
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs px-5 py-2 rounded-xl flex items-center gap-1.5 transition shadow-lg shadow-indigo-600/20"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs px-5 py-2 rounded-xl flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isTh ? '💾 บันทึกทั้งหมด' : 'Save Batch'}</span>
@@ -1380,9 +1443,79 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                         </tr>
                       );
                     })}
+                    {batchItems.length === 0 && (
+                      <tr>
+                        <td colSpan={15} className="p-8 text-center">
+                          <p className={`text-xs mb-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {isTh ? 'ยังไม่มีรายการถ้วยทดสอบในตาราง กรุณากดเพิ่มถ้วย' : 'No cup measurement entries. Click below to add.'}
+                          </p>
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => addCups(1)}
+                              className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition ${
+                                isLight
+                                  ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300 shadow-xs'
+                                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                              }`}
+                            >
+                              <Plus className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />
+                              {isTh ? '+ เพิ่ม 1 ถ้วย' : '+ 1 Cup'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => addCups(6)}
+                              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition shadow-sm"
+                            >
+                              <Layers className="w-3.5 h-3.5 inline mr-1 text-indigo-200" />
+                              {isTh ? '+ เพิ่ม 6 ถ้วย (+6 Cups)' : '+ 6 Cups'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </form>
+            </div>
+
+            {/* Quick Actions Footer below Table */}
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t text-xs ${
+              isLight ? 'border-slate-200 text-slate-600' : 'border-slate-800 text-slate-400'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">
+                  {isTh ? 'รวมจำนวนถ้วยทดสอบ:' : 'Total Cups:'}
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  {batchItems.length} {isTh ? 'ถ้วย' : 'cups'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => addCups(1)}
+                  className={`text-xs px-3 py-1.5 rounded-lg border font-semibold flex items-center gap-1 transition ${
+                    isLight 
+                      ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300' 
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                  }`}
+                  title={isTh ? 'เพิ่มถ้วย 1 ถ้วย' : 'Add 1 cup'}
+                >
+                  <Plus className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>{isTh ? '+ 1 ถ้วย' : '+ 1 Cup'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addCups(6)}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3.5 py-1.5 rounded-lg border border-indigo-500/40 font-bold flex items-center gap-1 transition shadow-xs active:scale-95"
+                  title={isTh ? 'เพิ่มถ้วย 6 ถ้วยพร้อมกัน' : 'Add 6 cups batch at once'}
+                >
+                  <Layers className="w-3.5 h-3.5 text-indigo-200" />
+                  <span>{isTh ? '+ 6 ถ้วย (+6 Cups)' : '+ 6 Cups'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1871,14 +2004,12 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                   <input
                     list="edit-mixing-shift-options"
                     type="text"
-                    placeholder="e.g. Day / Night / Shift A..."
+                    placeholder="e.g. Shift A, Shift B, Shift C..."
                     value={editingHistoryItem.shift || ''}
                     onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, shift: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
                   />
                   <datalist id="edit-mixing-shift-options">
-                    <option value="Day (กะกลางวัน / A)" />
-                    <option value="Night (กะกลางคืน / B)" />
                     <option value="Shift A" />
                     <option value="Shift B" />
                     <option value="Shift C" />

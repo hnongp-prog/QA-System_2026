@@ -43,7 +43,9 @@ import {
   Disc,
   Copy,
   Eye,
-  Calculator
+  Calculator,
+  Moon,
+  Sun
 } from 'lucide-react';
 
 import { 
@@ -53,7 +55,8 @@ import {
   CuttingEvaluationType,
   MicroType,
   Language, 
-  InspectionActivity 
+  InspectionActivity,
+  ThemeMode
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
 import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
@@ -92,6 +95,8 @@ interface CuttingDimensionAppProps {
   onBackToPortal?: () => void;
   onLogNewActivity?: (activity: InspectionActivity) => void;
   language?: Language;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 // Sparkline Component
@@ -436,9 +441,12 @@ const INITIAL_INSPECTIONS: CuttingInspectionRecord[] = [
 export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   onBackToPortal,
   onLogNewActivity,
-  language = 'th'
+  language = 'th',
+  theme = 'light',
+  onToggleTheme
 }) => {
   const isTh = language === 'th';
+  const isLight = theme === 'light';
   const [activeTab, setActiveTab] = useState<'new-batch' | 'settings' | 'dashboard' | 'history'>('new-batch');
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -2273,7 +2281,9 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 font-sans text-slate-100 p-4 sm:p-6 space-y-6">
+    <div className={`min-h-screen font-sans p-4 sm:p-6 space-y-6 transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
+    }`}>
 
       {/* Admin Security Modal */}
       {showAdminModal && (
@@ -2395,6 +2405,21 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition ${
+                isLight
+                  ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 shadow-xs'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}
+            >
+              {isLight ? <Moon className="w-3.5 h-3.5 text-indigo-600" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
+              <span>{isLight ? (isTh ? 'สว่าง' : 'Light') : (isTh ? 'มืด' : 'Dark')}</span>
+            </button>
+          )}
+
           <div className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>Cloud Sync Active</span>
@@ -2588,12 +2613,10 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                   name="shift"
                   value={headerInfo.shift}
                   onChange={handleHeaderChange}
-                  placeholder="e.g. Day / Night / Shift A..."
+                  placeholder="e.g. Shift A, Shift B, Shift C..."
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
                 />
                 <datalist id="cutting-shift-options">
-                  <option value="Day (กะกลางวัน / A)" />
-                  <option value="Night (กะกลางคืน / B)" />
                   <option value="Shift A" />
                   <option value="Shift B" />
                   <option value="Shift C" />
@@ -5023,14 +5046,12 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                   <input
                     list="edit-cutting-shift-options"
                     type="text"
-                    placeholder="e.g. Day / Night / Shift A..."
+                    placeholder="e.g. Shift A, Shift B, Shift C..."
                     value={editingHistoryItem.shift || ''}
                     onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, shift: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
                   />
                   <datalist id="edit-cutting-shift-options">
-                    <option value="Day (กะกลางวัน / A)" />
-                    <option value="Night (กะกลางคืน / B)" />
                     <option value="Shift A" />
                     <option value="Shift B" />
                     <option value="Shift C" />

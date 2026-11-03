@@ -1742,14 +1742,12 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                     type="text"
                     value={header.shift || ''}
                     onChange={(e) => setHeader({ ...header, shift: e.target.value })}
-                    placeholder="e.g. Day / Night / Shift A..."
+                    placeholder="e.g. Shift A, Shift B, Shift C..."
                     className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 ${
                       isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-200'
                     }`}
                   />
                   <datalist id="chem-shift-list">
-                    <option value="Day (กะกลางวัน / A)" />
-                    <option value="Night (กะกลางคืน / B)" />
                     <option value="Shift A" />
                     <option value="Shift B" />
                     <option value="Shift C" />
@@ -2609,7 +2607,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 <input
                   list="edit-chem-shift-options"
                   type="text"
-                  placeholder="e.g. Day / Night / Shift A..."
+                  placeholder="e.g. Shift A, Shift B, Shift C..."
                   value={editingHistoryItem.shift || ''}
                   onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, shift: e.target.value } : null)}
                   className={`w-full border rounded-xl px-3 py-2 focus:outline-none ${
@@ -2617,8 +2615,6 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                   }`}
                 />
                 <datalist id="edit-chem-shift-options">
-                  <option value="Day (กะกลางวัน / A)" />
-                  <option value="Night (กะกลางคืน / B)" />
                   <option value="Shift A" />
                   <option value="Shift B" />
                   <option value="Shift C" />

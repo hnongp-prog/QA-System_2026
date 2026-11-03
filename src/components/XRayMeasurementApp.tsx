@@ -1520,12 +1520,10 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                   name="shift"
                   value={headerInfo.shift}
                   onChange={handleHeaderChange}
-                  placeholder="e.g. Day / Night / Shift A..."
+                  placeholder="e.g. Shift A, Shift B, Shift C..."
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-semibold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
                 />
                 <datalist id="xray-shift-options">
-                  <option value="Day (กะกลางวัน / A)" />
-                  <option value="Night (กะกลางคืน / B)" />
                   <option value="Shift A" />
                   <option value="Shift B" />
                   <option value="Shift C" />
@@ -3046,14 +3044,12 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                   <input
                     list="edit-xray-shift-options"
                     type="text"
-                    placeholder="e.g. Day / Night / Shift A..."
+                    placeholder="e.g. Shift A, Shift B, Shift C..."
                     value={editingHistoryItem.shift || ''}
                     onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, shift: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
                   />
                   <datalist id="edit-xray-shift-options">
-                    <option value="Day (กะกลางวัน / A)" />
-                    <option value="Night (กะกลางคืน / B)" />
                     <option value="Shift A" />
                     <option value="Shift B" />
                     <option value="Shift C" />

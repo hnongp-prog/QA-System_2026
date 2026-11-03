@@ -56,6 +56,7 @@ import { ThicknessWallApp } from './components/ThicknessWallApp';
 import { BilletCuttingApp } from './components/BilletCuttingApp';
 import { NcrManagementApp } from './components/NcrManagementApp';
 import { CoiManagementApp } from './components/CoiManagementApp';
+import { QualityAnalyticsApp } from './components/QualityAnalyticsApp';
 import { createNcrFromFailInspection, getStoredNcrRecords } from './utils/ncrStorage';
 import { useCloudState, logCloudInspectionActivity } from './services/firestoreSync';
 
@@ -86,11 +87,25 @@ export default function App() {
   const [activeSubApp, setActiveSubApp] = useState<string | null>(null);
 
   // UI Navigation & Controls
-  const [theme, setTheme] = useState<ThemeMode>('light');
+  const [theme, setTheme] = useState<ThemeMode>(() => {
+    return (localStorage.getItem('qa_system_theme') as ThemeMode) || 'light';
+  });
   const [language, setLanguage] = useState<Language>('th');
   const [selectedCategory, setSelectedCategory] = useState<QACategory>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMainTab, setActiveMainTab] = useState<'PORTAL' | 'LOGS'>('PORTAL');
+
+  // Synchronize theme with document element and storage for all sub-apps
+  useEffect(() => {
+    localStorage.setItem('qa_system_theme', theme);
+    if (theme === 'light') {
+      document.documentElement.classList.add('theme-light');
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('theme-light');
+    }
+  }, [theme]);
 
   const toggleTheme = () => {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
@@ -413,6 +428,7 @@ export default function App() {
         onBack={() => setActiveSubApp(null)}
         language={language}
         theme={theme}
+        onToggleTheme={toggleTheme}
         userRole={userProfile.role}
         userName={userProfile.name}
       />
@@ -437,6 +453,17 @@ export default function App() {
         onBackToPortal={() => setActiveSubApp(null)}
         onBackToMenu={() => setActiveSubApp(null)}
         onLogNewActivity={handleAddTestActivity}
+        language={language}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+      />
+    );
+  }
+
+  if (activeSubApp === 'ANA-01' || activeSubApp === 'mod-ana-01') {
+    return (
+      <QualityAnalyticsApp
+        onBackToPortal={() => setActiveSubApp(null)}
         language={language}
         theme={theme}
         onToggleTheme={toggleTheme}

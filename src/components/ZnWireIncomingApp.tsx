@@ -1420,12 +1420,10 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                               type="text"
                               value={item.shift || ''}
                               onChange={(e) => updateItemField(idx, 'shift', e.target.value)}
-                              placeholder="e.g. Day / Night / A"
+                              placeholder="e.g. Shift A, Shift B, Shift C..."
                               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
                             />
                             <datalist id="zn-shift-options">
-                              <option value="Day (กะกลางวัน / A)" />
-                              <option value="Night (กะกลางคืน / B)" />
                               <option value="Shift A" />
                               <option value="Shift B" />
                               <option value="Shift C" />
@@ -2165,14 +2163,12 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                     <input
                       list="edit-zn-shift-options"
                       type="text"
-                      placeholder="e.g. Day / Night / Shift A..."
+                      placeholder="e.g. Shift A, Shift B, Shift C..."
                       value={editingHistoryItem.shift || ''}
                       onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, shift: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
                     />
                     <datalist id="edit-zn-shift-options">
-                      <option value="Day (กะกลางวัน / A)" />
-                      <option value="Night (กะกลางคืน / B)" />
                       <option value="Shift A" />
                       <option value="Shift B" />
                       <option value="Shift C" />

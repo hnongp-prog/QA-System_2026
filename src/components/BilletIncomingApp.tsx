@@ -1831,7 +1831,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                                   <input
                                     list={`shift-list-${idx}`}
                                     type="text"
-                                    placeholder="e.g. Day / Night / Shift A..."
+                                    placeholder="e.g. Shift A, Shift B, Shift C..."
                                     value={item.shift || ''}
                                     onChange={(e) => updateItemField(idx, 'shift', e.target.value)}
                                     className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none border ${
@@ -1841,8 +1841,6 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                                     }`}
                                   />
                                   <datalist id={`shift-list-${idx}`}>
-                                    <option value="Day (กะกลางวัน / A)" />
-                                    <option value="Night (กะกลางคืน / B)" />
                                     <option value="Shift A" />
                                     <option value="Shift B" />
                                     <option value="Shift C" />
@@ -3218,7 +3216,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                 <input
                   list="edit-shift-options"
                   type="text"
-                  placeholder="e.g. Day / Night / Shift A..."
+                  placeholder="e.g. Shift A, Shift B, Shift C..."
                   value={editingHistoryItem.shift || ''}
                   onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, shift: e.target.value } : null)}
                   className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${
@@ -3228,8 +3226,6 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                   }`}
                 />
                 <datalist id="edit-shift-options">
-                  <option value="Day (กะกลางวัน / A)" />
-                  <option value="Night (กะกลางคืน / B)" />
                   <option value="Shift A" />
                   <option value="Shift B" />
                   <option value="Shift C" />
