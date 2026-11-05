@@ -637,7 +637,40 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
           batchLot: `${headerInfo.coatingType} - ${headerInfo.mixingLot}`,
           result: item.judgment === 'PASS' ? 'PASS' : 'REJECT',
           defectCount: item.judgment === 'FAIL' ? 1 : 0,
-          remarks: `Cup:${item.lotNumber}, Bind%:${item.binderPercent}, Solid%:${item.solidParticlePercent}, Grindo:${item.grindometer}, Visco:${item.viscosity}`
+          remarks: (() => {
+            if (item.judgment !== 'FAIL') return `PASS (Cup ${item.lotNumber}: All specs passed)`;
+            const failedSpecs: string[] = [];
+            if (checkPass(item.binderPercent, coatingTypeSpecs.binderSpec) === 'FAIL') {
+              failedSpecs.push(`Binder: ${item.binderPercent}% (Spec: ${coatingTypeSpecs.binderSpec})`);
+            }
+            if (checkPass(item.solidParticlePercent, coatingTypeSpecs.solidSpec) === 'FAIL') {
+              failedSpecs.push(`Solid: ${item.solidParticlePercent}% (Spec: ${coatingTypeSpecs.solidSpec})`);
+            }
+            if (checkPass(item.grindometer, coatingTypeSpecs.grindoSpec) === 'FAIL') {
+              failedSpecs.push(`Grindometer: ${item.grindometer} µm (Spec: ${coatingTypeSpecs.grindoSpec} µm)`);
+            }
+            if (checkPass(item.viscosity, coatingTypeSpecs.viscoSpec) === 'FAIL') {
+              failedSpecs.push(`Viscosity: ${item.viscosity} s (Spec: ${coatingTypeSpecs.viscoSpec} s)`);
+            }
+            return failedSpecs.length > 0 ? failedSpecs.join(', ') : `Cup ${item.lotNumber}: Out of spec`;
+          })(),
+          inspectionResult: (() => {
+            if (item.judgment !== 'FAIL') return `PASS (Cup ${item.lotNumber}: All specs passed)`;
+            const failedSpecs: string[] = [];
+            if (checkPass(item.binderPercent, coatingTypeSpecs.binderSpec) === 'FAIL') {
+              failedSpecs.push(`Binder: ${item.binderPercent}% (Spec: ${coatingTypeSpecs.binderSpec})`);
+            }
+            if (checkPass(item.solidParticlePercent, coatingTypeSpecs.solidSpec) === 'FAIL') {
+              failedSpecs.push(`Solid: ${item.solidParticlePercent}% (Spec: ${coatingTypeSpecs.solidSpec})`);
+            }
+            if (checkPass(item.grindometer, coatingTypeSpecs.grindoSpec) === 'FAIL') {
+              failedSpecs.push(`Grindometer: ${item.grindometer} µm (Spec: ${coatingTypeSpecs.grindoSpec} µm)`);
+            }
+            if (checkPass(item.viscosity, coatingTypeSpecs.viscoSpec) === 'FAIL') {
+              failedSpecs.push(`Viscosity: ${item.viscosity} s (Spec: ${coatingTypeSpecs.viscoSpec} s)`);
+            }
+            return failedSpecs.length > 0 ? failedSpecs.join(', ') : `Cup ${item.lotNumber}: Out of spec`;
+          })()
         });
       }
 

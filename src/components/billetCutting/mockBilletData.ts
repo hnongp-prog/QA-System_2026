@@ -19,9 +19,9 @@ export const checkAdminPassword = (input: string): boolean => {
 };
 
 export const INITIAL_BILLET_SPECS: Record<string, BilletCuttingSpec> = {
-  '6063-STD-500': {
-    id: 'spec-6063-500',
-    name: '6063-STD-500',
+  'CAPCO': {
+    id: 'spec-capco',
+    name: 'CAPCO',
     billetGrade: '6063',
     lengthNominal: '500',
     lengthMin: '498.0',
@@ -35,11 +35,11 @@ export const INITIAL_BILLET_SPECS: Record<string, BilletCuttingSpec> = {
     surfaceDefectMaxDepth: '2.0',
     surfaceDefectMaxWidth: '50.0',
     surfaceDefectMaxLength: '100.0',
-    remarks: 'Standard 6063 billet for architectural profiles (Ø5" / 127mm)'
+    remarks: 'CAPCO Supplier Spec - Standard 6063 billet for architectural profiles (Ø5" / 127mm)'
   },
-  '6063-STD-600': {
-    id: 'spec-6063-600',
-    name: '6063-STD-600',
+  'ALCOA': {
+    id: 'spec-alcoa',
+    name: 'ALCOA',
     billetGrade: '6063',
     lengthNominal: '600',
     lengthMin: '598.0',
@@ -53,11 +53,11 @@ export const INITIAL_BILLET_SPECS: Record<string, BilletCuttingSpec> = {
     surfaceDefectMaxDepth: '2.0',
     surfaceDefectMaxWidth: '50.0',
     surfaceDefectMaxLength: '100.0',
-    remarks: 'Standard 6063 billet (Ø5" / 127mm) length 600mm'
+    remarks: 'ALCOA Supplier Spec - Premium 6063 billet (Ø5" / 127mm) length 600mm'
   },
-  '6061-HVY-600': {
-    id: 'spec-6061-600',
-    name: '6061-HVY-600',
+  'THAI HONG': {
+    id: 'spec-thaihong',
+    name: 'THAI HONG',
     billetGrade: '6061',
     lengthNominal: '600',
     lengthMin: '597.5',
@@ -71,11 +71,11 @@ export const INITIAL_BILLET_SPECS: Record<string, BilletCuttingSpec> = {
     surfaceDefectMaxDepth: '2.0',
     surfaceDefectMaxWidth: '50.0',
     surfaceDefectMaxLength: '100.0',
-    remarks: 'High strength 6061 structural billet (Ø7" / 178mm)'
+    remarks: 'THAI HONG Supplier Spec - High strength 6061 structural billet (Ø7" / 178mm)'
   },
-  '6082-PRO-650': {
-    id: 'spec-6082-650',
-    name: '6082-PRO-650',
+  'HONG HO': {
+    id: 'spec-hongho',
+    name: 'HONG HO',
     billetGrade: '6082',
     lengthNominal: '650',
     lengthMin: '648.0',
@@ -89,11 +89,11 @@ export const INITIAL_BILLET_SPECS: Record<string, BilletCuttingSpec> = {
     surfaceDefectMaxDepth: '2.0',
     surfaceDefectMaxWidth: '50.0',
     surfaceDefectMaxLength: '100.0',
-    remarks: 'Automotive grade 6082 billet (Ø8" / 203mm)'
+    remarks: 'HONG HO Supplier Spec - Automotive grade 6082 billet (Ø8" / 203mm)'
   },
-  '1050-PURE-500': {
-    id: 'spec-1050-500',
-    name: '1050-PURE-500',
+  'CHALCO': {
+    id: 'spec-chalco',
+    name: 'CHALCO',
     billetGrade: '1050',
     lengthNominal: '500',
     lengthMin: '498.0',
@@ -107,7 +107,7 @@ export const INITIAL_BILLET_SPECS: Record<string, BilletCuttingSpec> = {
     surfaceDefectMaxDepth: '2.0',
     surfaceDefectMaxWidth: '50.0',
     surfaceDefectMaxLength: '100.0',
-    remarks: 'Commercial pure aluminum billet'
+    remarks: 'CHALCO Supplier Spec - Commercial pure 1050 aluminum billet'
   }
 };
 

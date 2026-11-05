@@ -163,22 +163,22 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
               <button
                 key={cat.key}
                 onClick={() => onSelectCategory(cat.key)}
-                className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 border ${
+                className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border ${
                   isSelected
                     ? isLight
                       ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                       : 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm'
                     : isLight
-                      ? 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+                      ? 'bg-slate-50 text-slate-800 border-slate-300 hover:bg-slate-100 hover:text-slate-950'
                       : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 border-slate-700'
                 }`}
               >
                 <span>{isTh ? cat.labelTh : cat.labelEn}</span>
                 {cat.key === 'ALL' && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-extrabold ${
                     isSelected
                       ? isLight ? 'bg-blue-700 text-white' : 'bg-slate-900 text-cyan-300'
-                      : isLight ? 'bg-slate-200 text-slate-700' : 'bg-slate-800 text-slate-300'
+                      : isLight ? 'bg-slate-200 text-slate-800' : 'bg-slate-800 text-slate-300'
                   }`}>
                     {totalModulesCount}
                   </span>
@@ -188,7 +188,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
           })}
         </div>
 
-        <div className={`text-xs shrink-0 self-end sm:self-center font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+        <div className={`text-xs shrink-0 self-end sm:self-center font-mono font-semibold ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>
           {isTh ? `แสดง ${filteredCount} จาก ${totalModulesCount} เมนูย่อย` : `Showing ${filteredCount} of ${totalModulesCount} sub-apps`}
         </div>
       </div>

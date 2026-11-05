@@ -1029,6 +1029,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
       };
 
       const decision = judgeStatus(item);
+      const specs = getRowEffectiveSpec(item);
       const recId = `rec-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
 
       const raMaxVal = getMax(item.raUp, item.raLo);
@@ -1037,6 +1038,39 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
       const ryMaxVal = getMax(item.ryUp, item.ryLo);
       const unZnRaMaxVal = getMax(item.unZnSprayRaUp, item.unZnSprayRaLo);
       const unZnRzMaxVal = getMax(item.unZnSprayRzUp, item.unZnSprayRzLo);
+
+      // Collect strictly only out-of-spec roughness parameters
+      const outOfSpecPoints: string[] = [];
+      const checkViolations = (arr: string[] | undefined, limit: number, label: string) => {
+        if (!arr || limit <= 0) return;
+        arr.forEach((v, idx) => {
+          if (isIgnoredValue(v)) return;
+          const num = parseFloat(String(v).trim());
+          if (!isNaN(num) && num > limit) {
+            outOfSpecPoints.push(`${label} Pt.${idx + 1} (${num.toFixed(3)} µm > Spec Max ${limit.toFixed(3)} µm)`);
+          }
+        });
+      };
+
+      if (specs.raUp > 0) checkViolations(item.raUp, specs.raUp, 'Ra Upper');
+      if (specs.raLo > 0) checkViolations(item.raLo, specs.raLo, 'Ra Lower');
+      if (specs.rzUp > 0) checkViolations(item.rzUp, specs.rzUp, 'Rz Upper');
+      if (specs.rzLo > 0) checkViolations(item.rzLo, specs.rzLo, 'Rz Lower');
+      if (specs.rtUp > 0) checkViolations(item.rtUp, specs.rtUp, 'Rt Upper');
+      if (specs.rtLo > 0) checkViolations(item.rtLo, specs.rtLo, 'Rt Lower');
+      if (specs.ryUp > 0) checkViolations(item.ryUp, specs.ryUp, 'Ry Upper');
+      if (specs.ryLo > 0) checkViolations(item.ryLo, specs.ryLo, 'Ry Lower');
+      if (specs.unZnSprayRaUp > 0) checkViolations(item.unZnSprayRaUp, specs.unZnSprayRaUp, 'Un Zn Ra Upper');
+      if (specs.unZnSprayRaLo > 0) checkViolations(item.unZnSprayRaLo, specs.unZnSprayRaLo, 'Un Zn Ra Lower');
+      if (specs.unZnSprayRzUp > 0) checkViolations(item.unZnSprayRzUp, specs.unZnSprayRzUp, 'Un Zn Rz Upper');
+      if (specs.unZnSprayRzLo > 0) checkViolations(item.unZnSprayRzLo, specs.unZnSprayRzLo, 'Un Zn Rz Lower');
+      if (stats && specs.rzCalUp > 0 && stats.rzCal > specs.rzCalUp) {
+        outOfSpecPoints.push(`RzCal (${stats.rzCal.toFixed(3)} µm > Spec Max ${specs.rzCalUp.toFixed(3)} µm)`);
+      }
+
+      const inspectionResultText = decision === 'Pass'
+        ? 'PASS (All specs within tolerance)'
+        : (outOfSpecPoints.length > 0 ? outOfSpecPoints.join(' | ') : 'Roughness Out of Spec');
 
       if (onLogNewActivity) {
         onLogNewActivity({
@@ -1051,7 +1085,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
           coilNo: item.lotNumber,
           profile: headerInfo.profileName,
           process: item.process,
-          inspectionResult: `${decision === 'Pass' ? 'PASS' : 'FAIL'} / Ra: ${raMaxVal} µm, Rz: ${rzMaxVal} µm${isProfileZnOrH(headerInfo.profileName) ? `, UnZn: ${unZnRaMaxVal}/${unZnRzMaxVal}` : ''}`,
+          inspectionResult: inspectionResultText,
           result: decision === 'Pass' ? 'PASS' : 'FAIL',
           defectCount: decision === 'Fail' ? 1 : 0,
           remarks: `Ra Max: ${raMaxVal} µm, Rz Max: ${rzMaxVal} µm, RzCal: ${stats ? stats.rzCal.toFixed(3) : '0.000'}${isProfileZnOrH(headerInfo.profileName) ? ` | Un Zn Spray: Ra ${unZnRaMaxVal} µm, Rz ${unZnRzMaxVal} µm` : ''}`

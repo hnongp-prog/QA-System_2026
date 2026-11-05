@@ -1215,8 +1215,8 @@ export interface CoiIssueRecord {
 // ==========================================
 export interface BilletCuttingSpec {
   id?: string;
-  name: string; // Profile / Spec Name (e.g. "6063-Ø5-L500", "6061-Ø7-L600")
-  billetGrade: string; // Billet Grade (e.g. "6063", "6061", "6082", "1050", "3003")
+  name: string; // Supplier Name / Spec Name (e.g. "ALCOA", "CAPCO", "THAI HONG", "6063-STD-500")
+  billetGrade: string; // Billet Grade (e.g. "6063", "6061", "6082", "1050", "3003", custom typable)
   lengthNominal?: string; // Nominal Length in mm (e.g. "500")
   lengthMin: string; // Min Length (mm)
   lengthMax: string; // Max Length (mm)

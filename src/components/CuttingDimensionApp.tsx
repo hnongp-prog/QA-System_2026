@@ -1934,14 +1934,52 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
       if (onLogNewActivity) {
         const isPass = decision === 'Pass';
-        const customPointsSummary = headerInfo.customControlPoints.map(cp => {
-          const val = finalCustomVals[cp.id];
-          return `${cp.name}: ${val || '-'}${cp.unit}`;
-        }).join(', ');
+        const failedPoints: string[] = [];
+        const checkPointFail = (name: string, valStr?: string, targetStr?: string, tpStr?: string, tmStr?: string) => {
+          if (!valStr || valStr === '-' || valStr === 'N/A') return;
+          const v = parseFloat(valStr);
+          const t = parseFloat(targetStr || '0');
+          const tp = parseFloat(tpStr || '0');
+          const tm = parseFloat(tmStr || '0');
+          if (targetStr && !isNaN(t) && !isNaN(v)) {
+            if (v > t + tp || v < t - tm) {
+              failedPoints.push(`${name} = ${v} mm (Spec: ${t} +${tp}/-${tm} mm)`);
+            }
+          }
+        };
+        const checkMaxFail = (name: string, valStr?: string, maxStr?: string, unit = 'mm') => {
+          if (!valStr || valStr === '-' || valStr === 'N/A') return;
+          const v = parseFloat(valStr);
+          const mx = parseFloat(maxStr || '0');
+          if (maxStr && !isNaN(mx) && mx > 0 && !isNaN(v)) {
+            if (v > mx) {
+              failedPoints.push(`${name} = ${v} ${unit} (Spec Max: ≤ ${mx})`);
+            }
+          }
+        };
+
+        if (showWidth) checkPointFail(headerInfo.widthName || 'Width', item.width, headerInfo.widthTarget, headerInfo.widthTolPlus, headerInfo.widthTolMinus);
+        if (showHeight) checkPointFail(headerInfo.heightName || 'Height', item.height, headerInfo.heightTarget, headerInfo.heightTolPlus, headerInfo.heightTolMinus);
+        if (showLength) checkPointFail(headerInfo.lengthName || 'Length', item.length, headerInfo.lengthTarget, headerInfo.lengthTolPlus, headerInfo.lengthTolMinus);
+        if (showBending) checkMaxFail(headerInfo.bendingName || 'Bending', item.bending, headerInfo.bendingMax);
+        if (showCamber) checkMaxFail(headerInfo.camberName || 'Camber', item.camber, headerInfo.camberMax, 'mm/m');
+        if (showTwist) checkMaxFail(headerInfo.twistName || 'Twist', item.twist, headerInfo.twistMax, 'deg/m');
+
+        if (activeCustomPoints.length > 0) {
+          activeCustomPoints.forEach(cp => {
+            const val = finalCustomVals[cp.id];
+            if (val && val !== '-' && val !== 'N/A') {
+              const res = validateCustomPoint(val, cp);
+              if (res === 'Fail') {
+                failedPoints.push(`${cp.name} = ${val} ${cp.unit || 'mm'} (Out of spec)`);
+              }
+            }
+          });
+        }
 
         const resText = isPass 
           ? `PASS (Standard & ${headerInfo.customControlPoints.length} Custom Points within tolerances)` 
-          : `FAIL / Out of Spec: W:${item.width || '-'}mm, H:${item.height || '-'}mm, L:${item.length || '-'}mm, Bending:${item.bending || '-'}mm ${customPointsSummary ? `[${customPointsSummary}]` : ''}`;
+          : `FAIL / Out of Spec: ${failedPoints.length > 0 ? failedPoints.join(', ') : 'Dimensional tolerance exceeded'}`;
 
         onLogNewActivity({
           id: recId,

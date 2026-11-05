@@ -4,6 +4,139 @@ import { saveCloudData, subscribeToCloudData } from '../services/firestoreSync';
 export const ROOT_CAUSE_CATEGORIES = ['Man', 'Method', 'Machine', 'Materail', 'Enviroment'] as const;
 export type RootCauseCategory = typeof ROOT_CAUSE_CATEGORIES[number];
 
+/**
+ * Extracts strictly ONLY the Out-of-Spec / NG points from inspection result text.
+ * Strips redundant generic prefixes (e.g. "FAIL / Out of Spec:"),
+ * filters out any passed/in-spec parameters, and returns an array of clean failure points.
+ */
+export function extractOnlyOutOfSpecPoints(rawResult?: string): string[] {
+  if (!rawResult || typeof rawResult !== 'string') return ['-'];
+  let text = rawResult.trim();
+  if (!text) return ['-'];
+
+  // If the whole string is an explicit overall PASS without any failure indicator
+  if (/^PASS\b/i.test(text) && !/\b(fail|ng|out\s*of\s*spec|exceed|below|above|under|over|reject)\b/i.test(text) && !/[><≠]/.test(text)) {
+    return ['-'];
+  }
+
+  // 1. Remove leading general prefixes
+  text = text
+    .replace(/^FAIL\s*\/\s*Out\s*of\s*Spec\s*:\s*/i, '')
+    .replace(/^FAIL\s*:\s*/i, '')
+    .replace(/^Out\s*of\s*Spec\s*:\s*/i, '')
+    .replace(/^NG\s*:\s*/i, '')
+    .replace(/^REJECT\s*:\s*/i, '')
+    .trim();
+
+  // 2. Parse segments separated by comma, semicolon, newline, or pipe outside parentheses/brackets
+  const segments: string[] = [];
+  let current = '';
+  let parenDepth = 0;
+  let bracketDepth = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '(') parenDepth++;
+    else if (char === ')') parenDepth = Math.max(0, parenDepth - 1);
+    else if (char === '[') bracketDepth++;
+    else if (char === ']') bracketDepth = Math.max(0, bracketDepth - 1);
+
+    if ((char === ',' || char === ';' || char === '\n' || char === '|') && parenDepth === 0 && bracketDepth === 0) {
+      if (current.trim()) segments.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) segments.push(current.trim());
+
+  if (segments.length === 0) return ['-'];
+
+  // Helper: check if a segment has an explicit failure indicator or comparison operator
+  const isSegmentNg = (s: string): boolean => {
+    // Has explicit fail keywords
+    if (/\b(fail|ng|out\s*of\s*spec|exceed|exceeded|below|above|under|over|mismatch|reject|quarantine|defect|error|not\s+in\s+spec|out\s*of\s*tolerance)\b/i.test(s)) {
+      return true;
+    }
+    // Has comparison operator with a limit (e.g. > 13.0, < 12.0, < Min, > Max)
+    if (/[><≠≤≥]/.test(s)) {
+      return true;
+    }
+    // Has spec violation markers like (Spec: ...), (Limit: ...), (Spec Min: ...), (Spec Max: ...)
+    if (/\b(spec\s*:|spec\s+min|spec\s+max|limit\s*:|target\s*:)\b/i.test(s)) {
+      return true;
+    }
+    // Has max(...) or min(...) markers indicating limit breach
+    if (/\b(max\s*\(|min\s*\()/i.test(s)) {
+      return true;
+    }
+    return false;
+  };
+
+  // Helper: check if a segment is an in-spec / passing mechanical property from Tensile test or normal measure
+  // e.g. "Tensile 425 MPa", "Tensile: 425.0 MPa", "Yield: 265 MPa", "Elong: 22.5%", "Elongation 22%"
+  const isMechanicalWithinSpec = (s: string): boolean => {
+    const hasMechKeyword = /\b(tensile|yield|elong|elongation)\b/i.test(s);
+    if (!hasMechKeyword) return false;
+    // If it mentions tensile/yield/elong but does NOT have any fail indicator, comparison operator, or spec breach:
+    return !isSegmentNg(s);
+  };
+
+  // Check if any segment in the collection is explicitly marked as NG or out-of-spec
+  const hasAnyExplicitNg = segments.some(seg => isSegmentNg(seg.trim()));
+
+  // 3. Filter segments:
+  const outOfSpecSegments = segments.filter(seg => {
+    const s = seg.trim();
+    if (!s) return false;
+
+    // Discard any segment explicitly marked with PASS / OK / Good / In Spec without failure indicators
+    const isExplicitPass = /\b(pass|ok|good|within\s+spec|in\s+spec|normal)\b/i.test(s);
+    if (isExplicitPass && !isSegmentNg(s)) {
+      return false;
+    }
+
+    // Tensile test specific: If tensile, yield, or elongation are listed without an explicit failure indicator,
+    // they are normal measurements that are within spec! Discard them!
+    if (isMechanicalWithinSpec(s)) {
+      return false;
+    }
+
+    // If at least one segment in the row is explicitly marked NG / has a violation operator,
+    // then any other segment that does NOT have any NG indicator or comparison is a passing dimension/reading!
+    if (hasAnyExplicitNg && !isSegmentNg(s)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  // 4. Format and clean each remaining segment
+  const finalPoints = (outOfSpecSegments.length > 0 ? outOfSpecSegments : [])
+    .map(seg => {
+      return seg
+        .replace(/^FAIL\s*\/\s*Out\s*of\s*Spec\s*:\s*/i, '')
+        .replace(/^FAIL\s*:\s*/i, '')
+        .replace(/^Out\s*of\s*Spec\s*:\s*/i, '')
+        .replace(/^NG\s*:\s*/i, '')
+        .replace(/^REJECT\s*:\s*/i, '')
+        .trim();
+    })
+    .filter(Boolean);
+
+  // If after filtering everything was discarded (i.e. all points were actually within spec or general text),
+  // fallback safely to non-mechanical segments if dimension was the one present
+  if (finalPoints.length === 0) {
+    const nonMech = segments.filter(s => !isMechanicalWithinSpec(s.trim()));
+    if (nonMech.length > 0) {
+      return nonMech.map(s => s.replace(/^(FAIL|NG|REJECT|Out of Spec)\s*(\/|:)?\s*/i, '').trim()).filter(Boolean);
+    }
+    return [text.replace(/^(FAIL|NG|REJECT|Out of Spec)\s*(\/|:)?\s*/i, '').trim() || '-'];
+  }
+
+  return finalPoints;
+}
+
 export const INITIAL_NCR_RECORDS: NcrRecord[] = [
   {
     id: 'NCR-2026-001',
@@ -276,7 +409,7 @@ export function exportNcrToCsv(records: NcrRecord[]): void {
     r.inspectionDate,
     r.inspector,
     r.process,
-    r.inspectionResult,
+    extractOnlyOutOfSpecPoints(r.inspectionResult).join(' | '),
     r.status,
     r.severity,
     r.sourceModuleCode,

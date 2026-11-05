@@ -187,14 +187,14 @@ export const ModuleGrid: React.FC<ModuleGridProps> = ({
                   <IconRenderer name={mod.iconName} className="w-5 h-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className={`text-base font-bold transition-colors leading-snug line-clamp-2 ${
+                  <h3 className={`text-base font-extrabold transition-colors leading-snug line-clamp-2 ${
                     isLight 
-                      ? 'text-slate-900 group-hover:text-blue-600' 
+                      ? 'text-slate-900 group-hover:text-blue-700' 
                       : 'text-white group-hover:text-cyan-300'
                   }`}>
                     {title}
                   </h3>
-                  <p className={`text-[11px] mt-1 line-clamp-2 leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <p className={`text-[11px] mt-1 line-clamp-2 leading-relaxed font-medium ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>
                     {description}
                   </p>
                 </div>

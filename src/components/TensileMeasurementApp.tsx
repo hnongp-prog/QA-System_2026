@@ -311,7 +311,7 @@ const INITIAL_RECORDS: TensileRecord[] = [
     machine: 'TENSILE-M02',
     inspector: 'Kittisak N. (IPQA)',
     sample_name: 'SAMPLE-2A',
-    width: 20.0,
+    width: 21.2,
     h_left: 2.2,
     h_middle: 2.2,
     h_right: 2.2,
@@ -724,9 +724,44 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
 
       newRecordsToSave.push(rec);
 
+      const ngPoints: string[] = [];
+      if (isFieldNg('width', row.width, matchedSpec)) {
+        const specTxt = `${matchedSpec.min_w} - ${matchedSpec.max_w} mm`;
+        const valNum = typeof w === 'number' ? w : parseFloat(String(w));
+        const comp = !isNaN(valNum) && valNum < matchedSpec.min_w ? `< Min ${matchedSpec.min_w}` : `> Max ${matchedSpec.max_w}`;
+        ngPoints.push(`Width ${w} mm (${comp} mm, Spec: ${specTxt})`);
+      }
+      if (isFieldNg('h_left', row.h_left, matchedSpec)) {
+        const specTxt = `${matchedSpec.min_h} - ${matchedSpec.max_h} mm`;
+        const valNum = typeof hl === 'number' ? hl : parseFloat(String(hl));
+        const comp = !isNaN(valNum) && valNum < matchedSpec.min_h ? `< Min ${matchedSpec.min_h}` : `> Max ${matchedSpec.max_h}`;
+        ngPoints.push(`Height L ${hl} mm (${comp} mm, Spec: ${specTxt})`);
+      }
+      if (isFieldNg('h_middle', row.h_middle, matchedSpec)) {
+        const specTxt = `${matchedSpec.min_h} - ${matchedSpec.max_h} mm`;
+        const valNum = typeof hm === 'number' ? hm : parseFloat(String(hm));
+        const comp = !isNaN(valNum) && valNum < matchedSpec.min_h ? `< Min ${matchedSpec.min_h}` : `> Max ${matchedSpec.max_h}`;
+        ngPoints.push(`Height M ${hm} mm (${comp} mm, Spec: ${specTxt})`);
+      }
+      if (isFieldNg('h_right', row.h_right, matchedSpec)) {
+        const specTxt = `${matchedSpec.min_h} - ${matchedSpec.max_h} mm`;
+        const valNum = typeof hr === 'number' ? hr : parseFloat(String(hr));
+        const comp = !isNaN(valNum) && valNum < matchedSpec.min_h ? `< Min ${matchedSpec.min_h}` : `> Max ${matchedSpec.max_h}`;
+        ngPoints.push(`Height R ${hr} mm (${comp} mm, Spec: ${specTxt})`);
+      }
+      if (isFieldNg('tensile', row.tensile, matchedSpec)) {
+        ngPoints.push(`Tensile strength ${t} MPa (Out of Spec: ${formatTensileSpec(matchedSpec)})`);
+      }
+      if (isFieldNg('yield', row.yield_val, matchedSpec)) {
+        ngPoints.push(`Yield strength ${y} MPa (Out of Spec: ${formatYieldSpec(matchedSpec)})`);
+      }
+      if (isFieldNg('elong', row.elong, matchedSpec)) {
+        ngPoints.push(`Elongation ${e}% (Out of Spec: ${formatElongationSpec(matchedSpec)})`);
+      }
+
       const inspectionResultText = decision === 'PASS' 
-        ? `PASS (Tensile: ${t} MPa, Yield: ${y} MPa, Elong: ${e}%)` 
-        : `FAIL / Out of Spec: Tensile ${t} MPa (Spec: ${formatTensileSpec(matchedSpec)}), Yield ${y} MPa (Spec: ${formatYieldSpec(matchedSpec)}), Elongation ${e}% (Spec: ${formatElongationSpec(matchedSpec)})`;
+        ? `PASS (All specs within tolerance)` 
+        : (ngPoints.length > 0 ? ngPoints.join(' | ') : 'Dimension Out of Spec');
 
       if (onLogNewActivity) {
         onLogNewActivity({

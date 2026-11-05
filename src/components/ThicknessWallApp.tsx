@@ -781,14 +781,20 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
       )}
 
       {/* Top Navigation Header */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b ${
+        isLight ? 'border-slate-300' : 'border-slate-800'
+      }`}>
         <div className="flex items-center gap-3">
           {onBackToPortal && (
             <button
               onClick={onBackToPortal}
-              className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition flex items-center gap-1.5 text-xs font-semibold"
+              className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-xs font-bold ${
+                isLight 
+                  ? 'bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-sm' 
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800'
+              }`}
             >
-              <ArrowLeft className="w-4 h-4 text-cyan-400" />
+              <ArrowLeft className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
               <span>{isTh ? 'กลับสู่เมนูหลัก QA' : 'Back to Portal'}</span>
             </button>
           )}
@@ -799,14 +805,18 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                <span className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded border ${
+                  isLight ? 'bg-indigo-100 text-indigo-900 border-indigo-300' : 'bg-indigo-950 text-indigo-300 border-indigo-800'
+                }`}>
                   IPQA-07
                 </span>
-                <h1 className="text-xl font-bold text-white tracking-tight">
+                <h1 className={`text-xl font-extrabold tracking-tight ${
+                  isLight ? 'text-slate-900' : 'text-white'
+                }`}>
                   {isTh ? 'ระบบวัดความหนาผนังชิ้นงาน (Thickness Wall Measurement)' : 'Thickness Wall Measure System'}
                 </h1>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className={`text-xs mt-0.5 font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                 {isTh ? 'สกัดข้อมูลด้วย Gemini AI 3.8 • Server-Side Cloud Synced' : 'AI-powered wall thickness extraction & quality specification audit'}
               </p>
             </div>
@@ -814,11 +824,15 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
         </div>
 
         {/* Tab Buttons */}
-        <div className="flex items-center gap-1.5 overflow-x-auto bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
+        <div className={`flex items-center gap-1.5 overflow-x-auto p-1.5 rounded-2xl border ${
+          isLight ? 'bg-white border-slate-300 shadow-sm' : 'bg-slate-900 border-slate-800'
+        }`}>
           <button
             onClick={() => handleSwitchTab('extraction')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'extraction' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200'
+              activeTab === 'extraction' 
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
+                : isLight ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
@@ -828,7 +842,9 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
           <button
             onClick={() => handleSwitchTab('dashboard')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200'
+              activeTab === 'dashboard' 
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
+                : isLight ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
@@ -838,7 +854,9 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
           <button
             onClick={() => handleSwitchTab('settings')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'settings' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200'
+              activeTab === 'settings' 
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
+                : isLight ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <Settings className="w-3.5 h-3.5" />
@@ -848,9 +866,9 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
           {onToggleTheme && (
             <button
               onClick={onToggleTheme}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition ml-1 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition ml-1 ${
                 isLight
-                  ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 shadow-xs'
+                  ? 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200 shadow-xs'
                   : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
               }`}
               title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}

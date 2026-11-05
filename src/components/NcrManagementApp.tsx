@@ -48,7 +48,8 @@ import {
   addNcrRecord, 
   exportNcrToCsv,
   subscribeToNcrRecords,
-  ROOT_CAUSE_CATEGORIES
+  ROOT_CAUSE_CATEGORIES,
+  extractOnlyOutOfSpecPoints
 } from '../utils/ncrStorage';
 
 export const ROOT_CAUSE_CATEGORIES_CONFIG = [
@@ -692,15 +693,19 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
           </div>
 
           {/* Main NCR Table with Separated Dimensions */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-            <div className="px-5 py-4 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
+          <div className={`border rounded-3xl overflow-hidden transition-colors ${
+            isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800 shadow-xl'
+          }`}>
+            <div className={`px-5 py-4 border-b flex items-center justify-between ${
+              isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
+            }`}>
               <div className="flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5 text-rose-400" />
-                <span className="text-sm font-bold text-white tracking-wide">
+                <ShieldAlert className="w-5 h-5 text-rose-500" />
+                <span className={`text-sm font-bold tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? 'ตารางแยกรายละเอียดของเสียตามมิติที่กำหนด (NCR Breakdown Table)' : 'Non-Conformance Detail Log by Dimension'}
                 </span>
               </div>
-              <span className="text-xs text-slate-400 font-mono">
+              <span className={`text-xs font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh ? `แสดงผล ${filteredList.length} จาก ${ncrList.length} รายการ` : `Showing ${filteredList.length} of ${ncrList.length} items`}
               </span>
             </div>
@@ -708,28 +713,30 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 font-semibold uppercase tracking-wider text-[11px]">
+                  <tr className={`border-b font-semibold uppercase tracking-wider text-[11px] ${
+                    isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-slate-950 text-slate-400 border-slate-800'
+                  }`}>
                     <th className="py-3 px-4 w-28">NCR No.</th>
-                    <th className="py-3 px-4 min-w-[150px] text-rose-300">1. Coil no.</th>
-                    <th className="py-3 px-4 min-w-[170px] text-indigo-300">2. Profile</th>
-                    <th className="py-3 px-4 min-w-[140px] text-cyan-300">3. Inspection Date</th>
-                    <th className="py-3 px-4 min-w-[140px] text-amber-300">4. Inspector</th>
-                    <th className="py-3 px-4 min-w-[180px] text-purple-300">5. Process</th>
-                    <th className="py-3 px-4 min-w-[280px] text-rose-400">6. Inspection Result / Out of Spec</th>
+                    <th className={`py-3 px-4 min-w-[150px] ${isLight ? 'text-rose-700 font-bold' : 'text-rose-300'}`}>1. Coil no.</th>
+                    <th className={`py-3 px-4 min-w-[170px] ${isLight ? 'text-indigo-700 font-bold' : 'text-indigo-300'}`}>2. Profile</th>
+                    <th className={`py-3 px-4 min-w-[140px] ${isLight ? 'text-cyan-700 font-bold' : 'text-cyan-300'}`}>3. Inspection Date</th>
+                    <th className={`py-3 px-4 min-w-[140px] ${isLight ? 'text-amber-700 font-bold' : 'text-amber-300'}`}>4. Inspector</th>
+                    <th className={`py-3 px-4 min-w-[180px] ${isLight ? 'text-purple-700 font-bold' : 'text-purple-300'}`}>5. Process</th>
+                    <th className={`py-3 px-4 min-w-[280px] ${isLight ? 'text-rose-700 font-bold' : 'text-rose-400'}`}>6. Inspection Result / Out of Spec</th>
                     <th className="py-3 px-4 min-w-[140px]">Status</th>
                     <th className="py-3 px-4 text-center w-24">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 font-sans">
+                <tbody className={`divide-y font-sans ${isLight ? 'divide-slate-200' : 'divide-slate-800/60'}`}>
                   {filteredList.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="py-12 text-center text-slate-500">
                         <div className="flex flex-col items-center justify-center gap-2">
-                          <CheckCircle2 className="w-8 h-8 text-emerald-400/50" />
-                          <p className="text-sm font-semibold text-slate-400">
+                          <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                          <p className={`text-sm font-semibold ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>
                             {isTh ? 'ไม่พบรายการของเสียที่ตรงตามเงื่อนไข' : 'No Non-conformance records found'}
                           </p>
-                          <p className="text-xs text-slate-600">
+                          <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-600'}`}>
                             {isTh ? 'ระบบตรวจรับและผลิตทั้งหมดผ่านเกณฑ์มาตรฐานสมบูรณ์' : 'All incoming and in-process tests are currently within standard specifications.'}
                           </p>
                         </div>
@@ -739,11 +746,13 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                     filteredList.map((item) => (
                       <tr
                         key={item.id}
-                        className="hover:bg-slate-800/40 transition-colors group cursor-pointer"
+                        className={`transition-colors group cursor-pointer ${
+                          isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-800/40'
+                        }`}
                         onClick={() => setSelectedNcr(item)}
                       >
                         {/* NCR ID */}
-                        <td className="py-3.5 px-4 font-mono font-bold text-rose-400">
+                        <td className="py-3.5 px-4 font-mono font-bold text-rose-500">
                           <div className="flex items-center gap-1.5">
                             <span>{item.id}</span>
                             <button
@@ -751,10 +760,10 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                                 e.stopPropagation();
                                 copyToClipboard(item.id, item.id);
                               }}
-                              className="text-slate-600 hover:text-slate-300 transition"
+                              className={`${isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-600 hover:text-slate-300'} transition`}
                               title="Copy ID"
                             >
-                              {copiedId === item.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              {copiedId === item.id ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                             </button>
                           </div>
                           <div className="mt-1">{getSeverityBadge(item.severity)}</div>
@@ -763,8 +772,10 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                         {/* 1. Coil no. */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-1.5">
-                            <Tag className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                            <span className="font-mono font-bold text-white text-sm bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800">
+                            <Tag className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                            <span className={`font-mono font-bold text-sm px-2 py-0.5 rounded-lg border ${
+                              isLight ? 'bg-slate-100 text-slate-900 border-slate-200' : 'bg-slate-950 text-white border-slate-800'
+                            }`}>
                               {item.coilNo}
                             </span>
                           </div>
@@ -772,14 +783,14 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
 
                         {/* 2. Profile */}
                         <td className="py-3.5 px-4">
-                          <div className="font-semibold text-indigo-300">{item.profile}</div>
-                          <span className="text-[10px] text-slate-500 font-mono">{item.sourceModuleCode}</span>
+                          <div className={`font-semibold ${isLight ? 'text-indigo-900' : 'text-indigo-300'}`}>{item.profile}</div>
+                          <span className={`text-[10px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{item.sourceModuleCode}</span>
                         </td>
 
                         {/* 3. Inspection date */}
                         <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-1 text-slate-300 font-mono">
-                            <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+                          <div className={`flex items-center gap-1 font-mono ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                            <Calendar className="w-3.5 h-3.5 text-cyan-500" />
                             <span>{item.inspectionDate}</span>
                           </div>
                         </td>
@@ -787,32 +798,48 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                         {/* 4. Inspector */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5 text-amber-400" />
-                            <span className="font-medium text-slate-200">{item.inspector}</span>
+                            <User className="w-3.5 h-3.5 text-amber-500" />
+                            <span className={`font-medium ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{item.inspector}</span>
                           </div>
                         </td>
 
                         {/* 5. Process */}
                         <td className="py-3.5 px-4">
-                          <span className="inline-block px-2 py-1 rounded-lg text-xs font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20 max-w-[200px] truncate" title={item.process}>
+                          <span className={`inline-block px-2 py-1 rounded-lg text-xs font-semibold border max-w-[200px] truncate ${
+                            isLight ? 'bg-purple-50 text-purple-800 border-purple-200' : 'bg-purple-500/10 text-purple-300 border-purple-500/20'
+                          }`} title={item.process}>
                             {item.process}
                           </span>
                         </td>
 
-                        {/* 6. Inspection result */}
+                        {/* 6. Inspection result - Out of Spec only */}
                         <td className="py-3.5 px-4">
-                          <div className="bg-rose-950/20 border border-rose-500/20 rounded-xl p-2 text-rose-300 font-mono text-[11px] leading-relaxed">
-                            {item.inspectionResult}
-                          </div>
+                          {(() => {
+                            const ngPoints = extractOnlyOutOfSpecPoints(item.inspectionResult);
+                            return (
+                              <div className={`border rounded-xl p-2.5 font-mono text-[11px] leading-relaxed space-y-1 ${
+                                isLight ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-rose-950/20 border-rose-500/20 text-rose-300'
+                              }`}>
+                                {ngPoints.map((pt, idx) => (
+                                  <div key={idx} className="flex items-start gap-1.5">
+                                    <span className="text-rose-500 font-bold shrink-0 mt-0.5">•</span>
+                                    <span className={`font-semibold ${isLight ? 'text-rose-900' : 'text-rose-200'}`}>{pt}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
                           {item.immediateAction && (
-                            <div className="text-[10px] text-slate-400 mt-1 truncate max-w-[280px]">
-                              <span className="text-amber-400 font-semibold">{isTh ? 'มาตรการ:' : 'Action:'}</span> {item.immediateAction}
+                            <div className={`text-[10px] mt-1 truncate max-w-[280px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                              <span className="text-amber-500 font-semibold">{isTh ? 'มาตรการ:' : 'Action:'}</span> {item.immediateAction}
                             </div>
                           )}
                           {item.rootCauseCategories && item.rootCauseCategories.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {item.rootCauseCategories.map((cat) => (
-                                <span key={cat} className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-rose-300 border border-rose-500/30">
+                                <span key={cat} className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border ${
+                                  isLight ? 'bg-slate-100 text-rose-700 border-rose-300' : 'bg-slate-800 text-rose-300 border-rose-500/30'
+                                }`}>
                                   {cat}
                                 </span>
                               ))}
@@ -1310,9 +1337,18 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
 
                 {/* 6. Inspection Result / Out of Spec */}
                 <div className="space-y-1 sm:col-span-2 lg:col-span-3">
-                  <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">6. Inspection Result (Out of Spec Details)</span>
-                  <div className="text-xs font-mono text-rose-300 bg-rose-950/20 border border-rose-500/30 p-3 rounded-xl leading-relaxed">
-                    {selectedNcr.inspectionResult}
+                  <span className={`text-[11px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-700' : 'text-rose-400'}`}>
+                    6. Inspection Result (Out of Spec Details)
+                  </span>
+                  <div className={`text-xs font-mono p-3 rounded-xl leading-relaxed space-y-1.5 border ${
+                    isLight ? 'bg-rose-50 border-rose-200 text-rose-850' : 'bg-rose-950/20 border-rose-500/30 text-rose-300'
+                  }`}>
+                    {extractOnlyOutOfSpecPoints(selectedNcr.inspectionResult).map((pt, idx) => (
+                      <div key={idx} className="flex items-start gap-2">
+                        <span className="text-rose-500 font-bold shrink-0 mt-0.5">•</span>
+                        <span className={`font-semibold ${isLight ? 'text-rose-900' : 'text-rose-200'}`}>{pt}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
