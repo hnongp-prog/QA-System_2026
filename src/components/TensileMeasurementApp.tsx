@@ -55,6 +55,7 @@ import {
   ThemeMode
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
+import { InspectorDatalist, saveRecordedInspector } from '../utils/inspectorStorage';
 import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
 import { STANDARD_PROCESS_OPTIONS, STANDARD_MACHINE_OPTIONS } from '../constants/processOptions';
 
@@ -764,6 +765,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
         : (ngPoints.length > 0 ? ngPoints.join(' | ') : 'Dimension Out of Spec');
 
       if (onLogNewActivity) {
+        if (mainInspector) saveRecordedInspector(mainInspector);
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1341,6 +1343,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                 </label>
                 <input
                   type="text"
+                  list="qa-inspector-list"
                   value={mainInspector}
                   onChange={(e) => setMainInspector(e.target.value)}
                   placeholder={isTh ? 'ชื่อผู้ตรวจสอบ (Inspector)' : 'Inspector Name'}
@@ -1512,7 +1515,6 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         type="text"
                         value={topRow.coil_no}
                         onChange={(e) => setTopRow(prev => ({ ...prev, coil_no: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
                         placeholder="COIL-01"
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
                       />
@@ -1524,7 +1526,6 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         type="text"
                         value={topRow.heat_no}
                         onChange={(e) => setTopRow(prev => ({ ...prev, heat_no: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
                         placeholder="HEAT-01"
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
                       />
@@ -1536,7 +1537,6 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         type="text"
                         value={topRow.work_order}
                         onChange={(e) => setTopRow(prev => ({ ...prev, work_order: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
                         placeholder="WO-01"
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-400 uppercase"
                       />
@@ -1548,7 +1548,6 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         type="text"
                         value={topRow.sample_name}
                         onChange={(e) => setTopRow(prev => ({ ...prev, sample_name: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
                         placeholder={`SAMPLE-${String(enteredRows.length + 1).padStart(2, '0')}`}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-bold focus:outline-none focus:border-cyan-400 uppercase"
                       />
@@ -1569,7 +1568,6 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         type="text"
                         value={topRow.width}
                         onChange={(e) => setTopRow(prev => ({ ...prev, width: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
                         placeholder={matchedSpec ? `${matchedSpec.min_w} - ${matchedSpec.max_w}` : '0.00 / -'}
                         title={isTopWNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('width', matchedSpec)})` : undefined}
                         className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono transition-colors focus:outline-none ${
@@ -1595,7 +1593,6 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         type="text"
                         value={topRow.h_left}
                         onChange={(e) => setTopRow(prev => ({ ...prev, h_left: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
                         placeholder={matchedSpec ? `${matchedSpec.min_h} - ${matchedSpec.max_h}` : '0.00 / -'}
                         title={isTopHLNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_left', matchedSpec)})` : undefined}
                         className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono transition-colors focus:outline-none ${
@@ -1621,7 +1618,6 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         type="text"
                         value={topRow.h_middle}
                         onChange={(e) => setTopRow(prev => ({ ...prev, h_middle: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
                         placeholder={matchedSpec ? `${matchedSpec.min_h} - ${matchedSpec.max_h}` : '0.00 / -'}
                         title={isTopHMNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_middle', matchedSpec)})` : undefined}
                         className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono transition-colors focus:outline-none ${
@@ -1647,7 +1643,6 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         type="text"
                         value={topRow.h_right}
                         onChange={(e) => setTopRow(prev => ({ ...prev, h_right: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
                         placeholder={matchedSpec ? `${matchedSpec.min_h} - ${matchedSpec.max_h}` : '0.00 / -'}
                         title={isTopHRNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('h_right', matchedSpec)})` : undefined}
                         className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono transition-colors focus:outline-none ${
@@ -1673,7 +1668,6 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         type="text"
                         value={topRow.tensile}
                         onChange={(e) => setTopRow(prev => ({ ...prev, tensile: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
                         placeholder={matchedSpec ? formatTensileSpec(matchedSpec) : 'MPa / -'}
                         title={isTopTensileNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('tensile', matchedSpec)})` : undefined}
                         className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold transition-colors focus:outline-none ${
@@ -1699,7 +1693,6 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                         type="text"
                         value={topRow.yield_val}
                         onChange={(e) => setTopRow(prev => ({ ...prev, yield_val: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
                         placeholder={matchedSpec ? formatYieldSpec(matchedSpec) : 'MPa / -'}
                         title={isTopYieldNg ? `NG: ค่าอยู่นอกสเปก (Spec: ${getFieldSpecText('yield_val', matchedSpec)})` : undefined}
                         className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold transition-colors focus:outline-none ${
@@ -1724,6 +1717,7 @@ export const TensileMeasurementApp: React.FC<TensileMeasurementAppProps> = ({
                       <input
                         type="text"
                         value={topRow.elong}
+                        data-no-enter-advance="true"
                         onChange={(e) => setTopRow(prev => ({ ...prev, elong: e.target.value }))}
                         onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromTopRow(); }}
                         placeholder={matchedSpec ? formatElongationSpec(matchedSpec) : '% / -'}

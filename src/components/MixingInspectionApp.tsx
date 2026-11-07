@@ -35,6 +35,7 @@ import {
   ThemeMode
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
+import { InspectorDatalist, saveRecordedInspector } from '../utils/inspectorStorage';
 import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
 
 interface MixingInspectionAppProps {
@@ -626,6 +627,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
       const recId = `rec-mix-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
 
       if (onLogNewActivity) {
+        if (headerInfo.inspectorName) saveRecordedInspector(headerInfo.inspectorName);
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1179,6 +1181,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                 <input
                   type="text"
                   name="inspectorName"
+                  list="qa-inspector-list"
                   value={headerInfo.inspectorName}
                   onChange={handleHeaderChange}
                   placeholder={isTh ? 'ชื่อผู้ตรวจสอบ' : 'Inspector Name'}
@@ -2026,6 +2029,7 @@ export const MixingInspectionApp: React.FC<MixingInspectionAppProps> = ({
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Inspector Name</label>
                   <input
                     type="text"
+                    list="qa-inspector-list"
                     value={editingHistoryItem.inspectorName || ''}
                     onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, inspectorName: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"

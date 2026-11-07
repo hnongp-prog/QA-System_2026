@@ -47,6 +47,8 @@ import {
   saveOqaInspectionToCollection, 
   saveCloudData 
 } from '../services/firestoreSync';
+import { saveRecordedInspector } from '../utils/inspectorStorage';
+
 
 interface FgPreShipmentAppProps {
   onBackToPortal?: () => void;
@@ -229,7 +231,7 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
 
   // Form State
   const [formContainerVisible, setFormContainerVisible] = useState(false);
-  const [inspectorName, setInspectorName] = useState('Sompong P.');
+  const [inspectorName, setInspectorName] = useState('');
   const [partNo, setPartNo] = useState('');
   const [drawingNo, setDrawingNo] = useState('');
   const [profileName, setProfileName] = useState('');
@@ -744,7 +746,8 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
             ? 'PASS (Tag, Drawing & Box labels match Master Spec)' 
             : `FAIL / Out of Spec: ${aiResult?.reason || 'Tag details mismatch Master Spec standard'}`;
 
-          onLogNewActivity({
+          if (inspectorName) saveRecordedInspector(inspectorName);
+        onLogNewActivity({
             id: newRecord.docId!,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             moduleCode: 'OQA-01',
@@ -1477,6 +1480,7 @@ export const FgPreShipmentApp: React.FC<FgPreShipmentAppProps> = ({
                       <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Inspector Name</label>
                       <input
                         type="text"
+                        list="qa-inspector-list"
                         value={inspectorName}
                         onChange={(e) => setInspectorName(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"

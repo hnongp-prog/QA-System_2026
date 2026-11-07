@@ -333,8 +333,8 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <div>
-                    <label className={`text-[10px] font-bold uppercase block mb-1 ${
-                      isLight ? 'text-slate-700' : 'text-slate-400'
+                    <label className={`text-[10px] font-black uppercase block mb-1 ${
+                      isLight ? 'text-black' : 'text-slate-400'
                     }`}>
                       {isTh ? 'ชื่อผู้ขาย / ผู้ผลิต (Supplier Name) *' : 'Supplier Name *'}
                     </label>
@@ -343,9 +343,9 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder={isTh ? 'เช่น ALCOA, CAPCO, THAI HONG ฯลฯ' : 'e.g. ALCOA, CAPCO, THAI HONG'}
-                      className={`w-full rounded-xl px-3 py-2 font-mono font-bold focus:outline-none border ${
+                      className={`w-full rounded-xl px-3 py-2 font-mono font-bold focus:outline-none border-2 ${
                         isLight
-                          ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-indigo-600'
+                          ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:border-blue-700'
                           : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
                       }`}
                       required
@@ -353,8 +353,8 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                   </div>
 
                   <div>
-                    <label className={`text-[10px] font-bold uppercase block mb-1 ${
-                      isLight ? 'text-slate-700' : 'text-slate-400'
+                    <label className={`text-[10px] font-black uppercase block mb-1 ${
+                      isLight ? 'text-black' : 'text-slate-400'
                     }`}>
                       {isTh ? 'Billet Grade (พิมพ์เองได้) *' : 'Billet Grade (Type freely) *'}
                     </label>
@@ -364,9 +364,9 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                       value={billetGrade}
                       onChange={(e) => setBilletGrade(e.target.value)}
                       placeholder={isTh ? 'เช่น 6063, 6061, 6082' : 'e.g. 6063, 6061'}
-                      className={`w-full rounded-xl px-3 py-2 font-mono font-bold focus:outline-none border ${
+                      className={`w-full rounded-xl px-3 py-2 font-mono font-bold focus:outline-none border-2 ${
                         isLight
-                          ? 'bg-white border-slate-300 text-indigo-950 placeholder:text-slate-400 focus:border-indigo-600'
+                          ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:border-blue-700'
                           : 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500'
                       }`}
                       required
@@ -384,8 +384,8 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                   </div>
 
                   <div>
-                    <label className={`text-[10px] font-bold uppercase block mb-1 ${
-                      isLight ? 'text-slate-700' : 'text-slate-400'
+                    <label className={`text-[10px] font-black uppercase block mb-1 ${
+                      isLight ? 'text-black' : 'text-slate-400'
                     }`}>
                       {isTh ? 'Nominal Length (mm) *' : 'Nominal Length (mm) *'}
                     </label>
@@ -395,9 +395,9 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                       value={lengthNominal}
                       onChange={(e) => setLengthNominal(e.target.value)}
                       placeholder="500"
-                      className={`w-full rounded-xl px-3 py-2 font-bold focus:outline-none border ${
+                      className={`w-full rounded-xl px-3 py-2 font-black focus:outline-none border-2 ${
                         isLight
-                          ? 'bg-white border-slate-300 text-indigo-900 focus:border-indigo-600'
+                          ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:border-blue-700'
                           : 'bg-slate-900 border-slate-800 text-indigo-300 focus:border-indigo-500'
                       }`}
                       required
@@ -408,38 +408,38 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                 {/* Length & Diameter Bounds */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Length Spec */}
-                  <div className={`p-3.5 rounded-xl border space-y-2 ${
-                    isLight ? 'bg-white border-slate-200' : 'bg-slate-900/90 border-slate-800'
+                  <div className={`p-3.5 rounded-xl border-2 space-y-2 ${
+                    isLight ? 'bg-white border-blue-200' : 'bg-slate-900/90 border-slate-800'
                   }`}>
-                    <span className={`text-[11px] font-bold block ${
-                      isLight ? 'text-emerald-800' : 'text-emerald-400'
+                    <span className={`text-[11px] font-black block ${
+                      isLight ? 'text-black' : 'text-emerald-400'
                     }`}>
                       1. Length Spec (mm)
                     </span>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
-                        <span className={`text-[9px] font-bold block ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Min (mm)</span>
+                        <span className={`text-[9px] font-bold block ${isLight ? 'text-black' : 'text-slate-400'}`}>Min (mm)</span>
                         <input
                           type="number" step="0.1"
                           value={lengthMin}
                           onChange={(e) => setLengthMin(e.target.value)}
-                          className={`w-full rounded-lg px-2.5 py-1.5 font-bold border ${
+                          className={`w-full rounded-lg px-2.5 py-1.5 font-black border-2 ${
                             isLight
-                              ? 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white'
+                              ? 'bg-white border-blue-600 text-black focus:border-blue-700'
                               : 'bg-slate-950 border-slate-800 text-white'
                           }`}
                           required
                         />
                       </div>
                       <div>
-                        <span className={`text-[9px] font-bold block ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Max (mm)</span>
+                        <span className={`text-[9px] font-bold block ${isLight ? 'text-black' : 'text-slate-400'}`}>Max (mm)</span>
                         <input
                           type="number" step="0.1"
                           value={lengthMax}
                           onChange={(e) => setLengthMax(e.target.value)}
-                          className={`w-full rounded-lg px-2.5 py-1.5 font-bold border ${
+                          className={`w-full rounded-lg px-2.5 py-1.5 font-black border-2 ${
                             isLight
-                              ? 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white'
+                              ? 'bg-white border-blue-600 text-black focus:border-blue-700'
                               : 'bg-slate-950 border-slate-800 text-white'
                           }`}
                           required
@@ -449,38 +449,38 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                   </div>
 
                   {/* Diameter Spec */}
-                  <div className={`p-3.5 rounded-xl border space-y-2 ${
-                    isLight ? 'bg-white border-slate-200' : 'bg-slate-900/90 border-slate-800'
+                  <div className={`p-3.5 rounded-xl border-2 space-y-2 ${
+                    isLight ? 'bg-white border-blue-200' : 'bg-slate-900/90 border-slate-800'
                   }`}>
-                    <span className={`text-[11px] font-bold block ${
-                      isLight ? 'text-sky-800' : 'text-sky-400'
+                    <span className={`text-[11px] font-black block ${
+                      isLight ? 'text-black' : 'text-sky-400'
                     }`}>
                       2. Diameter Spec (mm)
                     </span>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
-                        <span className={`text-[9px] font-bold block ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Min (mm)</span>
+                        <span className={`text-[9px] font-bold block ${isLight ? 'text-black' : 'text-slate-400'}`}>Min (mm)</span>
                         <input
                           type="number" step="0.1"
                           value={diameterMin}
                           onChange={(e) => setDiameterMin(e.target.value)}
-                          className={`w-full rounded-lg px-2.5 py-1.5 font-bold border ${
+                          className={`w-full rounded-lg px-2.5 py-1.5 font-black border-2 ${
                             isLight
-                              ? 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white'
+                              ? 'bg-white border-blue-600 text-black focus:border-blue-700'
                               : 'bg-slate-950 border-slate-800 text-white'
                           }`}
                           required
                         />
                       </div>
                       <div>
-                        <span className={`text-[9px] font-bold block ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Max (mm)</span>
+                        <span className={`text-[9px] font-bold block ${isLight ? 'text-black' : 'text-slate-400'}`}>Max (mm)</span>
                         <input
                           type="number" step="0.1"
                           value={diameterMax}
                           onChange={(e) => setDiameterMax(e.target.value)}
-                          className={`w-full rounded-lg px-2.5 py-1.5 font-bold border ${
+                          className={`w-full rounded-lg px-2.5 py-1.5 font-black border-2 ${
                             isLight
-                              ? 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white'
+                              ? 'bg-white border-blue-600 text-black focus:border-blue-700'
                               : 'bg-slate-950 border-slate-800 text-white'
                           }`}
                           required
@@ -492,36 +492,36 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
 
                 {/* Bending, Cutting Surface, Surface Defect */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className={`p-3 rounded-xl border ${
-                    isLight ? 'bg-white border-slate-200' : 'bg-slate-900/90 border-slate-800'
+                  <div className={`p-3 rounded-xl border-2 ${
+                    isLight ? 'bg-white border-blue-200' : 'bg-slate-900/90 border-slate-800'
                   }`}>
-                    <label className={`text-[10px] font-bold uppercase flex items-center justify-between mb-1 ${
-                      isLight ? 'text-amber-800' : 'text-amber-400'
+                    <label className={`text-[10px] font-black uppercase flex items-center justify-between mb-1 ${
+                      isLight ? 'text-black' : 'text-amber-400'
                     }`}>
                       <span>Bending Max</span>
-                      <span className={`text-[8px] font-mono ${isLight ? 'text-amber-700' : 'text-amber-500'}`}>(Lx0.15%)</span>
+                      <span className={`text-[8px] font-mono ${isLight ? 'text-black' : 'text-amber-500'}`}>(Lx0.15%)</span>
                     </label>
                     <div className="flex items-center gap-1.5">
                       <input
                         type="text"
                         readOnly
                         value={`${computedBendingMax} mm`}
-                        className={`w-full rounded-lg px-2.5 py-1.5 font-mono font-bold border ${
+                        className={`w-full rounded-lg px-2.5 py-1.5 font-mono font-black border-2 ${
                           isLight
-                            ? 'bg-slate-50 border-slate-300 text-amber-900'
+                            ? 'bg-slate-50 border-blue-600 text-black'
                             : 'bg-slate-950 border-slate-800 text-amber-300'
                         }`}
                       />
-                      <Calculator className={`w-4 h-4 shrink-0 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
+                      <Calculator className={`w-4 h-4 shrink-0 ${isLight ? 'text-black' : 'text-amber-400'}`} />
                     </div>
-                    <span className={`text-[9px] block mt-1 ${isLight ? 'text-slate-600' : 'text-slate-500'}`}>Auto: {lengthNominal} × 0.15%</span>
+                    <span className={`text-[9px] font-bold block mt-1 ${isLight ? 'text-black' : 'text-slate-500'}`}>Auto: {lengthNominal} × 0.15%</span>
                   </div>
 
-                  <div className={`p-3 rounded-xl border ${
-                    isLight ? 'bg-white border-slate-200' : 'bg-slate-900/90 border-slate-800'
+                  <div className={`p-3 rounded-xl border-2 ${
+                    isLight ? 'bg-white border-blue-200' : 'bg-slate-900/90 border-slate-800'
                   }`}>
-                    <label className={`text-[10px] font-bold uppercase block mb-1 ${
-                      isLight ? 'text-rose-800' : 'text-pink-400'
+                    <label className={`text-[10px] font-black uppercase block mb-1 ${
+                      isLight ? 'text-black' : 'text-pink-400'
                     }`}>
                       Cutting Surface Max (mm)
                     </label>
@@ -530,21 +530,21 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                       value={cuttingSurfaceMax}
                       onChange={(e) => setCuttingSurfaceMax(e.target.value)}
                       placeholder="2.0"
-                      className={`w-full rounded-lg px-2.5 py-1.5 font-bold border ${
+                      className={`w-full rounded-lg px-2.5 py-1.5 font-black border-2 ${
                         isLight
-                          ? 'bg-slate-50 border-slate-300 text-rose-900 focus:bg-white'
+                          ? 'bg-white border-blue-600 text-black focus:border-blue-700'
                           : 'bg-slate-950 border-slate-800 text-pink-300'
                       }`}
                       required
                     />
-                    <span className={`text-[9px] block mt-1 ${isLight ? 'text-slate-600' : 'text-slate-500'}`}>{isTh ? 'เกณฑ์มาตรฐาน < 2.0 mm' : 'Standard < 2.0 mm'}</span>
+                    <span className={`text-[9px] font-bold block mt-1 ${isLight ? 'text-black' : 'text-slate-500'}`}>{isTh ? 'เกณฑ์มาตรฐาน < 2.0 mm' : 'Standard < 2.0 mm'}</span>
                   </div>
 
-                  <div className={`p-3 rounded-xl border ${
-                    isLight ? 'bg-white border-slate-200' : 'bg-slate-900/90 border-slate-800'
+                  <div className={`p-3 rounded-xl border-2 ${
+                    isLight ? 'bg-white border-blue-200' : 'bg-slate-900/90 border-slate-800'
                   }`}>
-                    <label className={`text-[10px] font-bold uppercase block mb-1 ${
-                      isLight ? 'text-purple-800' : 'text-purple-400'
+                    <label className={`text-[10px] font-black uppercase block mb-1 ${
+                      isLight ? 'text-black' : 'text-purple-400'
                     }`}>
                       Surface Defect Spec
                     </label>
@@ -553,13 +553,13 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                       value={surfaceDefectSpecText}
                       onChange={(e) => setSurfaceDefectSpecText(e.target.value)}
                       placeholder="≤ 2x50x100 mm"
-                      className={`w-full rounded-lg px-2.5 py-1.5 font-bold border ${
+                      className={`w-full rounded-lg px-2.5 py-1.5 font-bold border-2 ${
                         isLight
-                          ? 'bg-slate-50 border-slate-300 text-purple-900 focus:bg-white'
+                          ? 'bg-white border-blue-600 text-black focus:border-blue-700'
                           : 'bg-slate-950 border-slate-800 text-purple-300'
                       }`}
                     />
-                    <span className={`text-[9px] block mt-1 ${isLight ? 'text-slate-600' : 'text-slate-500'}`}>{isTh ? 'ลึก ≤2, กว้าง ≤50, ยาว ≤100' : 'Depth ≤2, W ≤50, L ≤100'}</span>
+                    <span className={`text-[9px] font-bold block mt-1 ${isLight ? 'text-black' : 'text-slate-500'}`}>{isTh ? 'ลึก ≤2, กว้าง ≤50, ยาว ≤100' : 'Depth ≤2, W ≤50, L ≤100'}</span>
                   </div>
                 </div>
 
@@ -570,9 +570,9 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
                     placeholder={isTh ? 'หมายเหตุเพิ่มเติม (ถ้ามี)' : 'Additional remarks'}
-                    className={`w-full rounded-xl px-3 py-2 text-xs border ${
+                    className={`w-full rounded-xl px-3 py-2 text-xs border-2 font-bold ${
                       isLight
-                        ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400'
+                        ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:border-blue-700'
                         : 'bg-slate-900 border-slate-800 text-slate-300'
                     }`}
                   />

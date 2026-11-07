@@ -58,6 +58,7 @@ import {
   ThemeMode
 } from '../types';
 import { analyzeBilletCertClient } from '../services/geminiClient';
+import { InspectorDatalist, saveRecordedInspector } from '../utils/inspectorStorage';
 import { BilletWeightAnalyticsChart } from './billetIncoming/BilletWeightAnalyticsChart';
 import { generateQrSvgString, QRCodeView, getBilletQrPayload, QrDataMode, QrZoomModal } from '../utils/qrCodeHelper';
 
@@ -612,6 +613,10 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
         const resultDesc = jg === 'PASS' 
           ? 'PASS (Chemical composition and dimensions meet Grade Spec)' 
           : `FAIL / Out of Spec: Chemical composition or physical defect on Heat ${item.heat_number} (${item.grade})`;
+
+        if (item.inspector_name) {
+          saveRecordedInspector(item.inspector_name);
+        }
 
         onLogNewActivity({
           id: entryId,
@@ -1813,6 +1818,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                                     <input
                                       type="text"
                                       placeholder="Name..."
+                                      list="qa-inspector-list"
                                       value={item.inspector_name || ''}
                                       onChange={(e) => updateItemField(idx, 'inspector_name', e.target.value)}
                                       className={`w-full rounded-lg pl-8 pr-2.5 py-1.5 text-xs font-medium focus:outline-none border ${
@@ -3201,6 +3207,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                 <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Inspector</label>
                 <input
                   type="text"
+                  list="qa-inspector-list"
                   value={editingHistoryItem.inspector_name || ''}
                   onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, inspector_name: e.target.value } : null)}
                   className={`w-full rounded-xl px-3 py-2 focus:outline-none border ${

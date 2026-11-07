@@ -53,6 +53,7 @@ import {
 } from '../types';
 import { analyzeZnWireCertClient } from '../services/geminiClient';
 import { useCloudState } from '../services/firestoreSync';
+import { InspectorDatalist, saveRecordedInspector } from '../utils/inspectorStorage';
 import { generateQrSvgString, QRCodeView, getZnWireQrPayload, QrDataMode, QrZoomModal } from '../utils/qrCodeHelper';
 
 interface ZnWireIncomingAppProps {
@@ -499,6 +500,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
           ? 'PASS (Zn Wire weight, diameter and composition meet Grade Spec)' 
           : `FAIL / Out of Spec: Zn Wire parameters out of spec on Heat ${item.heat_number} (Drum ${item.drum || 'N/A'})`;
 
+        if (item.inspector_name) saveRecordedInspector(item.inspector_name);
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1406,6 +1408,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                             <label className="text-[9px] font-bold text-slate-500 uppercase block mb-1">Inspector</label>
                             <input
                               type="text"
+                              list="qa-inspector-list"
                               value={item.inspector_name || ''}
                               onChange={(e) => updateItemField(idx, 'inspector_name', e.target.value)}
                               placeholder="Inspector"
@@ -2152,6 +2155,7 @@ export const ZnWireIncomingApp: React.FC<ZnWireIncomingAppProps> = ({
                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Inspector Name</label>
                     <input
                       type="text"
+                      list="qa-inspector-list"
                       value={editingHistoryItem.inspector_name || ''}
                       onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, inspector_name: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"

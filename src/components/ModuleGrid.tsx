@@ -74,6 +74,8 @@ export const ModuleGrid: React.FC<ModuleGridProps> = ({
           return 'bg-purple-50 text-purple-700 border-purple-200';
         case 'CERTIFICATE_COI':
           return 'bg-teal-50 text-teal-700 border-teal-200';
+        case 'STAFF':
+          return 'bg-cyan-50 text-cyan-700 border-cyan-200';
         default:
           return 'bg-slate-100 text-slate-700 border-slate-200';
       }
@@ -99,6 +101,8 @@ export const ModuleGrid: React.FC<ModuleGridProps> = ({
           return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
         case 'CERTIFICATE_COI':
           return 'bg-teal-500/10 text-teal-400 border-teal-500/30';
+        case 'STAFF':
+          return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
         default:
           return 'bg-slate-800 text-slate-300 border-slate-700';
       }

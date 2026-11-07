@@ -57,8 +57,11 @@ import { BilletCuttingApp } from './components/BilletCuttingApp';
 import { NcrManagementApp } from './components/NcrManagementApp';
 import { CoiManagementApp } from './components/CoiManagementApp';
 import { QualityAnalyticsApp } from './components/QualityAnalyticsApp';
+import { QAInspectorApp } from './components/QAInspectorApp';
 import { createNcrFromFailInspection, getStoredNcrRecords } from './utils/ncrStorage';
+import { InspectorDatalist, saveRecordedInspector } from './utils/inspectorStorage';
 import { useCloudState, logCloudInspectionActivity } from './services/firestoreSync';
+import { useGlobalEnterToNextField } from './utils/keyboardNavigation';
 
 import { 
   Layers, 
@@ -94,6 +97,9 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<QACategory>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMainTab, setActiveMainTab] = useState<'PORTAL' | 'LOGS'>('PORTAL');
+
+  // Universal Enter-to-Next-Field keyboard navigation across all sub-apps
+  useGlobalEnterToNextField();
 
   // Synchronize theme with document element and storage for all sub-apps
   useEffect(() => {
@@ -174,6 +180,7 @@ export default function App() {
 
     // Also log event document to collection for audit trail
     logCloudInspectionActivity(newAct);
+    if (newAct.inspector) saveRecordedInspector(newAct.inspector);
 
     const isFail = newAct.result === 'FAIL' || newAct.result === 'REJECT';
 
@@ -277,197 +284,222 @@ export default function App() {
       });
   }, [effectiveModules, selectedCategory, searchQuery]);
 
-  // If a sub-app is active, render its full application screen (MUST be after all hooks)
-  if (activeSubApp === 'IPQA-01' || activeSubApp === 'IPQC-01') {
-    return (
-      <TensileMeasurementApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+  // If a sub-app is active, render its full application screen with global datalist
+  const renderSubApp = () => {
+    if (activeSubApp === 'IPQA-01' || activeSubApp === 'IPQC-01') {
+      return (
+        <TensileMeasurementApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'IPQA-02' || activeSubApp === 'IPQC-02') {
-    return (
-      <RoughnessMeasurementApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'IPQA-02' || activeSubApp === 'IPQC-02') {
+      return (
+        <RoughnessMeasurementApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'IPQA-03' || activeSubApp === 'IPQC-03') {
-    return (
-      <XRayMeasurementApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'IPQA-03' || activeSubApp === 'IPQC-03') {
+      return (
+        <XRayMeasurementApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'IPQA-04' || activeSubApp === 'IPQC-04') {
-    return (
-      <CoatingMeasurementApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'IPQA-04' || activeSubApp === 'IPQC-04') {
+      return (
+        <CoatingMeasurementApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'IPQA-05' || activeSubApp === 'IPQC-05') {
-    return (
-      <CuttingDimensionApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'IPQA-05' || activeSubApp === 'IPQC-05') {
+      return (
+        <CuttingDimensionApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'IPQA-06' || activeSubApp === 'IPQC-06') {
-    return (
-      <MixingInspectionApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'IPQA-06' || activeSubApp === 'IPQC-06') {
+      return (
+        <MixingInspectionApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'IQA-01' || activeSubApp === 'IQC-01') {
-    return (
-      <BilletIncomingApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'IQA-01' || activeSubApp === 'IQC-01') {
+      return (
+        <BilletIncomingApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'IQA-02' || activeSubApp === 'IQC-02') {
-    return (
-      <ChemicalIncomingApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'IQA-02' || activeSubApp === 'IQC-02') {
+      return (
+        <ChemicalIncomingApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'IQA-03' || activeSubApp === 'IQC-03') {
-    return (
-      <ZnWireIncomingApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'IQA-03' || activeSubApp === 'IQC-03') {
+      return (
+        <ZnWireIncomingApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'EQP-01') {
-    return (
-      <MetrologyCalibrationApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'EQP-01') {
+      return (
+        <MetrologyCalibrationApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'OQA-01' || activeSubApp === 'OQC-01') {
-    return (
-      <FgPreShipmentApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'OQA-01' || activeSubApp === 'OQC-01') {
+      return (
+        <FgPreShipmentApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'IPQA-07' || activeSubApp === 'IPQC-07') {
-    return (
-      <ThicknessWallApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'IPQA-07' || activeSubApp === 'IPQC-07') {
+      return (
+        <ThicknessWallApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'IPQA-08' || activeSubApp === 'IPQC-08' || activeSubApp === 'mod-ipqa-08') {
-    return (
-      <BilletCuttingApp
-        onBack={() => setActiveSubApp(null)}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        userRole={userProfile.role}
-        userName={userProfile.name}
-      />
-    );
-  }
+    if (activeSubApp === 'IPQA-08' || activeSubApp === 'IPQC-08' || activeSubApp === 'mod-ipqa-08') {
+      return (
+        <BilletCuttingApp
+          onBack={() => setActiveSubApp(null)}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          userRole={userProfile.role}
+          userName={userProfile.name}
+        />
+      );
+    }
 
-  if (activeSubApp === 'NCR-01') {
-    return (
-      <NcrManagementApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'NCR-01') {
+      return (
+        <NcrManagementApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'COI-01') {
-    return (
-      <CoiManagementApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        onBackToMenu={() => setActiveSubApp(null)}
-        onLogNewActivity={handleAddTestActivity}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+    if (activeSubApp === 'COI-01') {
+      return (
+        <CoiManagementApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          onBackToMenu={() => setActiveSubApp(null)}
+          onLogNewActivity={handleAddTestActivity}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
 
-  if (activeSubApp === 'ANA-01' || activeSubApp === 'mod-ana-01') {
+    if (activeSubApp === 'ANA-01' || activeSubApp === 'mod-ana-01') {
+      return (
+        <QualityAnalyticsApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
+
+    if (activeSubApp === 'INS-01' || activeSubApp === 'mod-ins-01' || activeSubApp === 'QA-INS') {
+      return (
+        <QAInspectorApp
+          onBackToPortal={() => setActiveSubApp(null)}
+          language={language}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
+
+    return null;
+  };
+
+  const activeSubAppElement = renderSubApp();
+  if (activeSubAppElement) {
     return (
-      <QualityAnalyticsApp
-        onBackToPortal={() => setActiveSubApp(null)}
-        language={language}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
+      <>
+        {activeSubAppElement}
+        <InspectorDatalist id="qa-inspector-list" />
+      </>
     );
   }
 
@@ -602,6 +634,8 @@ export default function App() {
                   setActiveSubApp('NCR-01');
                 } else if (mod.code === 'COI-01') {
                   setActiveSubApp('COI-01');
+                } else if (mod.code === 'INS-01' || mod.id === 'mod-ins-01' || mod.code === 'QA-INS') {
+                  setActiveSubApp('INS-01');
                 } else {
                   setSelectedModuleForDetail(mod);
                 }
@@ -645,6 +679,7 @@ export default function App() {
 
       {/* Global Footer */}
       <Footer language={language} theme={theme} />
+      <InspectorDatalist id="qa-inspector-list" />
 
     </div>
   );

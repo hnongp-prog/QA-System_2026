@@ -39,6 +39,7 @@ import {
   ThemeMode
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
+import { InspectorDatalist, saveRecordedInspector } from '../utils/inspectorStorage';
 
 interface MetrologyCalibrationAppProps {
   onBackToPortal?: () => void;
@@ -218,6 +219,20 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
   const [calModalItem, setCalModalItem] = useState<InstrumentRecord | null>(null);
   const [repairModalItem, setRepairModalItem] = useState<InstrumentRecord | null>(null);
   const [historyModalItem, setHistoryModalItem] = useState<InstrumentRecord | null>(null);
+
+  // Edit Latest Calibration Modal State (Admin Protected)
+  const [editCalModalItem, setEditCalModalItem] = useState<InstrumentRecord | null>(null);
+  const [targetHistoryId, setTargetHistoryId] = useState<string | null>(null);
+  const [editCalFormData, setEditCalFormData] = useState({
+    sendDate: new Date().toISOString().split('T')[0],
+    receiveDate: new Date().toISOString().split('T')[0],
+    lab: 'Internal Metrology Lab',
+    certNo: '',
+    actualError: '',
+    uncertainty: '',
+    officer: '',
+    note: ''
+  });
 
   // Status message bar
   const [statusMsg, setStatusMsg] = useState<{ type: 'info' | 'success' | 'error'; message: string }>({
@@ -492,6 +507,7 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
       setInstruments(prev => [newInst, ...prev]);
 
       if (onLogNewActivity) {
+        if (calFormData.officer) saveRecordedInspector(calFormData.officer);
         onLogNewActivity({
           id: newInst.docId!,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -568,7 +584,8 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
     }));
 
     if (onLogNewActivity) {
-      onLogNewActivity({
+      if (calFormData.officer) saveRecordedInspector(calFormData.officer);
+        onLogNewActivity({
         id: calModalItem.docId!,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         moduleCode: 'EQP-01',
@@ -588,6 +605,140 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
       message: isPassed
         ? isTh ? `บันทึกสอบเทียบ ${calModalItem.id} ผ่านเกณฑ์ (Error: ${errorVal})` : `Calibration PASSED for ${calModalItem.id}`
         : isTh ? `บันทึกสอบเทียบ ${calModalItem.id} ไม่ผ่านเกณฑ์! (Error: ${errorVal} > Spec: ±${calModalItem.spec})` : `Calibration FAILED for ${calModalItem.id}`
+    });
+  };
+
+  // Open Edit Latest Calibration Modal (Protected with Admin password)
+  const openEditLatestCalibration = (inst: InstrumentRecord, specificHistoryItem?: InstrumentCalHistoryItem) => {
+    // Find latest calibration item in history if not specified
+    const latestCal = specificHistoryItem || (inst.history ? inst.history.find(h => h.type === 'CALIBRATION') : undefined);
+
+    setEditCalModalItem(inst);
+    setTargetHistoryId(latestCal?.id || null);
+    setEditCalFormData({
+      sendDate: latestCal?.sendDate || latestCal?.date || inst.lastCalDate || new Date().toISOString().split('T')[0],
+      receiveDate: latestCal?.receiveDate || latestCal?.date || inst.lastCalDate || new Date().toISOString().split('T')[0],
+      lab: latestCal?.lab || 'Internal Metrology Lab',
+      certNo: latestCal?.certNo || `CAL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      actualError: latestCal?.error !== undefined ? String(latestCal.error) : (inst.lastError !== undefined ? String(inst.lastError) : ''),
+      uncertainty: latestCal?.uncertainty !== undefined ? String(latestCal.uncertainty) : '',
+      officer: latestCal?.officer || 'Sompong P. (QA Metrology)',
+      note: latestCal?.note || ''
+    });
+  };
+
+  const handleRequestEditLatestCal = (inst: InstrumentRecord, specificHistoryItem?: InstrumentCalHistoryItem) => {
+    requestSecurityCheck(() => {
+      openEditLatestCalibration(inst, specificHistoryItem);
+    });
+  };
+
+  // Update Calibration Result (Admin verified)
+  const handleUpdateLatestCalibration = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCalModalItem) return;
+
+    const errorVal = parseFloat(editCalFormData.actualError);
+    if (isNaN(errorVal)) return;
+
+    const isPassed = Math.abs(errorVal) <= editCalModalItem.spec;
+    const resultLabel: 'PASS' | 'FAIL' = isPassed ? 'PASS' : 'FAIL';
+
+    setInstruments(prev => prev.map(item => {
+      if (item.docId === editCalModalItem.docId) {
+        let updatedHistory = [...(item.history || [])];
+
+        let found = false;
+        if (targetHistoryId) {
+          updatedHistory = updatedHistory.map(h => {
+            if (h.id === targetHistoryId) {
+              found = true;
+              return {
+                ...h,
+                date: editCalFormData.receiveDate,
+                sendDate: editCalFormData.sendDate,
+                receiveDate: editCalFormData.receiveDate,
+                error: errorVal,
+                result: resultLabel,
+                lab: editCalFormData.lab,
+                certNo: editCalFormData.certNo,
+                uncertainty: parseFloat(editCalFormData.uncertainty) || 0,
+                officer: editCalFormData.officer,
+                note: editCalFormData.note
+              };
+            }
+            return h;
+          });
+        }
+
+        if (!found) {
+          const calIndex = updatedHistory.findIndex(h => h.type === 'CALIBRATION');
+          if (calIndex >= 0) {
+            updatedHistory[calIndex] = {
+              ...updatedHistory[calIndex],
+              date: editCalFormData.receiveDate,
+              sendDate: editCalFormData.sendDate,
+              receiveDate: editCalFormData.receiveDate,
+              error: errorVal,
+              result: resultLabel,
+              lab: editCalFormData.lab,
+              certNo: editCalFormData.certNo,
+              uncertainty: parseFloat(editCalFormData.uncertainty) || 0,
+              officer: editCalFormData.officer,
+              note: editCalFormData.note
+            };
+          } else {
+            updatedHistory.unshift({
+              id: `cal-hist-${Date.now()}`,
+              type: 'CALIBRATION',
+              date: editCalFormData.receiveDate,
+              sendDate: editCalFormData.sendDate,
+              receiveDate: editCalFormData.receiveDate,
+              error: errorVal,
+              result: resultLabel,
+              lab: editCalFormData.lab,
+              certNo: editCalFormData.certNo,
+              uncertainty: parseFloat(editCalFormData.uncertainty) || 0,
+              officer: editCalFormData.officer,
+              note: editCalFormData.note
+            });
+          }
+        }
+
+        return {
+          ...item,
+          lastCalDate: editCalFormData.receiveDate,
+          lastResult: resultLabel,
+          lastError: errorVal,
+          history: updatedHistory
+        };
+      }
+      return item;
+    }));
+
+    if (onLogNewActivity) {
+      if (editCalFormData.officer) saveRecordedInspector(editCalFormData.officer);
+      onLogNewActivity({
+        id: editCalModalItem.docId!,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        moduleCode: 'EQP-01',
+        moduleTitleTh: 'ระบบควบคุมเครื่องมือวัด (Metrology & Calibration)',
+        moduleTitleEn: 'Equipment Calibration & Gauge Tracking',
+        inspector: editCalFormData.officer || 'Calibration Inspector (Admin Edit)',
+        batchLot: `${editCalModalItem.id} (${editCalModalItem.name})`,
+        result: isPassed ? 'PASS' : 'REJECT',
+        defectCount: isPassed ? 0 : 1,
+        remarks: `[แก้ไขผลสอบเทียบ] Error: ${errorVal} (Spec: ±${editCalModalItem.spec}), Cert: ${editCalFormData.certNo}`
+      });
+    }
+
+    setEditCalModalItem(null);
+    setTargetHistoryId(null);
+    setStatusMsg({
+      type: 'success',
+      message: isTh 
+        ? `✓ แก้ไขบันทึกสอบเทียบล่าสุดของ ${editCalModalItem.id} เรียบร้อยแล้ว (Error: ${errorVal}, ผล: ${resultLabel})`
+        : `✓ Updated latest calibration for ${editCalModalItem.id} successfully`
     });
   };
 
@@ -822,6 +973,8 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
     <div className={`min-h-screen font-sans p-4 sm:p-6 space-y-6 transition-colors duration-200 ${
       isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'
     }`}>
+      {/* Universal QA Inspector Datalist */}
+      <InspectorDatalist id="qa-inspector-list" />
 
       {/* Admin Verification Modal */}
       {securityModal.show && (
@@ -833,7 +986,7 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
               </div>
               <h3 className="text-lg font-bold text-white">Admin Verification</h3>
               <p className="text-xs text-slate-400">
-                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อดำเนินการสิทธิ์ผู้ดูแลระบบ' : 'Enter admin password for protected operation'}
+                {isTh ? 'กรุณาระบุรหัสผ่านเพื่อดำเนินการสิทธิ์ผู้ดูแลระบบ (ค่าเริ่มต้น: admin2026)' : 'Enter admin password for protected operation (Default: admin2026)'}
               </p>
             </div>
 
@@ -1155,13 +1308,26 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
                           </div>
                         ) : (
                           <div className="space-y-0.5">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                              inst.lastResult === 'PASS' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
-                              inst.lastResult === 'FAIL' ? 'bg-rose-950 text-rose-300 border border-rose-800' :
-                              'bg-slate-800 text-slate-400'
-                            }`}>
-                              {inst.lastResult || '-'}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                inst.lastResult === 'PASS' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
+                                inst.lastResult === 'FAIL' ? 'bg-rose-950 text-rose-300 border border-rose-800' :
+                                'bg-slate-800 text-slate-400'
+                              }`}>
+                                {inst.lastResult || '-'}
+                              </span>
+                              {inst.lastCalDate && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRequestEditLatestCal(inst)}
+                                  title={isTh ? 'แก้ไขบันทึกผลสอบเทียบล่าสุด (ยืนยัน Admin Password)' : 'Edit latest calibration (Admin Password required)'}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-950/90 hover:bg-cyan-900 text-cyan-300 border border-cyan-800 transition active:scale-95"
+                                >
+                                  <Edit3 className="w-2.5 h-2.5 text-cyan-400" />
+                                  <span>{isTh ? 'แก้ไข' : 'Edit'}</span>
+                                </button>
+                              )}
+                            </div>
                             {inst.lastError !== undefined && (
                               <div className="text-[10px] font-mono text-slate-400">
                                 Err: ±{inst.lastError}
@@ -1200,6 +1366,18 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
                                 <CheckSquare className="w-3 h-3" />
                                 <span>{isTh ? 'บันทึกสอบเทียบ' : 'Calibrate'}</span>
                               </button>
+
+                              {inst.lastCalDate && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRequestEditLatestCal(inst)}
+                                  className="bg-cyan-950 hover:bg-cyan-900 border border-cyan-800 text-cyan-300 px-2 py-1 rounded-lg text-[10px] font-bold transition flex items-center gap-1 active:scale-95 shadow-xs"
+                                  title={isTh ? 'แก้ไขบันทึกผลสอบเทียบล่าสุด (ยืนยัน Admin Password)' : 'Edit latest calibration record (Admin Password required)'}
+                                >
+                                  <Edit3 className="w-3 h-3 text-cyan-400" />
+                                  <span>{isTh ? 'แก้ไขผลล่าสุด' : 'Edit Cal'}</span>
+                                </button>
+                              )}
 
                               <button
                                 onClick={() => {
@@ -1680,6 +1858,7 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
                 <input
                   type="text"
                   required
+                  list="qa-inspector-list"
                   value={calFormData.officer}
                   onChange={(e) => setCalFormData(prev => ({ ...prev, officer: e.target.value }))}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
@@ -1710,6 +1889,194 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
                   className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition shadow-lg shadow-emerald-600/20"
                 >
                   {isTh ? 'ยืนยันผลการสอบเทียบ' : 'Confirm Calibration'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2.1 Edit Latest Calibration Modal (Admin Protected) */}
+      {editCalModalItem && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl border border-cyan-500/20">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-white">
+                      {isTh ? 'แก้ไขบันทึกผลสอบเทียบล่าสุด' : 'Edit Latest Calibration'}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-950/90 text-indigo-300 border border-indigo-800/80 flex items-center gap-1 font-mono">
+                      <ShieldCheck className="w-3 h-3 text-indigo-400" /> Admin
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-cyan-400 font-mono font-bold">{editCalModalItem.id} - {editCalModalItem.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setEditCalModalItem(null); setTargetHistoryId(null); }}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Spec & Live Evaluation Card */}
+            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Spec Limit</span>
+                  <span className="font-mono font-bold text-amber-300 text-sm">± {editCalModalItem.spec}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Frequency</span>
+                  <span className="font-mono font-bold text-indigo-300 text-sm">{formatFrequencyDisplay(editCalModalItem.frequency)}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase font-bold block">ประเมินผล (Live Result)</span>
+                  {editCalFormData.actualError !== '' && !isNaN(parseFloat(editCalFormData.actualError)) ? (
+                    Math.abs(parseFloat(editCalFormData.actualError)) <= editCalModalItem.spec ? (
+                      <span className="px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded font-bold text-xs inline-block">
+                        ✓ PASS (อยู่ในเกณฑ์)
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-rose-950 text-rose-300 border border-rose-800 rounded font-bold text-xs inline-block">
+                        ✕ FAIL (เกินเกณฑ์ Spec)
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-slate-500 text-xs">-</span>
+                  )}
+                </div>
+              </div>
+              <div className="text-[10px] text-slate-400 bg-slate-900/60 px-2.5 py-1.5 rounded-lg border border-slate-800/80 flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span>{isTh ? 'ใช้แก้ไขข้อมูลที่บันทึกผิดพลาด เช่น ค่า Error, วันที่, หรือเลขที่ใบเซอร์ (ยืนยันรหัสผ่าน Admin เรียบร้อย)' : 'Use to correct erroneous records e.g. actual error, dates, or cert number.'}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdateLatestCalibration} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">วันที่ส่งสอบเทียบ</label>
+                  <input
+                    type="date"
+                    required
+                    value={editCalFormData.sendDate}
+                    onChange={(e) => setEditCalFormData(prev => ({ ...prev, sendDate: e.target.value }))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">วันที่ได้รับคืน / วันสอบเทียบ</label>
+                  <input
+                    type="date"
+                    required
+                    value={editCalFormData.receiveDate}
+                    onChange={(e) => setEditCalFormData(prev => ({ ...prev, receiveDate: e.target.value }))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">สถาบัน / ห้องปฏิบัติการสอบเทียบ</label>
+                  <input
+                    type="text"
+                    required
+                    value={editCalFormData.lab}
+                    onChange={(e) => setEditCalFormData(prev => ({ ...prev, lab: e.target.value }))}
+                    placeholder="เช่น NIMT, Internal Metrology"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">หมายเลขใบรับรอง (Cert No.)</label>
+                  <input
+                    type="text"
+                    required
+                    value={editCalFormData.certNo}
+                    onChange={(e) => setEditCalFormData(prev => ({ ...prev, certNo: e.target.value }))}
+                    placeholder="เช่น CAL-2026-0801"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">ค่า Error ที่วัดได้ (Actual Error) *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-slate-500 font-bold">±</span>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      required
+                      value={editCalFormData.actualError}
+                      onChange={(e) => setEditCalFormData(prev => ({ ...prev, actualError: e.target.value }))}
+                      placeholder="เช่น 0.005"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-7 pr-3 py-2 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">ค่าความไม่แน่นอน (Uncertainty)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-slate-500 font-bold">±</span>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={editCalFormData.uncertainty}
+                      onChange={(e) => setEditCalFormData(prev => ({ ...prev, uncertainty: e.target.value }))}
+                      placeholder="เช่น 0.001"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-7 pr-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">ผู้ตรวจสอบ / เจ้าหน้าที่</label>
+                <input
+                  type="text"
+                  required
+                  list="qa-inspector-list"
+                  value={editCalFormData.officer}
+                  onChange={(e) => setEditCalFormData(prev => ({ ...prev, officer: e.target.value }))}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">หมายเหตุ / เหตุผลการแก้ไข</label>
+                <textarea
+                  rows={2}
+                  value={editCalFormData.note}
+                  onChange={(e) => setEditCalFormData(prev => ({ ...prev, note: e.target.value }))}
+                  placeholder="เช่น แก้ไขเนื่องจากคีย์ค่า Error ผิดพลาด..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => { setEditCalModalItem(null); setTargetHistoryId(null); }}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition"
+                >
+                  {isTh ? 'ยกเลิก' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold rounded-xl transition shadow-lg shadow-cyan-600/20 active:scale-95"
+                >
+                  {isTh ? 'บันทึกการแก้ไข' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -1872,13 +2239,31 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
                         <span className="font-mono text-slate-400 text-[10px]">{log.date}</span>
                       </div>
 
-                      {log.result && (
-                        <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                          log.result === 'PASS' ? 'text-emerald-400' : 'text-rose-400'
-                        }`}>
-                          {log.result}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {log.result && (
+                          <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                            log.result === 'PASS' ? 'text-emerald-400' : 'text-rose-400'
+                          }`}>
+                            {log.result}
+                          </span>
+                        )}
+
+                        {log.type === 'CALIBRATION' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const targetItem = historyModalItem;
+                              setHistoryModalItem(null);
+                              handleRequestEditLatestCal(targetItem, log);
+                            }}
+                            title={isTh ? 'แก้ไขบันทึกสอบเทียบนี้ (ยืนยัน Admin Password)' : 'Edit this calibration record (Admin Password required)'}
+                            className="px-2 py-0.5 rounded text-[9.5px] font-bold bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/80 flex items-center gap-1 transition active:scale-95"
+                          >
+                            <Edit3 className="w-2.5 h-2.5 text-cyan-400" />
+                            <span>{isTh ? 'แก้ไข' : 'Edit'}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {log.type === 'CALIBRATION' && (

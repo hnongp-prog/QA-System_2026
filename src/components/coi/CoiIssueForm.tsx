@@ -365,6 +365,7 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
             <label className="block text-slate-400 text-[11px] mb-1 font-semibold">{isTh ? 'ผู้ตรวจสอบ (Inspector Name)' : 'Inspector Name'}</label>
             <input
               type="text"
+              list="qa-inspector-list"
               value={inspectorName}
               onChange={e => setInspectorName(e.target.value)}
               className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-cyan-500 focus:outline-none"

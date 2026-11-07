@@ -233,17 +233,17 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
           isLight ? 'border-slate-200' : 'border-slate-800'
         }`}>
           <div>
-            <label className={`text-[10px] font-extrabold uppercase block mb-1 ${
-              isLight ? 'text-slate-800' : 'text-slate-400'
+            <label className={`text-[10px] font-black uppercase block mb-1 ${
+              isLight ? 'text-black' : 'text-slate-400'
             }`}>
               {isTh ? 'เลือกปี (Year)' : 'Select Year'}
             </label>
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
-              className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border ${
+              className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border-2 ${
                 isLight 
-                  ? 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-indigo-600' 
+                  ? 'bg-white border-blue-600 text-black focus:border-blue-700' 
                   : 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500'
               }`}
             >
@@ -255,17 +255,17 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
           </div>
 
           <div>
-            <label className={`text-[10px] font-extrabold uppercase block mb-1 ${
-              isLight ? 'text-slate-800' : 'text-slate-400'
+            <label className={`text-[10px] font-black uppercase block mb-1 ${
+              isLight ? 'text-black' : 'text-slate-400'
             }`}>
               {isTh ? 'เลือกเดือน (Month)' : 'Select Month'}
             </label>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border ${
+              className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border-2 ${
                 isLight 
-                  ? 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-indigo-600' 
+                  ? 'bg-white border-blue-600 text-black focus:border-blue-700' 
                   : 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500'
               }`}
             >
@@ -286,17 +286,17 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
           </div>
 
           <div>
-            <label className={`text-[10px] font-extrabold uppercase block mb-1 ${
-              isLight ? 'text-slate-800' : 'text-slate-400'
+            <label className={`text-[10px] font-black uppercase block mb-1 ${
+              isLight ? 'text-black' : 'text-slate-400'
             }`}>
               {isTh ? 'เลือก Billet Grade' : 'Billet Grade'}
             </label>
             <select
               value={selectedGrade}
               onChange={(e) => setSelectedGrade(e.target.value)}
-              className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border ${
+              className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border-2 ${
                 isLight 
-                  ? 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-indigo-600' 
+                  ? 'bg-white border-blue-600 text-black focus:border-blue-700' 
                   : 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500'
               }`}
             >

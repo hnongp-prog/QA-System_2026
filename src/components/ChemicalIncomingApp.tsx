@@ -55,6 +55,7 @@ import {
 } from '../types';
 import { analyzeChemicalCertClient } from '../services/geminiClient';
 import { useCloudState } from '../services/firestoreSync';
+import { InspectorDatalist, saveRecordedInspector } from '../utils/inspectorStorage';
 import { generateQrSvgString, QRCodeView, getChemQrPayload, QrDataMode, QrZoomModal } from '../utils/qrCodeHelper';
 
 interface ChemicalIncomingAppProps {
@@ -527,6 +528,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
     setHistory(prev => [newEntry, ...prev]);
 
     // Log to parent activity feed
+    if (header.inspector_name) saveRecordedInspector(header.inspector_name);
     if (onLogNewActivity) {
       const outOfSpecDetails = formattedItems
         .filter(item => item.status === 'FAIL')
@@ -1724,6 +1726,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                   </label>
                   <input
                     type="text"
+                    list="qa-inspector-list"
                     value={header.inspector_name}
                     onChange={(e) => setHeader({ ...header, inspector_name: e.target.value })}
                     placeholder="Inspector Name"
@@ -2594,6 +2597,7 @@ export const ChemicalIncomingApp: React.FC<ChemicalIncomingAppProps> = ({
                 <label className={`text-[10px] font-bold block mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Inspector</label>
                 <input
                   type="text"
+                  list="qa-inspector-list"
                   value={editingHistoryItem.inspector || ''}
                   onChange={(e) => setEditingHistoryItem(prev => prev ? { ...prev, inspector: e.target.value } : null)}
                   className={`w-full border rounded-xl px-3 py-2 focus:outline-none ${

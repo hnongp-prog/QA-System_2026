@@ -34,6 +34,7 @@ import {
   ThemeMode
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
+import { InspectorDatalist, saveRecordedInspector } from '../utils/inspectorStorage';
 import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
 import { STANDARD_PROCESS_OPTIONS, STANDARD_MACHINE_OPTIONS } from '../constants/processOptions';
 
@@ -155,6 +156,26 @@ const DEFAULT_PROFILES: CoatingProfileSpec[] = [
     scothMagicTapeLo: '0.50',
     stdLength: '200',
     stdCoatingWidth: '100'
+  },
+  {
+    name: 'Coating_Manual_Standard',
+    calcMode: 'manual',
+    widthMin: '1000', widthMax: '1020',
+    heightMin: '0.40', heightMax: '0.60',
+    binderMin: '0.00', binderMax: '0.20',
+    amtBinderMin: '', amtBinderMax: '',
+    coatingWtMinUp: '10.0', coatingWtMaxUp: '20.0',
+    pencilHardnessUp: '2H',
+    coatingWtMinLo: '10.0', coatingWtMaxLo: '20.0',
+    pencilHardnessLo: '2H',
+    scothMagicTapeMax: '0.50',
+    scothMagicTapeMaxUp: '0.50',
+    scothMagicTapeMaxLo: '0.50',
+    scothMagicTape: '0.50',
+    scothMagicTapeUp: '0.50',
+    scothMagicTapeLo: '0.50',
+    stdLength: '200',
+    stdCoatingWidth: '100'
   }
 ];
 
@@ -244,6 +265,14 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
   // Saved Profiles & Inspections with Real-time Cloud Sync
   const [savedProfiles, setSavedProfiles] = useCloudState<CoatingProfileSpec[]>('coating_qc_profiles', DEFAULT_PROFILES);
   const [inspections, setInspections] = useCloudState<CoatingInspectionRecord[]>('coating_qc_inspections', INITIAL_INSPECTIONS);
+
+  // Automatically include built-in profiles (such as Coating_Manual_Standard) into profile list
+  const effectiveProfiles = useMemo(() => {
+    const existingNames = new Set(savedProfiles.map(p => p.name.toLowerCase()));
+    const missing = DEFAULT_PROFILES.filter(dp => !existingNames.has(dp.name.toLowerCase()));
+    if (missing.length === 0) return savedProfiles;
+    return [...savedProfiles, ...missing];
+  }, [savedProfiles]);
 
   // Auth State for Settings
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -626,7 +655,8 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     const tapeMaxLo = profile.scothMagicTapeMaxLo || profile.scothMagicTapeMax || profile.scothMagicTapeLo || profile.scothMagicTape || '0.50';
     const stdLen = formatSpecValue(profile.stdLength) || '200';
     const stdCoatW = formatSpecValue(profile.stdCoatingWidth) || '100';
-    const mode = profile.calcMode || 'calculated';
+    const isManualProfile = profile.calcMode === 'manual' || (Boolean(profile.name) && profile.name.toLowerCase().includes('manual'));
+    const mode = isManualProfile ? 'manual' : (profile.calcMode || 'calculated');
 
     const newHeader = {
       ...headerInfo,
@@ -672,13 +702,14 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
 
   useEffect(() => {
     if (headerInfo.profileName) {
-      const match = savedProfiles.find(p => p.name.toLowerCase() === headerInfo.profileName.toLowerCase());
+      const match = effectiveProfiles.find(p => p.name.toLowerCase() === headerInfo.profileName.toLowerCase());
       if (match) {
         const tapeMaxUp = match.scothMagicTapeMaxUp || match.scothMagicTapeMax || match.scothMagicTapeUp || match.scothMagicTape || '0.50';
         const tapeMaxLo = match.scothMagicTapeMaxLo || match.scothMagicTapeMax || match.scothMagicTapeLo || match.scothMagicTape || '0.50';
         const stdLen = formatSpecValue(match.stdLength) || '200';
         const stdCoatW = formatSpecValue(match.stdCoatingWidth) || '100';
-        const mode = match.calcMode || 'calculated';
+        const isManualProfile = match.calcMode === 'manual' || (Boolean(match.name) && match.name.toLowerCase().includes('manual'));
+        const mode = isManualProfile ? 'manual' : (match.calcMode || 'calculated');
 
         setHeaderInfo(prev => ({
           ...prev,
@@ -713,7 +744,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     } else {
       setProfileStatus('not-found');
     }
-  }, [headerInfo.profileName, savedProfiles]);
+  }, [headerInfo.profileName, effectiveProfiles]);
 
   const handleResetForm = () => {
     setHeaderInfo({
@@ -975,6 +1006,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       const recId = `rec-coat-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
 
       if (onLogNewActivity) {
+        if (headerInfo.inspectorName) saveRecordedInspector(headerInfo.inspectorName);
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1372,15 +1404,20 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                       handleResetForm();
                       return;
                     }
-                    const selected = savedProfiles.find(p => p.name === val);
+                    const selected = effectiveProfiles.find(p => p.name === val);
                     if (selected) selectProfile(selected);
                   }}
                   className="w-full bg-slate-950 border border-indigo-900/80 text-indigo-300 font-bold rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-400 uppercase"
                 >
                   <option value="">-- {isTh ? 'เลือก Profile' : 'Select Profile'} --</option>
-                  {savedProfiles.map(p => (
-                    <option key={p.name} value={p.name}>{p.name}</option>
-                  ))}
+                  {effectiveProfiles.map(p => {
+                    const isMan = p.calcMode === 'manual' || (Boolean(p.name) && p.name.toLowerCase().includes('manual'));
+                    return (
+                      <option key={p.name} value={p.name}>
+                        {p.name} {isMan ? (isTh ? '(Coating Manual - กรอกเอง)' : '(Manual)') : (isTh ? '(คำนวณอัตโนมัติ)' : '(Calculated)')}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -1391,6 +1428,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                 <input
                   type="text"
                   name="inspectorName"
+                  list="qa-inspector-list"
                   value={headerInfo.inspectorName}
                   onChange={handleHeaderChange}
                   placeholder={isTh ? 'ชื่อผู้ตรวจสอบ' : 'Inspector name'}
@@ -1495,10 +1533,17 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
           {/* Measurement Table */}
           <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 shadow-md overflow-hidden" ref={tableRef}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                <Activity className="w-4 h-4 text-emerald-400" />
-                {isTh ? '2. ตารางบันทึกค่าการเคลือบผิว (Coating Measurement Entry)' : '2. Coating Entry Table'}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-emerald-400" />
+                  {isTh ? '2. ตารางบันทึกค่าการเคลือบผิว (Coating Measurement Entry)' : '2. Coating Entry Table'}
+                </h3>
+                {headerInfo.calcMode === 'manual' && (
+                  <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold flex items-center gap-1">
+                    <span>⚡ Coating Manual (ซ่อน Empty Up/Lo อัตโนมัติ)</span>
+                  </span>
+                )}
+              </div>
 
               <div className="flex items-center gap-2">
                 <button
@@ -1536,7 +1581,16 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                     <tr>
                       <th className="px-3 py-3 w-56">Coil Info (Side / Dimension)</th>
                       <th className="px-3 py-3 text-center bg-indigo-950/30 text-indigo-300 border-l border-slate-800" colSpan={4}>
-                        Weight Inputs (Total / Dryer / Empty Up / Lo)
+                        {headerInfo.calcMode === 'manual' ? (
+                          <div className="flex flex-col items-center justify-center">
+                            <span>Weight Inputs (Total / Dryer Wt)</span>
+                            <span className="text-[9px] text-amber-300 font-semibold tracking-normal normal-case">
+                              {isTh ? '⚡ ซ่อน Empty Up & Lo อัตโนมัติ (Coating Manual)' : '⚡ Empty Up & Lo hidden (Manual)'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span>Weight Inputs (Total / Dryer / Empty Up / Lo)</span>
+                        )}
                       </th>
                       {headerInfo.calcMode === 'manual' ? (
                         <th className="px-3 py-3 text-center bg-amber-950/30 text-amber-300 border-l border-slate-800" colSpan={3}>
@@ -1690,7 +1744,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
 
                           {/* Weight Inputs */}
                           <td className="px-2 py-2.5 text-center bg-indigo-950/10 border-l border-slate-800" colSpan={4}>
-                            <div className="grid grid-cols-2 gap-1.5">
+                            <div className={`grid ${headerInfo.calcMode === 'manual' ? 'grid-cols-2 max-w-[280px] mx-auto' : 'grid-cols-2'} gap-1.5`}>
                               <input 
                                 type="number" step="0.0001" 
                                 placeholder="Total Wt (g)" 
@@ -1705,20 +1759,24 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                                 onChange={(e) => handleItemChange(item.id, 'weightAfterDryer', e.target.value)} 
                                 className="w-full bg-slate-950 border border-slate-800 text-indigo-300 rounded-lg px-1.5 py-1 text-xs text-center font-bold"
                               />
-                              <input 
-                                type="number" step="0.0001" 
-                                placeholder="Empty Up (g)" 
-                                value={item.wtWithoutCoatUp} 
-                                onChange={(e) => handleItemChange(item.id, 'wtWithoutCoatUp', e.target.value)} 
-                                className="w-full bg-slate-950 border border-slate-800 text-indigo-300 rounded-lg px-1.5 py-1 text-xs text-center font-bold"
-                              />
-                              <input 
-                                type="number" step="0.0001" 
-                                placeholder="Empty Lo (g)" 
-                                value={item.wtWithoutCoatLo} 
-                                onChange={(e) => handleItemChange(item.id, 'wtWithoutCoatLo', e.target.value)} 
-                                className="w-full bg-slate-950 border border-slate-800 text-indigo-300 rounded-lg px-1.5 py-1 text-xs text-center font-bold"
-                              />
+                              {headerInfo.calcMode !== 'manual' && (
+                                <>
+                                  <input 
+                                    type="number" step="0.0001" 
+                                    placeholder="Empty Up (g)" 
+                                    value={item.wtWithoutCoatUp} 
+                                    onChange={(e) => handleItemChange(item.id, 'wtWithoutCoatUp', e.target.value)} 
+                                    className="w-full bg-slate-950 border border-slate-800 text-indigo-300 rounded-lg px-1.5 py-1 text-xs text-center font-bold"
+                                  />
+                                  <input 
+                                    type="number" step="0.0001" 
+                                    placeholder="Empty Lo (g)" 
+                                    value={item.wtWithoutCoatLo} 
+                                    onChange={(e) => handleItemChange(item.id, 'wtWithoutCoatLo', e.target.value)} 
+                                    className="w-full bg-slate-950 border border-slate-800 text-indigo-300 rounded-lg px-1.5 py-1 text-xs text-center font-bold"
+                                  />
+                                </>
+                              )}
                             </div>
                           </td>
 
@@ -1934,7 +1992,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                 {isTh ? 'รายการ Profile ที่บันทึกไว้' : 'Saved Profiles'}
               </h4>
               <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {savedProfiles.map((p) => (
+                {effectiveProfiles.map((p) => (
                   <div
                     key={p.name}
                     onClick={() => selectProfile(p)}
@@ -2565,6 +2623,7 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Inspector Name</label>
                   <input
                     type="text"
+                    list="qa-inspector-list"
                     value={editingHistoryItem.inspectorName || ''}
                     onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, inspectorName: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
@@ -2844,8 +2903,8 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                 </div>
                 <p className="text-[11px] text-slate-400">
                   {isTh 
-                    ? 'ในโหมด Coating Manual ระบบจะซ่อนคอลัมน์คำนวณอัตโนมัติ 4 คอลัมน์ และแสดงคอลัมน์ Coating + Binder (M) โดยคำนวณ Binder% = Total Wt - Dryer Wt ส่วนค่า Coat Wt Up และ Lo ผู้ตรวจสอบเป็นผู้กรอกข้อมูลโดยตรง' 
-                    : 'In Coating Manual mode, standard auto metrics are replaced by Coating + Binder (M): Binder% = Total Wt - Dryer Wt, and Coating Wt Up/Lo are manually entered.'}
+                    ? 'ในโหมด Coating Manual ระบบจะซ่อนฟิลด์ Empty Up และ Empty Lo โดยอัตโนมัติเพื่อไม่ให้สับสน และแสดงคอลัมน์ Coating + Binder (M) โดยคำนวณ Binder% = Total Wt - Dryer Wt ส่วนค่า Coat Wt Up และ Lo ผู้ตรวจสอบเป็นผู้กรอกข้อมูลโดยตรง' 
+                    : 'In Coating Manual mode, Empty Up and Empty Lo fields are automatically hidden to prevent confusion. Standard auto metrics are replaced by Coating + Binder (M): Binder% = Total Wt - Dryer Wt, and Coating Wt Up/Lo are manually entered.'}
                 </p>
               </div>
 

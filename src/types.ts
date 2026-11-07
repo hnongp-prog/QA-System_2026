@@ -7,7 +7,29 @@ export type QACategory =
   | 'NCR'        // Non-Conformance Report & CAPA
   | 'ANALYTICS'  // QA Dashboard & Reports
   | 'CERTIFICATE_COI' // Certificate of Inspection (Certificate_COI)
+  | 'STAFF'      // QA Inspector & Staff Roster
   | 'CUSTOM';
+
+export type InspectorDepartment = 'IQA' | 'IPQA' | 'OQA' | 'QA_ALL' | 'METROLOGY';
+export type InspectorRole = 'INSPECTOR' | 'SR_INSPECTOR' | 'QA_ENGINEER' | 'SUPERVISOR';
+export type InspectorStatus = 'ACTIVE' | 'INACTIVE';
+
+export interface QAInspector {
+  id: string;
+  empCode: string;          // รหัสพนักงาน เช่น EMP-001, QA-101
+  name: string;             // ชื่อ-นามสกุล (ไทย)
+  nameEn?: string;          // ชื่อภาษาอังกฤษ
+  startDate: string;        // วันที่เริ่มทำงาน (YYYY-MM-DD)
+  department: InspectorDepartment; // สายงาน: IQA, IPQA, OQA, QA_ALL, METROLOGY
+  role: InspectorRole;      // ตำแหน่ง: INSPECTOR, SR_INSPECTOR, QA_ENGINEER, SUPERVISOR
+  status: InspectorStatus;  // ACTIVE / INACTIVE
+  phone?: string;
+  email?: string;
+  certifiedProcesses?: string[]; // ทักษะ/กระบวนการที่ผ่านการรับรอง
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
 
 export type ModuleStatus = 'ACTIVE' | 'READY_FOR_DEV' | 'IN_DEVELOPMENT' | 'PLANNED';
 

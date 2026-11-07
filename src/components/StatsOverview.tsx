@@ -43,6 +43,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
     { key: 'NCR', labelTh: 'NCR & CAPA ของเสีย', labelEn: 'NCR & Defect' },
     { key: 'ANALYTICS', labelTh: 'วิเคราะห์คุณภาพ', labelEn: 'Analytics' },
     { key: 'CERTIFICATE_COI', labelTh: 'Certificate_COI', labelEn: 'Certificate_COI' },
+    { key: 'STAFF', labelTh: 'QA Inspector พนักงาน', labelEn: 'QA Inspectors' },
   ];
 
   return (

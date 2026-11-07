@@ -88,6 +88,27 @@
         "reason": { "type": "string" }
       },
       "required": ["id", "inspectorName", "partNo", "result"]
+    },
+    "QAInspector": {
+      "title": "QA Inspector Staff Member",
+      "description": "Employee record for QA inspectors across IQA, IPQA, and OQA",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "empCode": { "type": "string" },
+        "name": { "type": "string" },
+        "nameEn": { "type": "string" },
+        "startDate": { "type": "string" },
+        "department": { "type": "string", "enum": ["IQA", "IPQA", "OQA", "QA_ALL", "METROLOGY"] },
+        "role": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "empCode", "name", "startDate", "status"]
     }
   },
   "firestore": {
@@ -110,6 +131,10 @@
     "/oqa_inspections/{recordId}": {
       "schema": { "$ref": "#/entities/FgPreShipmentRecord" },
       "description": "Collection of OQA-01 pre-shipment inspection logs"
+    },
+    "/qa_inspectors/{inspectorId}": {
+      "schema": { "$ref": "#/entities/QAInspector" },
+      "description": "Collection of QA Inspector roster staff documents"
     }
   }
 }

@@ -51,6 +51,8 @@ import {
   ROOT_CAUSE_CATEGORIES,
   extractOnlyOutOfSpecPoints
 } from '../utils/ncrStorage';
+import { saveRecordedInspector } from '../utils/inspectorStorage';
+
 
 export const ROOT_CAUSE_CATEGORIES_CONFIG = [
   { key: 'Man', label: 'Man', labelTh: 'Man (คน/พนักงาน)', descTh: 'ข้อผิดพลาดจากบุคคล ทักษะ ความเหนื่อยล้า การฝึกอบรม' },
@@ -128,7 +130,7 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
   const [newCoilNo, setNewCoilNo] = useState('');
   const [newProfile, setNewProfile] = useState('');
   const [newInspectionDate, setNewInspectionDate] = useState(() => new Date().toLocaleString('sv-SE').slice(0, 16));
-  const [newInspector, setNewInspector] = useState('Somchai P. (QA Inspector)');
+  const [newInspector, setNewInspector] = useState('');
   const [newProcess, setNewProcess] = useState(PROCESS_OPTIONS[0]);
   const [newInspectionResult, setNewInspectionResult] = useState('');
   const [newSeverity, setNewSeverity] = useState<NcrSeverity>('MAJOR');
@@ -295,7 +297,8 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
     setNcrList(getStoredNcrRecords());
 
     if (onLogNewActivity) {
-      onLogNewActivity({
+      if (newInspector) saveRecordedInspector(newInspector);
+        onLogNewActivity({
         id: created.docId!,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         moduleCode: 'NCR-01',
@@ -980,6 +983,7 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                 <input
                   type="text"
                   required
+                  list="qa-inspector-list"
                   value={newInspector}
                   onChange={(e) => setNewInspector(e.target.value)}
                   placeholder="e.g. Somchai P. (IPQA Lead)"

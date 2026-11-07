@@ -324,11 +324,68 @@ html.theme-light .text-violet-400 {
 html.theme-light input:not([type="checkbox"]):not([type="radio"]),
 html.theme-light select,
 html.theme-light textarea {
-  background-color: #ffffff !important;
-  color: #090d16 !important;
-  border-color: #cbd5e1 !important;
+  background-color: #ffffff;
+  color: #090d16;
+  border-color: #cbd5e1;
   font-weight: 600;
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+}
+
+/* Explicit border colors in Light Mode */
+html.theme-light input.border-blue-600,
+html.theme-light select.border-blue-600,
+html.theme-light .border-blue-600 {
+  border-color: #2563eb !important;
+}
+
+html.theme-light input.border-blue-700,
+html.theme-light select.border-blue-700,
+html.theme-light .border-blue-700 {
+  border-color: #1d4ed8 !important;
+}
+
+html.theme-light input.border-rose-600,
+html.theme-light select.border-rose-600,
+html.theme-light .border-rose-600 {
+  border-color: #e11d48 !important;
+}
+
+html.theme-light input.border-emerald-600,
+html.theme-light select.border-emerald-600,
+html.theme-light .border-emerald-600 {
+  border-color: #059669 !important;
+}
+
+/* High-priority rules for IPQA-08 in Light Theme: Black text & Blue 2px borders */
+html.theme-light [data-app="IPQA-08"] input:not([type="checkbox"]):not([type="radio"]),
+html.theme-light [data-app="IPQA-08"] select,
+html.theme-light .ipqa-08-container input:not([type="checkbox"]):not([type="radio"]),
+html.theme-light .ipqa-08-container select {
+  border-color: #2563eb !important;
+  border-width: 2px !important;
+  color: #000000 !important;
+  font-weight: 800 !important;
+}
+
+html.theme-light [data-app="IPQA-08"] input.border-rose-600,
+html.theme-light .ipqa-08-container input.border-rose-600 {
+  border-color: #e11d48 !important;
+  background-color: #ffe4e6 !important;
+  color: #000000 !important;
+}
+
+html.theme-light [data-app="IPQA-08"] thead,
+html.theme-light .ipqa-08-container thead {
+  background-color: #dbeafe !important;
+  color: #000000 !important;
+}
+
+html.theme-light [data-app="IPQA-08"] thead th,
+html.theme-light .ipqa-08-container thead th {
+  background-color: #dbeafe !important;
+  color: #000000 !important;
+  border-color: #93c5fd !important;
+  font-weight: 900 !important;
 }
 
 html.theme-light input:not([type="checkbox"]):not([type="radio"]):focus,
@@ -336,7 +393,7 @@ html.theme-light select:focus,
 html.theme-light textarea:focus {
   background-color: #ffffff !important;
   border-color: #2563eb !important;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15) !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25) !important;
 }
 
 html.theme-light input:disabled,

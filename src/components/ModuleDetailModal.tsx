@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { QAModule, Language, InspectionActivity, ThemeMode } from '../types';
 import { IconRenderer } from './IconRenderer';
+import { saveRecordedInspector } from '../utils/inspectorStorage';
+
 
 interface ModuleDetailModalProps {
   module: QAModule | null;
@@ -95,6 +97,7 @@ ${module.specs.keyFeaturesTh.map((f, i) => `   - ${f}`).join('\n')}
       remarks: testRemarks || (testResult === 'PASS' ? 'Sample passed standard spec limits' : 'Out of spec detected')
     };
 
+    if (testInspector) saveRecordedInspector(testInspector);
     onAddTestActivity(newActivity);
     setLoggedSuccessMsg(true);
     setTimeout(() => setLoggedSuccessMsg(false), 3000);
@@ -241,6 +244,7 @@ ${module.specs.keyFeaturesTh.map((f, i) => `   - ${f}`).join('\n')}
                   </label>
                   <input
                     type="text"
+                    list="qa-inspector-list"
                     value={testInspector}
                     onChange={(e) => setTestInspector(e.target.value)}
                     className={`w-full px-3 py-2 text-xs rounded-lg border transition ${

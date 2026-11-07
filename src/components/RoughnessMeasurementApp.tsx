@@ -41,6 +41,7 @@ import {
   ThemeMode
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
+import { InspectorDatalist, saveRecordedInspector } from '../utils/inspectorStorage';
 import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
 import { STANDARD_PROCESS_OPTIONS, STANDARD_MACHINE_OPTIONS } from '../constants/processOptions';
 
@@ -458,6 +459,31 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
         : (isTh ? `✓ เพิ่มจุดวัด ${type.toUpperCase()} ชุด ${count} จุด` : `✓ Added ${count} ${type.toUpperCase()} points`),
       'success'
     );
+  };
+
+  const removePoint = (type: 'ra' | 'rz' | 'rt' | 'ry' | 'unZnSpray', count: number = 1) => {
+    setPointConfig(prev => {
+      if (prev[type] <= 1) return prev;
+      const newCount = Math.max(1, prev[type] - count);
+      setBatchItems(prevItems => prevItems.map(item => {
+        if (type === 'unZnSpray') {
+          return {
+            ...item,
+            unZnSprayRaUp: item.unZnSprayRaUp.slice(0, newCount),
+            unZnSprayRaLo: item.unZnSprayRaLo.slice(0, newCount),
+            unZnSprayRzUp: item.unZnSprayRzUp.slice(0, newCount),
+            unZnSprayRzLo: item.unZnSprayRzLo.slice(0, newCount)
+          };
+        }
+        return {
+          ...item,
+          [`${type}Up`]: (item[`${type}Up` as keyof typeof item] as string[]).slice(0, newCount),
+          [`${type}Lo`]: (item[`${type}Lo` as keyof typeof item] as string[]).slice(0, newCount)
+        };
+      }));
+      return { ...prev, [type]: newCount };
+    });
+    showNotification(isTh ? `ลดจุดวัด ${type.toUpperCase()} 1 จุด` : `Reduced 1 ${type.toUpperCase()} point`, 'success');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, index?: number, field?: string) => {
@@ -1073,6 +1099,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
         : (outOfSpecPoints.length > 0 ? outOfSpecPoints.join(' | ') : 'Roughness Out of Spec');
 
       if (onLogNewActivity) {
+        if (headerInfo.inspectorName) saveRecordedInspector(headerInfo.inspectorName);
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1581,6 +1608,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                 <input
                   type="text"
                   name="inspectorName"
+                  list="qa-inspector-list"
                   value={headerInfo.inspectorName}
                   onChange={handleHeaderChange}
                   placeholder={isTh ? 'ชื่อผู้ตรวจสอบ / Inspector name' : 'Inspector name'}
@@ -1734,32 +1762,72 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                     <tr>
                       <th className="px-3 py-3 w-64">Coil Info (Side/Process)</th>
                       {isRaActive && (
-                        <th className="px-3 py-3 text-center bg-cyan-950/30 text-cyan-300 border-l border-slate-800" colSpan={pointConfig.ra * 2}>
-                          <div className="flex items-center justify-center gap-2">
+                        <th className="px-3 py-3 text-center bg-cyan-950/30 text-cyan-300 border-l border-slate-800">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
                             <span>Ra (Up / Lo) [{pointConfig.ra} pt]</span>
-                            <button
-                              type="button"
-                              onClick={() => addPoint('ra', 1)}
-                              title={isTh ? 'เพิ่มจุดวัด Ra (Up / Lo) +1 จุด' : '+1 Ra point (Up / Lo)'}
-                              className="px-2 py-0.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
-                            >
-                              +1
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {pointConfig.ra > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removePoint('ra', 1)}
+                                  title={isTh ? 'ลดจุดวัด Ra -1 จุด' : '-1 Ra point'}
+                                  className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded text-[9px] border border-slate-700 transition active:scale-95"
+                                >
+                                  -1
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => addPoint('ra', 1)}
+                                title={isTh ? 'เพิ่มจุดวัด Ra (Up / Lo) +1 จุด' : '+1 Ra point (Up / Lo)'}
+                                className="px-2 py-0.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
+                              >
+                                +1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => addPoint('ra', 3)}
+                                title={isTh ? 'เพิ่มจุดวัด Ra (Up / Lo) ชุด +3 จุดต่อเนื่อง' : '+3 Ra points (continuous)'}
+                                className="px-2 py-0.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold rounded text-[9px] shadow-xs transition active:scale-95 border border-cyan-300/40"
+                              >
+                                +3
+                              </button>
+                            </div>
                           </div>
                         </th>
                       )}
                       {isRzActive && (
-                        <th className="px-3 py-3 text-center bg-emerald-950/30 text-emerald-300 border-l border-slate-800" colSpan={pointConfig.rz * 2}>
-                          <div className="flex items-center justify-center gap-2">
+                        <th className="px-3 py-3 text-center bg-emerald-950/30 text-emerald-300 border-l border-slate-800">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
                             <span>Rz (Up / Lo) [{pointConfig.rz} pt]</span>
-                            <button
-                              type="button"
-                              onClick={() => addPoint('rz', 1)}
-                              title={isTh ? 'เพิ่มจุดวัด Rz (Up / Lo) +1 จุด' : '+1 Rz point (Up / Lo)'}
-                              className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
-                            >
-                              +1
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {pointConfig.rz > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removePoint('rz', 1)}
+                                  title={isTh ? 'ลดจุดวัด Rz -1 จุด' : '-1 Rz point'}
+                                  className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded text-[9px] border border-slate-700 transition active:scale-95"
+                                >
+                                  -1
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => addPoint('rz', 1)}
+                                title={isTh ? 'เพิ่มจุดวัด Rz (Up / Lo) +1 จุด' : '+1 Rz point (Up / Lo)'}
+                                className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
+                              >
+                                +1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => addPoint('rz', 3)}
+                                title={isTh ? 'เพิ่มจุดวัด Rz (Up / Lo) ชุด +3 จุดต่อเนื่อง' : '+3 Rz points (continuous)'}
+                                className="px-2 py-0.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded text-[9px] shadow-xs transition active:scale-95 border border-emerald-300/40"
+                              >
+                                +3
+                              </button>
+                            </div>
                           </div>
                         </th>
                       )}
@@ -1769,50 +1837,110 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                         </th>
                       )}
                       {isRtActive && (
-                        <th className="px-3 py-3 text-center bg-amber-950/30 text-amber-300 border-l border-slate-800" colSpan={pointConfig.rt * 2}>
-                          <div className="flex items-center justify-center gap-2">
+                        <th className="px-3 py-3 text-center bg-amber-950/30 text-amber-300 border-l border-slate-800">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
                             <span>Rt (Up / Lo) [{pointConfig.rt} pt]</span>
-                            <button
-                              type="button"
-                              onClick={() => addPoint('rt', 1)}
-                              title={isTh ? 'เพิ่มจุดวัด Rt (Up / Lo) +1 จุด' : '+1 Rt point (Up / Lo)'}
-                              className="px-2 py-0.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
-                            >
-                              +1
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {pointConfig.rt > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removePoint('rt', 1)}
+                                  title={isTh ? 'ลดจุดวัด Rt -1 จุด' : '-1 Rt point'}
+                                  className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded text-[9px] border border-slate-700 transition active:scale-95"
+                                >
+                                  -1
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => addPoint('rt', 1)}
+                                title={isTh ? 'เพิ่มจุดวัด Rt (Up / Lo) +1 จุด' : '+1 Rt point (Up / Lo)'}
+                                className="px-2 py-0.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
+                              >
+                                +1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => addPoint('rt', 3)}
+                                title={isTh ? 'เพิ่มจุดวัด Rt (Up / Lo) ชุด +3 จุดต่อเนื่อง' : '+3 Rt points (continuous)'}
+                                className="px-2 py-0.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded text-[9px] shadow-xs transition active:scale-95 border border-amber-300/40"
+                              >
+                                +3
+                              </button>
+                            </div>
                           </div>
                         </th>
                       )}
                       {isRyActive && (
-                        <th className="px-3 py-3 text-center bg-indigo-950/30 text-indigo-300 border-l border-slate-800" colSpan={pointConfig.ry * 2}>
-                          <div className="flex items-center justify-center gap-2">
+                        <th className="px-3 py-3 text-center bg-indigo-950/30 text-indigo-300 border-l border-slate-800">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
                             <span>Ry (Up / Lo) [{pointConfig.ry} pt]</span>
-                            <button
-                              type="button"
-                              onClick={() => addPoint('ry', 1)}
-                              title={isTh ? 'เพิ่มจุดวัด Ry (Up / Lo) +1 จุด' : '+1 Ry point (Up / Lo)'}
-                              className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
-                            >
-                              +1
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {pointConfig.ry > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removePoint('ry', 1)}
+                                  title={isTh ? 'ลดจุดวัด Ry -1 จุด' : '-1 Ry point'}
+                                  className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded text-[9px] border border-slate-700 transition active:scale-95"
+                                >
+                                  -1
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => addPoint('ry', 1)}
+                                title={isTh ? 'เพิ่มจุดวัด Ry (Up / Lo) +1 จุด' : '+1 Ry point (Up / Lo)'}
+                                className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
+                              >
+                                +1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => addPoint('ry', 3)}
+                                title={isTh ? 'เพิ่มจุดวัด Ry (Up / Lo) ชุด +3 จุดต่อเนื่อง' : '+3 Ry points (continuous)'}
+                                className="px-2 py-0.5 bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-extrabold rounded text-[9px] shadow-xs transition active:scale-95 border border-indigo-300/40"
+                              >
+                                +3
+                              </button>
+                            </div>
                           </div>
                         </th>
                       )}
                       {isUnZnSprayActive && (
-                        <th className="px-3 py-3 text-center bg-teal-950/40 text-teal-300 border-l border-teal-800" colSpan={pointConfig.unZnSpray * 4}>
-                          <div className="flex items-center justify-center gap-2">
+                        <th className="px-3 py-3 text-center bg-teal-950/40 text-teal-300 border-l border-teal-800">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
                             <span className="font-bold flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
                               Un Zn Spray [{pointConfig.unZnSpray} pt]
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => addPoint('unZnSpray', 1)}
-                              title={isTh ? 'เพิ่มจุดวัด Un Zn Spray (Up / Lo) +1 จุด' : '+1 Un Zn point (Up / Lo)'}
-                              className="px-2 py-0.5 bg-teal-600 hover:bg-teal-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
-                            >
-                              +1
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {pointConfig.unZnSpray > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removePoint('unZnSpray', 1)}
+                                  title={isTh ? 'ลดจุดวัด Un Zn Spray -1 จุด' : '-1 Un Zn point'}
+                                  className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded text-[9px] border border-slate-700 transition active:scale-95"
+                                >
+                                  -1
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => addPoint('unZnSpray', 1)}
+                                title={isTh ? 'เพิ่มจุดวัด Un Zn Spray (Up / Lo) +1 จุด' : '+1 Un Zn point (Up / Lo)'}
+                                className="px-2 py-0.5 bg-teal-600 hover:bg-teal-500 text-slate-950 font-bold rounded text-[9px] shadow-xs transition active:scale-95"
+                              >
+                                +1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => addPoint('unZnSpray', 3)}
+                                title={isTh ? 'เพิ่มจุดวัด Un Zn Spray ชุด +3 จุดต่อเนื่อง' : '+3 Un Zn points (continuous)'}
+                                className="px-2 py-0.5 bg-teal-500 hover:bg-teal-400 text-slate-950 font-extrabold rounded text-[9px] shadow-xs transition active:scale-95 border border-teal-300/40"
+                              >
+                                +3
+                              </button>
+                            </div>
                           </div>
                         </th>
                       )}
@@ -1903,72 +2031,112 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
 
                           {/* Ra Points */}
                           {isRaActive && (
-                            <td className="px-2 py-3 bg-cyan-950/10 border-l border-slate-800/80" colSpan={pointConfig.ra * 2}>
-                              <div className="flex gap-2 justify-center">
-                                {Array(pointConfig.ra).fill(0).map((_, pIdx) => (
-                                  <div key={pIdx} className="flex gap-1 items-center">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={item.raUp[pIdx]}
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'raUp', pIdx, e.target.value)}
-                                      placeholder="Up"
-                                      className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.raUp[pIdx] && parseFloat(item.raUp[pIdx]) > rowSpec.raUp && rowSpec.raUp > 0
-                                          ? 'border-rose-500 text-rose-300 bg-rose-950/40'
-                                          : 'border-slate-800 text-cyan-300'
-                                      }`}
-                                    />
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={item.raLo[pIdx]}
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'raLo', pIdx, e.target.value)}
-                                      placeholder="Lo"
-                                      className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.raLo[pIdx] && parseFloat(item.raLo[pIdx]) > rowSpec.raLo && rowSpec.raLo > 0
-                                          ? 'border-rose-500 text-rose-300 bg-rose-950/40'
-                                          : 'border-slate-800 text-cyan-300'
-                                      }`}
-                                    />
+                            <td className="px-2.5 py-2.5 bg-cyan-950/10 border-l border-slate-800/80">
+                              <div className="flex flex-col gap-1.5 justify-center">
+                                {/* Line 1: UP points */}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-7 shrink-0 px-1 py-0.5 bg-cyan-950 text-cyan-400 border border-cyan-800/60 rounded text-[9px] font-bold text-center tracking-wider font-mono">
+                                    UP
+                                  </span>
+                                  <div className="flex gap-1 items-center flex-nowrap">
+                                    {Array(pointConfig.ra).fill(0).map((_, pIdx) => (
+                                      <input
+                                        key={pIdx}
+                                        type="number"
+                                        step="0.01"
+                                        value={item.raUp[pIdx] || ''}
+                                        onChange={(e) => handleDynamicPointChange(item.id, 'raUp', pIdx, e.target.value)}
+                                        placeholder={`U${pIdx + 1}`}
+                                        title={`Ra UP Pt ${pIdx + 1}`}
+                                        className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none transition ${
+                                          item.raUp[pIdx] && parseFloat(item.raUp[pIdx]) > rowSpec.raUp && rowSpec.raUp > 0
+                                            ? 'border-rose-500 text-rose-300 bg-rose-950/40'
+                                            : 'border-slate-800 text-cyan-300 focus:border-cyan-500'
+                                        }`}
+                                      />
+                                    ))}
                                   </div>
-                                ))}
+                                </div>
+                                {/* Line 2: LO points */}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-7 shrink-0 px-1 py-0.5 bg-slate-900 text-slate-400 border border-slate-800 rounded text-[9px] font-bold text-center tracking-wider font-mono">
+                                    LO
+                                  </span>
+                                  <div className="flex gap-1 items-center flex-nowrap">
+                                    {Array(pointConfig.ra).fill(0).map((_, pIdx) => (
+                                      <input
+                                        key={pIdx}
+                                        type="number"
+                                        step="0.01"
+                                        value={item.raLo[pIdx] || ''}
+                                        onChange={(e) => handleDynamicPointChange(item.id, 'raLo', pIdx, e.target.value)}
+                                        placeholder={`L${pIdx + 1}`}
+                                        title={`Ra LO Pt ${pIdx + 1}`}
+                                        className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none transition ${
+                                          item.raLo[pIdx] && parseFloat(item.raLo[pIdx]) > rowSpec.raLo && rowSpec.raLo > 0
+                                            ? 'border-rose-500 text-rose-300 bg-rose-950/40'
+                                            : 'border-slate-800 text-cyan-300 focus:border-cyan-500'
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
                               </div>
                             </td>
                           )}
 
                           {/* Rz Points */}
                           {isRzActive && (
-                            <td className="px-2 py-3 bg-emerald-950/10 border-l border-slate-800/80" colSpan={pointConfig.rz * 2}>
-                              <div className="flex gap-2 justify-center">
-                                {Array(pointConfig.rz).fill(0).map((_, pIdx) => (
-                                  <div key={pIdx} className="flex gap-1 items-center">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={item.rzUp[pIdx]}
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'rzUp', pIdx, e.target.value)}
-                                      placeholder="Up"
-                                      className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.rzUp[pIdx] && parseFloat(item.rzUp[pIdx]) > rowSpec.rzUp && rowSpec.rzUp > 0
-                                          ? 'border-rose-500 text-rose-300 bg-rose-950/40'
-                                          : 'border-slate-800 text-emerald-300'
-                                      }`}
-                                    />
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={item.rzLo[pIdx]}
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'rzLo', pIdx, e.target.value)}
-                                      placeholder="Lo"
-                                      className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.rzLo[pIdx] && parseFloat(item.rzLo[pIdx]) > rowSpec.rzLo && rowSpec.rzLo > 0
-                                          ? 'border-rose-500 text-rose-300 bg-rose-950/40'
-                                          : 'border-slate-800 text-emerald-300'
-                                      }`}
-                                    />
+                            <td className="px-2.5 py-2.5 bg-emerald-950/10 border-l border-slate-800/80">
+                              <div className="flex flex-col gap-1.5 justify-center">
+                                {/* Line 1: UP points */}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-7 shrink-0 px-1 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800/60 rounded text-[9px] font-bold text-center tracking-wider font-mono">
+                                    UP
+                                  </span>
+                                  <div className="flex gap-1 items-center flex-nowrap">
+                                    {Array(pointConfig.rz).fill(0).map((_, pIdx) => (
+                                      <input
+                                        key={pIdx}
+                                        type="number"
+                                        step="0.01"
+                                        value={item.rzUp[pIdx] || ''}
+                                        onChange={(e) => handleDynamicPointChange(item.id, 'rzUp', pIdx, e.target.value)}
+                                        placeholder={`U${pIdx + 1}`}
+                                        title={`Rz UP Pt ${pIdx + 1}`}
+                                        className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none transition ${
+                                          item.rzUp[pIdx] && parseFloat(item.rzUp[pIdx]) > rowSpec.rzUp && rowSpec.rzUp > 0
+                                            ? 'border-rose-500 text-rose-300 bg-rose-950/40'
+                                            : 'border-slate-800 text-emerald-300 focus:border-emerald-500'
+                                        }`}
+                                      />
+                                    ))}
                                   </div>
-                                ))}
+                                </div>
+                                {/* Line 2: LO points */}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-7 shrink-0 px-1 py-0.5 bg-slate-900 text-slate-400 border border-slate-800 rounded text-[9px] font-bold text-center tracking-wider font-mono">
+                                    LO
+                                  </span>
+                                  <div className="flex gap-1 items-center flex-nowrap">
+                                    {Array(pointConfig.rz).fill(0).map((_, pIdx) => (
+                                      <input
+                                        key={pIdx}
+                                        type="number"
+                                        step="0.01"
+                                        value={item.rzLo[pIdx] || ''}
+                                        onChange={(e) => handleDynamicPointChange(item.id, 'rzLo', pIdx, e.target.value)}
+                                        placeholder={`L${pIdx + 1}`}
+                                        title={`Rz LO Pt ${pIdx + 1}`}
+                                        className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none transition ${
+                                          item.rzLo[pIdx] && parseFloat(item.rzLo[pIdx]) > rowSpec.rzLo && rowSpec.rzLo > 0
+                                            ? 'border-rose-500 text-rose-300 bg-rose-950/40'
+                                            : 'border-slate-800 text-emerald-300 focus:border-emerald-500'
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
                               </div>
                             </td>
                           )}
@@ -1984,79 +2152,119 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
 
                           {/* Rt Points */}
                           {isRtActive && (
-                            <td className="px-2 py-3 bg-amber-950/10 border-l border-slate-800/80" colSpan={pointConfig.rt * 2}>
-                              <div className="flex gap-2 justify-center">
-                                {Array(pointConfig.rt).fill(0).map((_, pIdx) => (
-                                  <div key={pIdx} className="flex gap-1 items-center">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={item.rtUp[pIdx]}
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'rtUp', pIdx, e.target.value)}
-                                      placeholder="Up"
-                                      className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.rtUp[pIdx] && parseFloat(item.rtUp[pIdx]) > rowSpec.rtUp && rowSpec.rtUp > 0
-                                          ? 'border-rose-500 text-rose-300 bg-rose-950/40'
-                                          : 'border-slate-800 text-amber-300'
-                                      }`}
-                                    />
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={item.rtLo[pIdx]}
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'rtLo', pIdx, e.target.value)}
-                                      placeholder="Lo"
-                                      className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.rtLo[pIdx] && parseFloat(item.rtLo[pIdx]) > rowSpec.rtLo && rowSpec.rtLo > 0
-                                          ? 'border-rose-500 text-rose-300 bg-rose-950/40'
-                                          : 'border-slate-800 text-amber-300'
-                                      }`}
-                                    />
+                            <td className="px-2.5 py-2.5 bg-amber-950/10 border-l border-slate-800/80">
+                              <div className="flex flex-col gap-1.5 justify-center">
+                                {/* Line 1: UP points */}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-7 shrink-0 px-1 py-0.5 bg-amber-950 text-amber-400 border border-amber-800/60 rounded text-[9px] font-bold text-center tracking-wider font-mono">
+                                    UP
+                                  </span>
+                                  <div className="flex gap-1 items-center flex-nowrap">
+                                    {Array(pointConfig.rt).fill(0).map((_, pIdx) => (
+                                      <input
+                                        key={pIdx}
+                                        type="number"
+                                        step="0.01"
+                                        value={item.rtUp[pIdx] || ''}
+                                        onChange={(e) => handleDynamicPointChange(item.id, 'rtUp', pIdx, e.target.value)}
+                                        placeholder={`U${pIdx + 1}`}
+                                        title={`Rt UP Pt ${pIdx + 1}`}
+                                        className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none transition ${
+                                          item.rtUp[pIdx] && parseFloat(item.rtUp[pIdx]) > rowSpec.rtUp && rowSpec.rtUp > 0
+                                            ? 'border-rose-500 text-rose-300 bg-rose-950/40'
+                                            : 'border-slate-800 text-amber-300 focus:border-amber-500'
+                                        }`}
+                                      />
+                                    ))}
                                   </div>
-                                ))}
+                                </div>
+                                {/* Line 2: LO points */}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-7 shrink-0 px-1 py-0.5 bg-slate-900 text-slate-400 border border-slate-800 rounded text-[9px] font-bold text-center tracking-wider font-mono">
+                                    LO
+                                  </span>
+                                  <div className="flex gap-1 items-center flex-nowrap">
+                                    {Array(pointConfig.rt).fill(0).map((_, pIdx) => (
+                                      <input
+                                        key={pIdx}
+                                        type="number"
+                                        step="0.01"
+                                        value={item.rtLo[pIdx] || ''}
+                                        onChange={(e) => handleDynamicPointChange(item.id, 'rtLo', pIdx, e.target.value)}
+                                        placeholder={`L${pIdx + 1}`}
+                                        title={`Rt LO Pt ${pIdx + 1}`}
+                                        className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none transition ${
+                                          item.rtLo[pIdx] && parseFloat(item.rtLo[pIdx]) > rowSpec.rtLo && rowSpec.rtLo > 0
+                                            ? 'border-rose-500 text-rose-300 bg-rose-950/40'
+                                            : 'border-slate-800 text-amber-300 focus:border-amber-500'
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
                               </div>
                             </td>
                           )}
 
                           {/* Ry Points */}
                           {isRyActive && (
-                            <td className="px-2 py-3 bg-indigo-950/10 border-l border-slate-800/80" colSpan={pointConfig.ry * 2}>
-                              <div className="flex gap-2 justify-center">
-                                {Array(pointConfig.ry).fill(0).map((_, pIdx) => (
-                                  <div key={pIdx} className="flex gap-1 items-center">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={item.ryUp[pIdx]}
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'ryUp', pIdx, e.target.value)}
-                                      placeholder="Up"
-                                      className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.ryUp[pIdx] && parseFloat(item.ryUp[pIdx]) > rowSpec.ryUp && rowSpec.ryUp > 0
-                                          ? 'border-rose-500 text-rose-300 bg-rose-950/40'
-                                          : 'border-slate-800 text-indigo-300'
-                                      }`}
-                                    />
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={item.ryLo[pIdx]}
-                                      onChange={(e) => handleDynamicPointChange(item.id, 'ryLo', pIdx, e.target.value)}
-                                      placeholder="Lo"
-                                      className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none ${
-                                        item.ryLo[pIdx] && parseFloat(item.ryLo[pIdx]) > rowSpec.ryLo && rowSpec.ryLo > 0
-                                          ? 'border-rose-500 text-rose-300 bg-rose-950/40'
-                                          : 'border-slate-800 text-indigo-300'
-                                      }`}
-                                    />
+                            <td className="px-2.5 py-2.5 bg-indigo-950/10 border-l border-slate-800/80">
+                              <div className="flex flex-col gap-1.5 justify-center">
+                                {/* Line 1: UP points */}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-7 shrink-0 px-1 py-0.5 bg-indigo-950 text-indigo-400 border border-indigo-800/60 rounded text-[9px] font-bold text-center tracking-wider font-mono">
+                                    UP
+                                  </span>
+                                  <div className="flex gap-1 items-center flex-nowrap">
+                                    {Array(pointConfig.ry).fill(0).map((_, pIdx) => (
+                                      <input
+                                        key={pIdx}
+                                        type="number"
+                                        step="0.01"
+                                        value={item.ryUp[pIdx] || ''}
+                                        onChange={(e) => handleDynamicPointChange(item.id, 'ryUp', pIdx, e.target.value)}
+                                        placeholder={`U${pIdx + 1}`}
+                                        title={`Ry UP Pt ${pIdx + 1}`}
+                                        className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none transition ${
+                                          item.ryUp[pIdx] && parseFloat(item.ryUp[pIdx]) > rowSpec.ryUp && rowSpec.ryUp > 0
+                                            ? 'border-rose-500 text-rose-300 bg-rose-950/40'
+                                            : 'border-slate-800 text-indigo-300 focus:border-indigo-500'
+                                        }`}
+                                      />
+                                    ))}
                                   </div>
-                                ))}
+                                </div>
+                                {/* Line 2: LO points */}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-7 shrink-0 px-1 py-0.5 bg-slate-900 text-slate-400 border border-slate-800 rounded text-[9px] font-bold text-center tracking-wider font-mono">
+                                    LO
+                                  </span>
+                                  <div className="flex gap-1 items-center flex-nowrap">
+                                    {Array(pointConfig.ry).fill(0).map((_, pIdx) => (
+                                      <input
+                                        key={pIdx}
+                                        type="number"
+                                        step="0.01"
+                                        value={item.ryLo[pIdx] || ''}
+                                        onChange={(e) => handleDynamicPointChange(item.id, 'ryLo', pIdx, e.target.value)}
+                                        placeholder={`L${pIdx + 1}`}
+                                        title={`Ry LO Pt ${pIdx + 1}`}
+                                        className={`w-12 bg-slate-950 border text-center font-mono text-xs rounded py-1 focus:outline-none transition ${
+                                          item.ryLo[pIdx] && parseFloat(item.ryLo[pIdx]) > rowSpec.ryLo && rowSpec.ryLo > 0
+                                            ? 'border-rose-500 text-rose-300 bg-rose-950/40'
+                                            : 'border-slate-800 text-indigo-300 focus:border-indigo-500'
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
                               </div>
                             </td>
                           )}
 
                           {/* Un Zn Spray Points */}
                           {isUnZnSprayActive && (
-                            <td className="px-2 py-3 bg-teal-950/20 border-l border-teal-800/70" colSpan={pointConfig.unZnSpray * 4}>
+                            <td className="px-2 py-3 bg-teal-950/20 border-l border-teal-800/70">
                               <div className="flex gap-2 justify-center">
                                 {Array(pointConfig.unZnSpray).fill(0).map((_, pIdx) => (
                                   <div key={pIdx} className="flex gap-1.5 items-center bg-slate-950/60 p-1 rounded-lg border border-teal-900/40">
@@ -2994,6 +3202,7 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Inspector Name</label>
                   <input
                     type="text"
+                    list="qa-inspector-list"
                     value={editingHistoryItem.inspectorName || ''}
                     onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, inspectorName: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"

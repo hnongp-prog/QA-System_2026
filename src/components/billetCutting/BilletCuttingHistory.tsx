@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { BilletCuttingRecord, Language, ThemeMode } from '../../types';
 import { ADMIN_PASSWORD, checkAdminPassword } from './mockBilletData';
+import { InspectorDatalist, saveRecordedInspector } from '../../utils/inspectorStorage';
 
 interface BilletCuttingHistoryProps {
   records: BilletCuttingRecord[];
@@ -300,17 +301,17 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
         }`}>
           {/* Month Mode Switcher */}
           <div>
-            <label className={`text-[10px] font-extrabold uppercase block mb-1 ${
-              isLight ? 'text-slate-800' : 'text-slate-400'
+            <label className={`text-[10px] font-black uppercase block mb-1 ${
+              isLight ? 'text-black' : 'text-slate-400'
             }`}>
               {isTh ? 'ช่วงเวลาแสดงผล *' : 'Display Period *'}
             </label>
             <select
               value={filterMonthMode}
               onChange={(e) => setFilterMonthMode(e.target.value as any)}
-              className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border ${
+              className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border-2 ${
                 isLight 
-                  ? 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-indigo-600' 
+                  ? 'bg-white border-blue-600 text-black focus:border-blue-700' 
                   : 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500'
               }`}
             >
@@ -323,17 +324,17 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
           {filterMonthMode === 'CUSTOM' ? (
             <>
               <div>
-                <label className={`text-[10px] font-extrabold uppercase block mb-1 ${
-                  isLight ? 'text-slate-800' : 'text-slate-400'
+                <label className={`text-[10px] font-black uppercase block mb-1 ${
+                  isLight ? 'text-black' : 'text-slate-400'
                 }`}>
                   {isTh ? 'เลือกเดือน' : 'Month'}
                 </label>
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border ${
+                  className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border-2 ${
                     isLight 
-                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-indigo-600' 
+                      ? 'bg-white border-blue-600 text-black focus:border-blue-700' 
                       : 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500'
                   }`}
                 >
@@ -354,17 +355,17 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
               </div>
 
               <div>
-                <label className={`text-[10px] font-extrabold uppercase block mb-1 ${
-                  isLight ? 'text-slate-800' : 'text-slate-400'
+                <label className={`text-[10px] font-black uppercase block mb-1 ${
+                  isLight ? 'text-black' : 'text-slate-400'
                 }`}>
                   {isTh ? 'เลือกปี' : 'Year'}
                 </label>
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(e.target.value)}
-                  className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border ${
+                  className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border-2 ${
                     isLight 
-                      ? 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-indigo-600' 
+                      ? 'bg-white border-blue-600 text-black focus:border-blue-700' 
                       : 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500'
                   }`}
                 >
@@ -376,17 +377,17 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
             </>
           ) : (
             <div>
-              <label className={`text-[10px] font-extrabold uppercase block mb-1 ${
-                isLight ? 'text-slate-800' : 'text-slate-400'
+              <label className={`text-[10px] font-black uppercase block mb-1 ${
+                isLight ? 'text-black' : 'text-slate-400'
               }`}>
                 {isTh ? 'สถานะผลการตรวจ' : 'Status Filter'}
               </label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border ${
+                className={`w-full rounded-xl px-3 py-2 text-xs font-bold focus:outline-none border-2 ${
                   isLight 
-                    ? 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-indigo-600' 
+                    ? 'bg-white border-blue-600 text-black focus:border-blue-700' 
                     : 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500'
                 }`}
               >
@@ -399,21 +400,21 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
 
           {/* Search Box */}
           <div className={filterMonthMode === 'CUSTOM' ? 'col-span-1' : 'col-span-2'}>
-            <label className={`text-[10px] font-extrabold uppercase block mb-1 ${
-              isLight ? 'text-slate-800' : 'text-slate-400'
+            <label className={`text-[10px] font-black uppercase block mb-1 ${
+              isLight ? 'text-black' : 'text-slate-400'
             }`}>
               {isTh ? 'ค้นหาด่วน (Lot No, Heat No, Grade, Supplier)' : 'Quick Search'}
             </label>
             <div className="relative">
-              <Search className={`w-4 h-4 absolute left-3 top-2.5 ${isLight ? 'text-slate-500' : 'text-slate-500'}`} />
+              <Search className={`w-4 h-4 absolute left-3 top-3 ${isLight ? 'text-black' : 'text-slate-500'}`} />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={isTh ? 'พิมพ์คำค้นหา...' : 'Search lot, heat, inspector...'}
-                className={`w-full rounded-xl pl-9 pr-3 py-2 text-xs font-bold focus:outline-none border ${
+                className={`w-full rounded-xl pl-9 pr-3 py-2 text-xs font-bold focus:outline-none border-2 ${
                   isLight 
-                    ? 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:bg-white focus:border-indigo-600' 
+                    ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:border-blue-700' 
                     : 'bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-indigo-500'
                 }`}
               />
@@ -813,26 +814,28 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
 
             <form onSubmit={handleSaveEditedRecord} className="space-y-4">
               {/* Header Fields */}
-              <div className={`grid grid-cols-1 sm:grid-cols-4 gap-3 p-4 rounded-2xl border text-xs ${
-                isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-800'
+              <div className={`grid grid-cols-1 sm:grid-cols-4 gap-3 p-4 rounded-2xl border-2 text-xs ${
+                isLight ? 'bg-slate-50 border-blue-200 text-black' : 'bg-slate-950 border-slate-800'
               }`}>
                 <div>
-                  <label className={`text-[10px] font-bold uppercase block mb-1 ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>Inspector Name</label>
+                  <label className={`text-[10px] font-black uppercase block mb-1 ${isLight ? 'text-black' : 'text-slate-400'}`}>Inspector Name</label>
                   <input
                     type="text"
+                    list="qa-inspector-list"
                     value={editingRecord.header.inspectorName}
                     onChange={(e) => setEditingRecord({
                       ...editingRecord,
                       header: { ...editingRecord.header, inspectorName: e.target.value }
                     })}
-                    className={`w-full rounded-xl px-3 py-2 font-bold border ${
-                      isLight ? 'bg-white border-slate-300 text-slate-950' : 'bg-slate-900 border-slate-800 text-white'
+                    className={`w-full rounded-xl px-3 py-2 font-bold border-2 ${
+                      isLight ? 'bg-white border-blue-600 text-black' : 'bg-slate-900 border-slate-800 text-white'
                     }`}
                     required
                   />
+                  <InspectorDatalist id="qa-inspector-list" />
                 </div>
                 <div>
-                  <label className={`text-[10px] font-bold uppercase block mb-1 ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>Shift</label>
+                  <label className={`text-[10px] font-black uppercase block mb-1 ${isLight ? 'text-black' : 'text-slate-400'}`}>Shift</label>
                   <input
                     type="text"
                     value={editingRecord.header.shift}
@@ -840,14 +843,14 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                       ...editingRecord,
                       header: { ...editingRecord.header, shift: e.target.value }
                     })}
-                    className={`w-full rounded-xl px-3 py-2 font-bold border ${
-                      isLight ? 'bg-white border-slate-300 text-indigo-950' : 'bg-slate-900 border-slate-800 text-indigo-300'
+                    className={`w-full rounded-xl px-3 py-2 font-bold border-2 ${
+                      isLight ? 'bg-white border-blue-600 text-black' : 'bg-slate-900 border-slate-800 text-indigo-300'
                     }`}
                     required
                   />
                 </div>
                 <div>
-                  <label className={`text-[10px] font-bold uppercase block mb-1 ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>Cutting Length (mm)</label>
+                  <label className={`text-[10px] font-black uppercase block mb-1 ${isLight ? 'text-black' : 'text-slate-400'}`}>Cutting Length (mm)</label>
                   <input
                     type="text"
                     value={editingRecord.header.cuttingLength}
@@ -855,14 +858,14 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                       ...editingRecord,
                       header: { ...editingRecord.header, cuttingLength: e.target.value }
                     })}
-                    className={`w-full rounded-xl px-3 py-2 font-bold border ${
-                      isLight ? 'bg-white border-slate-300 text-pink-950' : 'bg-slate-900 border-slate-800 text-pink-300'
+                    className={`w-full rounded-xl px-3 py-2 font-bold border-2 ${
+                      isLight ? 'bg-white border-blue-600 text-black' : 'bg-slate-900 border-slate-800 text-pink-300'
                     }`}
                     required
                   />
                 </div>
                 <div>
-                  <label className={`text-[10px] font-bold uppercase block mb-1 ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>Lot No.</label>
+                  <label className={`text-[10px] font-black uppercase block mb-1 ${isLight ? 'text-black' : 'text-slate-400'}`}>Lot No.</label>
                   <input
                     type="text"
                     value={editingRecord.header.lotNo}
@@ -870,8 +873,8 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                       ...editingRecord,
                       header: { ...editingRecord.header, lotNo: e.target.value }
                     })}
-                    className={`w-full rounded-xl px-3 py-2 font-bold font-mono border ${
-                      isLight ? 'bg-white border-slate-300 text-amber-950' : 'bg-slate-900 border-slate-800 text-amber-300'
+                    className={`w-full rounded-xl px-3 py-2 font-black font-mono border-2 ${
+                      isLight ? 'bg-white border-blue-600 text-black' : 'bg-slate-900 border-slate-800 text-amber-300'
                     }`}
                     required
                   />

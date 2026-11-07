@@ -33,6 +33,7 @@ import {
   Language, 
   ThemeMode 
 } from '../types';
+import { InspectorDatalist, saveRecordedInspector } from '../utils/inspectorStorage';
 import { INITIAL_BILLET_SPECS, INITIAL_BILLET_RECORDS, ADMIN_PASSWORD } from './billetCutting/mockBilletData';
 import { BilletCuttingSpecModal } from './billetCutting/BilletCuttingSpecModal';
 import { BilletCuttingDashboard } from './billetCutting/BilletCuttingDashboard';
@@ -347,6 +348,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
     };
 
     setRecords(prev => [newRecord, ...prev]);
+    saveRecordedInspector(header.inspectorName);
 
     setToastMessage(
       isTh
@@ -375,9 +377,12 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
   };
 
   return (
-    <div className={`min-h-screen font-sans pb-20 selection:bg-indigo-500 selection:text-white relative transition-colors ${
-      isLight ? 'bg-slate-100 text-slate-900' : 'bg-slate-950 text-slate-100'
-    }`}>
+    <div
+      data-app="IPQA-08"
+      className={`ipqa-08-container min-h-screen font-sans pb-20 selection:bg-indigo-500 selection:text-white relative transition-colors ${
+        isLight ? 'bg-slate-100 text-black' : 'bg-slate-950 text-slate-100'
+      }`}
+    >
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-20 right-6 z-[160] bg-emerald-600 text-white font-bold text-xs px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
@@ -388,7 +393,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
 
       {/* Top Navigation Bar */}
       <div className={`backdrop-blur-md border-b sticky top-0 z-40 px-4 sm:px-6 py-3 transition-colors ${
-        isLight ? 'bg-white/95 border-slate-200 shadow-xs' : 'bg-slate-900/90 border-slate-800/80'
+        isLight ? 'bg-white/95 border-slate-300 shadow-xs' : 'bg-slate-900/90 border-slate-800/80'
       }`}>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -396,7 +401,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
               onClick={onBack}
               className={`p-2.5 rounded-2xl border transition shadow-sm ${
                 isLight 
-                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300' 
+                  ? 'bg-slate-100 hover:bg-slate-200 text-black font-bold border-slate-300' 
                   : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
               }`}
               title={isTh ? 'กลับสู่หน้าหลัก QA Portal' : 'Back to Portal'}
@@ -409,16 +414,16 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className={`text-base font-black tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  <h1 className={`text-base font-black tracking-wide ${isLight ? 'text-black' : 'text-white'}`}>
                     IPQA-08: Billet Cutting
                   </h1>
                   <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold font-mono ${
-                    isLight ? 'bg-indigo-100 text-indigo-800 border-indigo-300' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                    isLight ? 'bg-blue-100 text-black border-blue-300 font-black' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
                   }`}>
                     PROD v2.0
                   </span>
                 </div>
-                <p className={`text-xs ${isLight ? 'text-slate-600 font-medium' : 'text-slate-400'}`}>
+                <p className={`text-xs ${isLight ? 'text-black font-bold' : 'text-slate-400'}`}>
                   {isTh ? 'ระบบตรวจสอบและบันทึกการตัดท่อนบิลเล็ตตามเกณฑ์มาตรฐาน' : 'Billet Cutting Quality Inspection & Spec Management System'}
                 </p>
               </div>
@@ -486,15 +491,15 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
               <button
                 type="button"
                 onClick={onToggleTheme}
-                className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition shrink-0 ml-1 ${
+                className={`px-3 py-2 rounded-xl text-xs font-bold border-2 flex items-center gap-1.5 transition shrink-0 ml-1 shadow-sm ${
                   isLight
-                    ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 shadow-xs'
-                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                    ? 'bg-amber-50 text-black border-amber-300 hover:bg-amber-100'
+                    : 'bg-slate-800 text-amber-300 border-slate-700 hover:bg-slate-700'
                 }`}
-                title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}
+                title={isLight ? 'คลิกเพื่อเปลี่ยนเป็น Dark Mode' : 'คลิกเพื่อเปลี่ยนเป็น ธีมสว่าง (Light Mode)'}
               >
-                {isLight ? <Moon className="w-3.5 h-3.5 text-indigo-600" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
-                <span>{isLight ? (isTh ? 'สว่าง' : 'Light') : (isTh ? 'มืด' : 'Dark')}</span>
+                {isLight ? <Sun className="w-4 h-4 text-amber-600" /> : <Moon className="w-4 h-4 text-cyan-400" />}
+                <span>{isLight ? (isTh ? 'ธีม: สว่าง (Light)' : 'Theme: Light') : (isTh ? 'ธีม: มืด (Dark)' : 'Theme: Dark')}</span>
               </button>
             )}
           </div>
@@ -520,10 +525,10 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                     <Sliders className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className={`text-sm font-black uppercase tracking-wider ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                    <h2 className={`text-sm font-black uppercase tracking-wider ${isLight ? 'text-black' : 'text-white'}`}>
                       {isTh ? '1.1 ข้อมูลส่วนหัว & เลือกเกณฑ์มาตรฐาน Billet Grade' : '1.1 Header Information & Billet Grade Spec'}
                     </h2>
-                    <p className={`text-[11px] font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                    <p className={`text-[11px] font-bold ${isLight ? 'text-slate-800' : 'text-slate-400'}`}>
                       {isTh ? 'เลือก Billet Grade เพื่อโหลดเกณฑ์ความยาว, เส้นผ่านศูนย์กลาง และคำนวณการโก่งงออัตโนมัติ' : 'Select Billet Grade spec to auto-calculate Bending limit & tolerances'}
                     </p>
                   </div>
@@ -531,15 +536,15 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
 
                 {/* Billet Grade Dropdown */}
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-slate-400'}`}>
+                  <span className={`text-xs font-black ${isLight ? 'text-black' : 'text-slate-400'}`}>
                     {isTh ? 'Billet Grade:' : 'Billet Grade:'}
                   </span>
                   <select
                     value={selectedProfileId}
                     onChange={(e) => handleProfileChange(e.target.value)}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-mono font-bold focus:outline-none border ${
+                    className={`rounded-xl px-3 py-1.5 text-xs font-mono font-black focus:outline-none border-2 ${
                       isLight 
-                        ? 'bg-slate-50 border-indigo-300 text-indigo-900 focus:border-indigo-600 focus:bg-white' 
+                        ? 'bg-white border-blue-600 text-black focus:border-blue-700 focus:bg-white shadow-xs' 
                         : 'bg-slate-950 border-indigo-500/40 text-indigo-300 focus:border-indigo-400'
                     }`}
                   >
@@ -558,35 +563,35 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
 
               {/* Active Spec Criteria Banner */}
               <div className={`grid grid-cols-2 sm:grid-cols-5 gap-3 p-3.5 rounded-2xl border font-mono text-xs ${
-                isLight ? 'bg-slate-100 border-slate-300' : 'bg-slate-950/80 border-slate-800'
+                isLight ? 'bg-blue-50/50 border-2 border-blue-200' : 'bg-slate-950/80 border-slate-800'
               }`}>
                 <div>
-                  <span className={`text-[10px] uppercase font-bold block ${isLight ? 'text-slate-700 font-extrabold' : 'text-slate-500'}`}>Length Spec</span>
-                  <span className={`font-black ${isLight ? 'text-emerald-950' : 'text-emerald-400'}`}>
+                  <span className={`text-[10px] uppercase font-black block ${isLight ? 'text-black' : 'text-slate-500'}`}>Length Spec</span>
+                  <span className={`font-black ${isLight ? 'text-black' : 'text-emerald-400'}`}>
                     {activeSpec ? `${activeSpec.lengthMin} - ${activeSpec.lengthMax} mm` : '— mm'}
                   </span>
                 </div>
                 <div>
-                  <span className={`text-[10px] uppercase font-bold block ${isLight ? 'text-slate-700 font-extrabold' : 'text-slate-500'}`}>Diameter Spec</span>
-                  <span className={`font-black ${isLight ? 'text-sky-950' : 'text-sky-400'}`}>
+                  <span className={`text-[10px] uppercase font-black block ${isLight ? 'text-black' : 'text-slate-500'}`}>Diameter Spec</span>
+                  <span className={`font-black ${isLight ? 'text-black' : 'text-sky-400'}`}>
                     {activeSpec ? `${activeSpec.diameterMin} - ${activeSpec.diameterMax} mm` : '— mm'}
                   </span>
                 </div>
                 <div>
-                  <span className={`text-[10px] uppercase font-bold block ${isLight ? 'text-amber-950 font-extrabold' : 'text-amber-500'}`}>Bending Max (Lx0.15%)</span>
-                  <span className={`font-black ${isLight ? 'text-amber-950' : 'text-amber-400'}`}>
+                  <span className={`text-[10px] uppercase font-black block ${isLight ? 'text-black' : 'text-amber-500'}`}>Bending Max (Lx0.15%)</span>
+                  <span className={`font-black ${isLight ? 'text-black' : 'text-amber-400'}`}>
                     {activeSpec ? `≤ ${activeSpec.bendingMax || (parseFloat(activeSpec.lengthNominal || '500') * 0.0015).toFixed(2)} mm` : '— mm'}
                   </span>
                 </div>
                 <div>
-                  <span className={`text-[10px] uppercase font-bold block ${isLight ? 'text-rose-950 font-extrabold' : 'text-pink-500'}`}>Cutting Surface Max</span>
-                  <span className={`font-black ${isLight ? 'text-rose-950' : 'text-pink-400'}`}>
+                  <span className={`text-[10px] uppercase font-black block ${isLight ? 'text-black' : 'text-pink-500'}`}>Cutting Surface Max</span>
+                  <span className={`font-black ${isLight ? 'text-black' : 'text-pink-400'}`}>
                     {activeSpec ? `< ${activeSpec.cuttingSurfaceMax || '2.0'} mm` : '< 2.0 mm'}
                   </span>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <span className={`text-[10px] uppercase font-bold block ${isLight ? 'text-purple-950 font-extrabold' : 'text-purple-500'}`}>Surface Defect Limit</span>
-                  <span className={`font-black ${isLight ? 'text-purple-950' : 'text-purple-300'}`}>
+                  <span className={`text-[10px] uppercase font-black block ${isLight ? 'text-black' : 'text-purple-500'}`}>Surface Defect Limit</span>
+                  <span className={`font-black ${isLight ? 'text-black' : 'text-purple-300'}`}>
                     {activeSpec ? (activeSpec.surfaceDefectSpecText || '≤ 2x50x100 mm') : '≤ 2x50x100 mm'}
                   </span>
                 </div>
@@ -595,37 +600,39 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
               {/* Header Input Fields: Inspector name, Shift, Cutting length, Lot no. */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
                 <div>
-                  <label className={`text-[11px] font-bold uppercase tracking-wider block mb-1 ${
-                    isLight ? 'text-slate-900 font-black' : 'text-slate-400'
+                  <label className={`text-[11px] font-black uppercase tracking-wider block mb-1 ${
+                    isLight ? 'text-black' : 'text-slate-400'
                   }`}>
                     {isTh ? 'ชื่อผู้ตรวจสอบ (Inspector Name) *' : 'Inspector Name *'}
                   </label>
                   <input
                     type="text"
+                    list="qa-inspector-list"
                     value={header.inspectorName}
                     onChange={(e) => setHeader({ ...header, inspectorName: e.target.value })}
-                    placeholder={isTh ? 'กรอกชื่อผู้ตรวจสอบ' : 'Enter inspector name'}
-                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none border ${
+                    placeholder={isTh ? 'เลือกจากรายชื่อ หรือพิมพ์เอง' : 'Select or enter inspector name'}
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none border-2 ${
                       isLight 
-                        ? 'bg-white border-slate-300 text-slate-950 placeholder:text-slate-500 focus:bg-white focus:border-indigo-600 shadow-2xs' 
+                        ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700 shadow-xs' 
                         : 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-indigo-500'
                     }`}
                     required
                   />
+                  <InspectorDatalist id="qa-inspector-list" />
                 </div>
 
                 <div>
-                  <label className={`text-[11px] font-bold uppercase tracking-wider block mb-1 ${
-                    isLight ? 'text-slate-900 font-black' : 'text-slate-400'
+                  <label className={`text-[11px] font-black uppercase tracking-wider block mb-1 ${
+                    isLight ? 'text-black' : 'text-slate-400'
                   }`}>
                     {isTh ? 'กะการทำงาน (Shift) *' : 'Shift *'}
                   </label>
                   <select
                     value={header.shift}
                     onChange={(e) => setHeader({ ...header, shift: e.target.value })}
-                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none border ${
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none border-2 ${
                       isLight 
-                        ? 'bg-white border-slate-300 text-slate-950 focus:bg-white focus:border-indigo-600 shadow-2xs' 
+                        ? 'bg-white border-blue-600 text-black focus:bg-white focus:border-blue-700 shadow-xs' 
                         : 'bg-slate-950 border-slate-800 text-indigo-300 focus:border-indigo-500'
                     }`}
                     required
@@ -638,8 +645,8 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                 </div>
 
                 <div>
-                  <label className={`text-[11px] font-bold uppercase tracking-wider block mb-1 ${
-                    isLight ? 'text-slate-900 font-black' : 'text-slate-400'
+                  <label className={`text-[11px] font-black uppercase tracking-wider block mb-1 ${
+                    isLight ? 'text-black' : 'text-slate-400'
                   }`}>
                     {isTh ? 'ความยาวตัดเป้าหมาย (Cutting Length mm) *' : 'Target Cutting Length (mm) *'}
                   </label>
@@ -657,9 +664,9 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                       }
                     }}
                     placeholder={isTh ? 'ระบุความยาวเป้าหมาย (เช่น 500)' : 'e.g. 500'}
-                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono focus:outline-none border ${
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-black font-mono focus:outline-none border-2 ${
                       isLight 
-                        ? 'bg-white border-slate-300 text-pink-900 font-black placeholder:text-slate-500 focus:bg-white focus:border-pink-600 shadow-2xs' 
+                        ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700 shadow-xs' 
                         : 'bg-slate-950 border-slate-800 text-pink-300 placeholder:text-slate-600 focus:border-pink-500'
                     }`}
                     required
@@ -667,8 +674,8 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                 </div>
 
                 <div>
-                  <label className={`text-[11px] font-bold uppercase tracking-wider block mb-1 ${
-                    isLight ? 'text-slate-900 font-black' : 'text-slate-400'
+                  <label className={`text-[11px] font-black uppercase tracking-wider block mb-1 ${
+                    isLight ? 'text-black' : 'text-slate-400'
                   }`}>
                     {isTh ? 'หมายเลขลอต (Lot No.) *' : 'Lot No. *'}
                   </label>
@@ -677,9 +684,9 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                     value={header.lotNo}
                     onChange={(e) => setHeader({ ...header, lotNo: e.target.value })}
                     placeholder={isTh ? 'ระบุหมายเลข Lot No.' : 'e.g. LOT-BC-260831-01'}
-                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono focus:outline-none border ${
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-black font-mono focus:outline-none border-2 ${
                       isLight 
-                        ? 'bg-white border-slate-300 text-amber-950 font-black placeholder:text-slate-500 focus:bg-white focus:border-amber-600 shadow-2xs' 
+                        ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700 shadow-xs' 
                         : 'bg-slate-950 border-slate-800 text-amber-300 placeholder:text-slate-600 focus:border-amber-500'
                     }`}
                     required
@@ -702,12 +709,12 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                     <Ruler className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className={`text-sm font-extrabold uppercase tracking-wider ${
-                      isLight ? 'text-slate-900' : 'text-white'
+                    <h2 className={`text-sm font-black uppercase tracking-wider ${
+                      isLight ? 'text-black' : 'text-white'
                     }`}>
                       {isTh ? '1.2 ตารางบันทึกการวัดค่า (Cutting Measurement Entry)' : '1.2 Cutting Measurement Data Table'}
                     </h2>
-                    <p className={`text-[11px] font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                    <p className={`text-[11px] font-bold ${isLight ? 'text-black' : 'text-slate-400'}`}>
                       {isTh 
                         ? 'Billet grade, Heat no, Supplier, Q\'ty, Length, Diameter, Bending (Lx0.15%), Cutting surface <2mm, Defect 2x50x100mm, Heat ID, Appearance, Judgement' 
                         : 'Record dimensions, auto Bending calc (Lx0.15%), tolerance checks & judgement'}
@@ -721,18 +728,19 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                     onClick={handleResetForm}
                     className={`px-3 py-1.5 font-bold text-xs rounded-xl transition flex items-center gap-1.5 border shadow-sm ${
                       isLight 
-                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300' 
+                        ? 'bg-slate-100 hover:bg-slate-200 text-black border-slate-300' 
                         : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700/80'
                     }`}
                     title={isTh ? 'ล้างข้อมูลตารางเป็นค่าว่าง' : 'Clear table'}
                   >
-                    <RotateCcw className={`w-3.5 h-3.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`} />
+                    <RotateCcw className={`w-3.5 h-3.5 ${isLight ? 'text-black' : 'text-slate-400'}`} />
                     <span>{isTh ? 'ล้างข้อมูล' : 'Clear Form'}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={addItemRow}
+                    data-add-row="true"
                     className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-indigo-600/20"
                   >
                     <Plus className="w-4 h-4" />
@@ -742,30 +750,30 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
               </div>
 
               {/* Items Entry Table */}
-              <div className={`overflow-x-auto rounded-2xl border ${
-                isLight ? 'border-slate-300 bg-white shadow-xs' : 'border-slate-800 bg-slate-950'
+              <div className={`overflow-x-auto rounded-2xl border-2 ${
+                isLight ? 'border-blue-400 bg-white shadow-xs' : 'border-slate-800 bg-slate-950'
               }`}>
                 <table className="w-full text-xs text-left border-collapse">
-                  <thead className={`font-black uppercase text-[10px] tracking-wider border-b ${
+                  <thead className={`font-black uppercase text-[10px] tracking-wider border-b-2 ${
                     isLight 
-                      ? 'bg-slate-200 text-slate-950 border-slate-300' 
+                      ? 'bg-blue-100 text-black border-blue-300' 
                       : 'bg-slate-950 text-slate-400 border-slate-800'
                   }`}>
                     <tr>
-                      <th className="p-3 w-10 text-center">#</th>
-                      <th className="p-3 w-28">{isTh ? 'Billet Grade *' : 'Grade *'}</th>
-                      <th className="p-3 w-28">{isTh ? 'Heat No *' : 'Heat No *'}</th>
-                      <th className="p-3 w-36">{isTh ? 'Supplier *' : 'Supplier *'}</th>
-                      <th className="p-3 w-20 text-center">{isTh ? 'Q\'ty (Pcs) *' : 'Q\'ty *'}</th>
-                      <th className="p-3 w-28 text-center">{isTh ? 'Length (mm) *' : 'Length *'}</th>
-                      <th className="p-3 w-28 text-center">{isTh ? 'Diameter (mm) *' : 'Diameter *'}</th>
-                      <th className="p-3 w-32 text-center">{isTh ? 'Bending (Lx0.15%) *' : 'Bending *'}</th>
-                      <th className="p-3 w-28 text-center">{isTh ? 'Cut Surface (<2mm) *' : 'Cut Surface *'}</th>
-                      <th className="p-3 w-36">{isTh ? 'Surface Defect' : 'Defect (2x50x100)'}</th>
-                      <th className="p-3 w-20 text-center">{isTh ? 'Heat ID' : 'Heat ID'}</th>
-                      <th className="p-3 w-20 text-center">{isTh ? 'Appearance' : 'Appear'}</th>
-                      <th className="p-3 w-24 text-center">{isTh ? 'Judgement' : 'Judgement'}</th>
-                      <th className="p-3 w-16 text-center">{isTh ? 'Action' : 'Action'}</th>
+                      <th className={`p-3 w-10 text-center ${isLight ? 'text-black font-black' : ''}`}>#</th>
+                      <th className={`p-3 w-28 ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Billet Grade *' : 'Grade *'}</th>
+                      <th className={`p-3 w-28 ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Heat No *' : 'Heat No *'}</th>
+                      <th className={`p-3 w-36 ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Supplier *' : 'Supplier *'}</th>
+                      <th className={`p-3 w-20 text-center ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Q\'ty (Pcs) *' : 'Q\'ty *'}</th>
+                      <th className={`p-3 w-28 text-center ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Length (mm) *' : 'Length *'}</th>
+                      <th className={`p-3 w-28 text-center ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Diameter (mm) *' : 'Diameter *'}</th>
+                      <th className={`p-3 w-32 text-center ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Bending (Lx0.15%) *' : 'Bending *'}</th>
+                      <th className={`p-3 w-28 text-center ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Cut Surface (<2mm) *' : 'Cut Surface *'}</th>
+                      <th className={`p-3 w-36 ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Surface Defect' : 'Defect (2x50x100)'}</th>
+                      <th className={`p-3 w-20 text-center ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Heat ID' : 'Heat ID'}</th>
+                      <th className={`p-3 w-20 text-center ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Appearance' : 'Appear'}</th>
+                      <th className={`p-3 w-24 text-center ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Judgement' : 'Judgement'}</th>
+                      <th className={`p-3 w-16 text-center ${isLight ? 'text-black font-black' : ''}`}>{isTh ? 'Action' : 'Action'}</th>
                     </tr>
                   </thead>
                   <tbody className={`divide-y font-mono ${
@@ -789,9 +797,9 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                       const isSurfaceOutOfSpec = isSurfaceFilled && !val.isSurfaceValid;
 
                       return (
-                        <tr key={item.id} className={isLight ? 'hover:bg-slate-50 transition' : 'hover:bg-slate-800/30 transition'}>
+                        <tr key={item.id} className={isLight ? 'hover:bg-blue-50/40 transition' : 'hover:bg-slate-800/30 transition'}>
                           {/* Row index */}
-                          <td className={`p-2 text-center font-black ${isLight ? 'text-slate-900' : 'text-slate-500'}`}>
+                          <td className={`p-2 text-center font-black ${isLight ? 'text-black' : 'text-slate-500'}`}>
                             {index + 1}
                           </td>
 
@@ -803,9 +811,9 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                               value={item.billetGrade}
                               onChange={(e) => handleItemChange(index, 'billetGrade', e.target.value)}
                               placeholder="6063"
-                              className={`w-full rounded-lg px-2 py-1.5 text-xs font-mono font-black focus:outline-none border ${
+                              className={`w-full rounded-lg px-2 py-1.5 text-xs font-mono font-black focus:outline-none border-2 ${
                                 isLight 
-                                  ? 'bg-white border-slate-300 text-indigo-950 placeholder:text-slate-500 focus:bg-white focus:border-indigo-600 shadow-2xs' 
+                                  ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700 shadow-2xs' 
                                   : 'bg-slate-950 border-slate-800 text-indigo-300 placeholder:text-slate-600 focus:border-indigo-500'
                               }`}
                               required
@@ -819,9 +827,9 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                               value={item.heatNo}
                               onChange={(e) => handleItemChange(index, 'heatNo', e.target.value)}
                               placeholder="HT-XXXXX"
-                              className={`w-full rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none border ${
+                              className={`w-full rounded-lg px-2 py-1.5 text-xs font-bold focus:outline-none border-2 ${
                                 isLight 
-                                  ? 'bg-white border-slate-300 text-slate-950 placeholder:text-slate-500 focus:bg-white focus:border-indigo-600 shadow-2xs' 
+                                  ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700 shadow-2xs' 
                                   : 'bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus:border-indigo-500'
                               }`}
                               required
@@ -835,9 +843,9 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                               value={item.supplier}
                               onChange={(e) => handleItemChange(index, 'supplier', e.target.value)}
                               placeholder="Supplier Name"
-                              className={`w-full rounded-lg px-2 py-1.5 text-xs font-sans font-bold focus:outline-none border ${
+                              className={`w-full rounded-lg px-2 py-1.5 text-xs font-sans font-bold focus:outline-none border-2 ${
                                 isLight 
-                                  ? 'bg-white border-slate-300 text-slate-950 placeholder:text-slate-500 focus:bg-white focus:border-indigo-600 shadow-2xs' 
+                                  ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700 shadow-2xs' 
                                   : 'bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus:border-indigo-500'
                               }`}
                               required
@@ -852,9 +860,9 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                               value={item.qty}
                               onChange={(e) => handleItemChange(index, 'qty', e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                               placeholder="0"
-                              className={`w-full rounded-lg px-2 py-1.5 text-xs text-center font-black focus:outline-none border ${
+                              className={`w-full rounded-lg px-2 py-1.5 text-xs text-center font-black focus:outline-none border-2 ${
                                 isLight 
-                                  ? 'bg-white border-slate-300 text-slate-950 placeholder:text-slate-500 focus:bg-white focus:border-indigo-600 shadow-2xs' 
+                                  ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700 shadow-2xs' 
                                   : 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-indigo-500'
                               }`}
                               required
@@ -870,17 +878,17 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                                 value={item.length}
                                 onChange={(e) => handleItemChange(index, 'length', e.target.value)}
                                 placeholder="500.0"
-                                className={`w-full border rounded-lg px-2 py-1.5 text-xs text-center font-bold focus:outline-none ${
+                                className={`w-full border-2 rounded-lg px-2 py-1.5 text-xs text-center font-black focus:outline-none ${
                                   !isLengthFilled
                                     ? isLight 
-                                      ? 'bg-white border-slate-300 text-slate-950 placeholder:text-slate-500 focus:bg-white' 
+                                      ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700' 
                                       : 'bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus:border-indigo-500'
                                     : isLengthOutOfSpec
                                       ? isLight
-                                        ? 'bg-rose-100 border-rose-500 text-rose-950 font-black focus:border-rose-600'
+                                        ? 'bg-rose-100 border-rose-600 text-black font-black focus:border-rose-700'
                                         : 'bg-rose-950/20 border-rose-500 text-rose-400 focus:border-rose-500'
                                       : isLight
-                                        ? 'bg-emerald-100 border-emerald-500 text-emerald-950 font-black focus:border-emerald-600'
+                                        ? 'bg-white border-blue-600 text-black font-black focus:border-blue-700'
                                         : 'bg-emerald-950/10 border-emerald-500/50 text-emerald-400 focus:border-emerald-500'
                                 }`}
                                 required
@@ -897,17 +905,17 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                                 value={item.diameter}
                                 onChange={(e) => handleItemChange(index, 'diameter', e.target.value)}
                                 placeholder="127.0"
-                                className={`w-full border rounded-lg px-2 py-1.5 text-xs text-center font-bold focus:outline-none ${
+                                className={`w-full border-2 rounded-lg px-2 py-1.5 text-xs text-center font-black focus:outline-none ${
                                   !isDiameterFilled
                                     ? isLight 
-                                      ? 'bg-white border-slate-300 text-slate-950 placeholder:text-slate-500 focus:bg-white' 
+                                      ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700' 
                                       : 'bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus:border-indigo-500'
                                     : isDiameterOutOfSpec
                                       ? isLight
-                                        ? 'bg-rose-100 border-rose-500 text-rose-950 font-black focus:border-rose-600'
+                                        ? 'bg-rose-100 border-rose-600 text-black font-black focus:border-rose-700'
                                         : 'bg-rose-950/20 border-rose-500 text-rose-400 focus:border-rose-500'
                                       : isLight
-                                        ? 'bg-sky-100 border-sky-500 text-sky-950 font-black focus:border-sky-600'
+                                        ? 'bg-white border-blue-600 text-black font-black focus:border-blue-700'
                                         : 'bg-sky-950/10 border-sky-500/50 text-sky-400 focus:border-sky-500'
                                 }`}
                                 required
@@ -924,23 +932,23 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                                 value={item.bending}
                                 onChange={(e) => handleItemChange(index, 'bending', e.target.value)}
                                 placeholder="0.50"
-                                className={`w-full border rounded-lg px-2 py-1 text-xs text-center font-bold focus:outline-none ${
+                                className={`w-full border-2 rounded-lg px-2 py-1 text-xs text-center font-black focus:outline-none ${
                                   !isBendingFilled
                                     ? isLight 
-                                      ? 'bg-white border-slate-300 text-slate-950 placeholder:text-slate-500 focus:bg-white' 
+                                      ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700' 
                                       : 'bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus:border-indigo-500'
                                     : isBendingOutOfSpec
                                       ? isLight
-                                        ? 'bg-rose-100 border-rose-500 text-rose-950 font-black focus:border-rose-600'
+                                        ? 'bg-rose-100 border-rose-600 text-black font-black focus:border-rose-700'
                                         : 'bg-rose-950/20 border-rose-500 text-rose-400 focus:border-rose-500'
                                       : isLight
-                                        ? 'bg-amber-100 border-amber-500 text-amber-950 font-black focus:border-amber-600'
+                                        ? 'bg-white border-blue-600 text-black font-black focus:border-blue-700'
                                         : 'bg-amber-950/10 border-amber-500/50 text-amber-300 focus:border-amber-500'
                                 }`}
                                 required
                               />
-                              <div className={`text-[9px] text-center ${isLight ? 'text-slate-700 font-bold' : 'text-slate-500'}`}>
-                                max ≤ <strong className={isLight ? 'text-amber-950 font-black' : 'text-amber-400'}>{computedBendingLimit}</strong>
+                              <div className={`text-[9px] text-center ${isLight ? 'text-black font-bold' : 'text-slate-500'}`}>
+                                max ≤ <strong className={isLight ? 'text-black font-black' : 'text-amber-400'}>{computedBendingLimit}</strong>
                               </div>
                             </div>
                           </td>
@@ -953,17 +961,17 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                               value={item.cuttingSurface}
                               onChange={(e) => handleItemChange(index, 'cuttingSurface', e.target.value)}
                               placeholder="1.2"
-                              className={`w-full border rounded-lg px-2 py-1.5 text-xs text-center font-bold focus:outline-none ${
+                              className={`w-full border-2 rounded-lg px-2 py-1.5 text-xs text-center font-black focus:outline-none ${
                                 !isSurfaceFilled
                                   ? isLight 
-                                    ? 'bg-white border-slate-300 text-slate-950 placeholder:text-slate-500 focus:bg-white' 
+                                    ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700' 
                                     : 'bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus:border-indigo-500'
                                   : isSurfaceOutOfSpec
                                     ? isLight
-                                      ? 'bg-rose-100 border-rose-500 text-rose-950 font-black focus:border-rose-600'
+                                      ? 'bg-rose-100 border-rose-600 text-black font-black focus:border-rose-700'
                                       : 'bg-rose-950/20 border-rose-500 text-rose-400 focus:border-rose-500'
                                     : isLight
-                                      ? 'bg-pink-100 border-pink-500 text-pink-950 font-black focus:border-pink-600'
+                                      ? 'bg-white border-blue-600 text-black font-black focus:border-blue-700'
                                       : 'bg-pink-950/10 border-pink-500/50 text-pink-400 focus:border-pink-500'
                               }`}
                               required
@@ -977,9 +985,9 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                               value={item.surfaceDefect}
                               onChange={(e) => handleItemChange(index, 'surfaceDefect', e.target.value)}
                               placeholder="Normal / None"
-                              className={`w-full rounded-lg px-2 py-1.5 text-xs font-sans font-bold focus:outline-none border ${
+                              className={`w-full rounded-lg px-2 py-1.5 text-xs font-sans font-bold focus:outline-none border-2 ${
                                 isLight 
-                                  ? 'bg-white border-slate-300 text-purple-950 placeholder:text-slate-500 focus:bg-white focus:border-purple-600 shadow-2xs' 
+                                  ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700 shadow-2xs' 
                                   : 'bg-slate-950 border-slate-800 text-purple-300 placeholder:text-slate-600 focus:border-purple-500'
                               }`}
                             />
@@ -990,13 +998,13 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                             <button
                               type="button"
                               onClick={() => handleItemChange(index, 'heatIdentify', item.heatIdentify === 'OK' ? 'NG' : 'OK')}
-                              className={`px-2 py-1 rounded text-[10px] font-black transition border ${
+                              className={`px-2 py-1 rounded text-[10px] font-black transition border-2 ${
                                 item.heatIdentify === 'OK'
                                   ? isLight 
-                                    ? 'bg-emerald-100 text-emerald-950 border-emerald-400' 
+                                    ? 'bg-emerald-100 text-black border-emerald-600' 
                                     : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                                   : isLight 
-                                    ? 'bg-rose-100 text-rose-950 border-rose-400' 
+                                    ? 'bg-rose-100 text-black border-rose-600' 
                                     : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                               }`}
                             >
@@ -1009,13 +1017,13 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                             <button
                               type="button"
                               onClick={() => handleItemChange(index, 'appearance', item.appearance === 'OK' ? 'NG' : 'OK')}
-                              className={`px-2 py-1 rounded text-[10px] font-black transition border ${
+                              className={`px-2 py-1 rounded text-[10px] font-black transition border-2 ${
                                 item.appearance === 'OK'
                                   ? isLight 
-                                    ? 'bg-emerald-100 text-emerald-950 border-emerald-400' 
+                                    ? 'bg-emerald-100 text-black border-emerald-600' 
                                     : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                                   : isLight 
-                                    ? 'bg-rose-100 text-rose-950 border-rose-400' 
+                                    ? 'bg-rose-100 text-black border-rose-600' 
                                     : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                               }`}
                             >
@@ -1025,16 +1033,16 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
 
                           {/* Judgement */}
                           <td className="p-1.5 text-center">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase inline-flex items-center gap-1 border ${
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase inline-flex items-center gap-1 border-2 ${
                               val.isPass
                                 ? isLight
-                                  ? 'bg-emerald-100 text-emerald-950 border-emerald-400'
+                                  ? 'bg-emerald-100 text-black border-emerald-600'
                                   : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                                 : isLight
-                                  ? 'bg-rose-100 text-rose-950 border-rose-400'
+                                  ? 'bg-rose-100 text-black border-rose-600'
                                   : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                             }`}>
-                              {val.isPass ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                              {val.isPass ? <CheckCircle2 className="w-3 h-3 text-emerald-700" /> : <XCircle className="w-3 h-3 text-rose-700" />}
                               <span>{val.isPass ? 'PASS' : 'FAIL'}</span>
                             </span>
                           </td>
@@ -1047,7 +1055,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                                 onClick={() => duplicateItemRow(index)}
                                 className={`p-1 rounded transition border ${
                                   isLight 
-                                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' 
+                                    ? 'bg-slate-100 hover:bg-slate-200 text-black border-slate-300' 
                                     : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-transparent'
                                 }`}
                                 title="Duplicate Row"
@@ -1088,28 +1096,28 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
               </datalist>
 
               {/* Bottom Summary Bar & Save Button */}
-              <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 ${
-                isLight ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'
+              <div className={`p-4 rounded-2xl border-2 flex flex-col sm:flex-row items-center justify-between gap-4 ${
+                isLight ? 'bg-blue-50/70 border-blue-300' : 'bg-slate-950 border-slate-800'
               }`}>
                 <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
-                  <div className={isLight ? 'text-slate-900 font-extrabold' : 'text-slate-400'}>
-                    {isTh ? 'จำนวนท่อนทั้งหมด:' : 'Total Q\'ty:'} <strong className={`text-sm ${isLight ? 'text-slate-950 font-black' : 'text-white'}`}>{formSummary.totalQty} Pcs</strong>
+                  <div className={isLight ? 'text-black font-extrabold' : 'text-slate-400'}>
+                    {isTh ? 'จำนวนท่อนทั้งหมด:' : 'Total Q\'ty:'} <strong className={`text-sm ${isLight ? 'text-black font-black' : 'text-white'}`}>{formSummary.totalQty} Pcs</strong>
                   </div>
-                  <div className={isLight ? 'text-emerald-950 font-extrabold' : 'text-emerald-400'}>
-                    {isTh ? 'ผ่านเกณฑ์:' : 'Passed:'} <strong className={`text-sm ${isLight ? 'text-emerald-900 font-black' : 'text-emerald-300'}`}>{formSummary.passedQty} Pcs</strong>
+                  <div className={isLight ? 'text-black font-extrabold' : 'text-emerald-400'}>
+                    {isTh ? 'ผ่านเกณฑ์:' : 'Passed:'} <strong className={`text-sm ${isLight ? 'text-black font-black' : 'text-emerald-300'}`}>{formSummary.passedQty} Pcs</strong>
                   </div>
-                  <div className={isLight ? 'text-rose-950 font-extrabold' : 'text-rose-400'}>
-                    {isTh ? 'งานเสีย:' : 'Defects:'} <strong className={`text-sm ${isLight ? 'text-rose-900 font-black' : 'text-rose-300'}`}>{formSummary.defectQty} Pcs</strong>
+                  <div className={isLight ? 'text-black font-extrabold' : 'text-rose-400'}>
+                    {isTh ? 'งานเสีย:' : 'Defects:'} <strong className={`text-sm ${isLight ? 'text-black font-black' : 'text-rose-300'}`}>{formSummary.defectQty} Pcs</strong>
                   </div>
                   <div className="flex items-center gap-1.5 font-bold">
-                    <span className={isLight ? 'text-slate-900 font-extrabold' : 'text-slate-400'}>{isTh ? 'สรุปรวมผลตรวจ:' : 'Overall Status:'}</span>
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${
+                    <span className={isLight ? 'text-black font-extrabold' : 'text-slate-400'}>{isTh ? 'สรุปรวมผลตรวจ:' : 'Overall Status:'}</span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border-2 ${
                       formSummary.overallPass 
                         ? isLight 
-                          ? 'bg-emerald-100 text-emerald-950 border-emerald-400' 
+                          ? 'bg-emerald-100 text-black border-emerald-600' 
                           : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
                         : isLight 
-                          ? 'bg-rose-100 text-rose-950 border-rose-400' 
+                          ? 'bg-rose-100 text-black border-rose-600' 
                           : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                     }`}>
                       {formSummary.overallPass ? 'PASS (ผ่าน)' : 'FAIL (มีงานเสีย)'}

@@ -59,6 +59,7 @@ import {
   ThemeMode
 } from '../types';
 import { useCloudState } from '../services/firestoreSync';
+import { InspectorDatalist, saveRecordedInspector } from '../utils/inspectorStorage';
 import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
 import { STANDARD_PROCESS_OPTIONS, STANDARD_MACHINE_OPTIONS } from '../constants/processOptions';
 import {
@@ -1127,6 +1128,189 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     }));
   };
 
+  // Quick Measurement Points Handlers for Width (+10, +1, -1)
+  const handleAddWidthPoints = (count: number) => {
+    const existingWidthCps = headerInfo.customControlPoints.filter(cp => 
+      cp.id.startsWith('cp_width_') || (cp.name.includes('ความกว้าง') && cp.name.includes('W'))
+    );
+    const startIdx = existingWidthCps.length + 2; // W1 is standard, so start from W2, W3...
+    const newPoints: CuttingCustomPointSpec[] = [];
+    const newIds: string[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const num = startIdx + i;
+      const newId = `cp_width_${Date.now()}_${num}_${Math.random().toString(36).substring(2, 6)}`;
+      newIds.push(newId);
+      newPoints.push({
+        id: newId,
+        name: `ความกว้าง W${num} (Width ${num})`,
+        unit: 'mm',
+        evalType: 'target_tol',
+        target: headerInfo.widthTarget || '',
+        tolPlus: headerInfo.widthTolPlus || '',
+        tolMinus: headerInfo.widthTolMinus || '',
+        description: `จุดวัดความกว้างตำแหน่งที่ ${num}`,
+        isSC: headerInfo.widthIsSC ?? true,
+        microType: headerInfo.widthMicroType || 'Blade',
+        order: (headerInfo.widthOrder ?? 1) + (num * 0.001)
+      });
+    }
+
+    setHeaderInfo(prev => ({
+      ...prev,
+      customControlPoints: [...prev.customControlPoints, ...newPoints],
+      pointOrderList: prev.pointOrderList ? [...prev.pointOrderList, ...newIds] : undefined
+    }));
+
+    setBatchItems(prev => prev.map(item => {
+      const updatedCustom = { ...(item.customPointValues || {}) };
+      newIds.forEach(id => {
+        if (updatedCustom[id] === undefined) {
+          updatedCustom[id] = '';
+        }
+      });
+      return {
+        ...item,
+        customPointValues: updatedCustom
+      };
+    }));
+
+    const total = 1 + existingWidthCps.length + count;
+    showNotification(isTh 
+      ? `เพิ่มจุดวัดความกว้าง +${count} จุดเรียบร้อย (รวมมี ${total} จุด: W1..W${total})` 
+      : `Added +${count} Width measurement points (Total: ${total} points: W1..W${total})`
+    );
+  };
+
+  const handleRemoveWidthPoint = () => {
+    const reversed = [...headerInfo.customControlPoints].reverse();
+    const lastWidthCp = reversed.find(cp => 
+      cp.id.startsWith('cp_width_') || (cp.name.includes('ความกว้าง') && cp.name.includes('W'))
+    );
+
+    if (!lastWidthCp) {
+      showNotification(isTh 
+        ? 'ไม่สามารถลดจุดวัดได้ (คงเหลือจุดวัดความกว้าง W1 อย่างน้อย 1 จุด)' 
+        : 'Cannot remove: Minimum 1 Width measurement point required'
+      );
+      return;
+    }
+
+    setHeaderInfo(prev => ({
+      ...prev,
+      customControlPoints: prev.customControlPoints.filter(cp => cp.id !== lastWidthCp.id),
+      pointOrderList: prev.pointOrderList ? prev.pointOrderList.filter(id => id !== lastWidthCp.id) : undefined
+    }));
+
+    setBatchItems(prev => prev.map(item => {
+      if (!item.customPointValues || !item.customPointValues[lastWidthCp.id]) return item;
+      const copy = { ...item.customPointValues };
+      delete copy[lastWidthCp.id];
+      return { ...item, customPointValues: copy };
+    }));
+
+    const remainingCount = headerInfo.customControlPoints.filter(cp => 
+      (cp.id.startsWith('cp_width_') || (cp.name.includes('ความกว้าง') && cp.name.includes('W'))) && cp.id !== lastWidthCp.id
+    ).length + 1;
+
+    showNotification(isTh 
+      ? `ลดจุดวัด ${lastWidthCp.name} แล้ว (คงเหลือ ${remainingCount} จุด)` 
+      : `Removed ${lastWidthCp.name} (Remaining: ${remainingCount} points)`
+    );
+  };
+
+  // Quick Measurement Points Handlers for Height (+10, +1, -1)
+  const handleAddHeightPoints = (count: number) => {
+    const existingHeightCps = headerInfo.customControlPoints.filter(cp => 
+      cp.id.startsWith('cp_height_') || (cp.name.includes('ความสูง') && cp.name.includes('H'))
+    );
+    const startIdx = existingHeightCps.length + 2; // H1 is standard, so start from H2, H3...
+    const newPoints: CuttingCustomPointSpec[] = [];
+    const newIds: string[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const num = startIdx + i;
+      const newId = `cp_height_${Date.now()}_${num}_${Math.random().toString(36).substring(2, 6)}`;
+      newIds.push(newId);
+      newPoints.push({
+        id: newId,
+        name: `ความสูง H${num} (Height ${num})`,
+        unit: 'mm',
+        evalType: 'target_tol',
+        target: headerInfo.heightTarget || '',
+        tolPlus: headerInfo.heightTolPlus || '',
+        tolMinus: headerInfo.heightTolMinus || '',
+        description: `จุดวัดความสูงตำแหน่งที่ ${num}`,
+        isSC: headerInfo.heightIsSC ?? true,
+        microType: headerInfo.heightMicroType || 'Blade',
+        order: (headerInfo.heightOrder ?? 2) + (num * 0.001)
+      });
+    }
+
+    setHeaderInfo(prev => ({
+      ...prev,
+      customControlPoints: [...prev.customControlPoints, ...newPoints],
+      pointOrderList: prev.pointOrderList ? [...prev.pointOrderList, ...newIds] : undefined
+    }));
+
+    setBatchItems(prev => prev.map(item => {
+      const updatedCustom = { ...(item.customPointValues || {}) };
+      newIds.forEach(id => {
+        if (updatedCustom[id] === undefined) {
+          updatedCustom[id] = '';
+        }
+      });
+      return {
+        ...item,
+        customPointValues: updatedCustom
+      };
+    }));
+
+    const total = 1 + existingHeightCps.length + count;
+    showNotification(isTh 
+      ? `เพิ่มจุดวัดความสูง +${count} จุดเรียบร้อย (รวมมี ${total} จุด: H1..H${total})` 
+      : `Added +${count} Height measurement points (Total: ${total} points: H1..H${total})`
+    );
+  };
+
+  const handleRemoveHeightPoint = () => {
+    const reversed = [...headerInfo.customControlPoints].reverse();
+    const lastHeightCp = reversed.find(cp => 
+      cp.id.startsWith('cp_height_') || (cp.name.includes('ความสูง') && cp.name.includes('H'))
+    );
+
+    if (!lastHeightCp) {
+      showNotification(isTh 
+        ? 'ไม่สามารถลดจุดวัดได้ (คงเหลือจุดวัดความสูง H1 อย่างน้อย 1 จุด)' 
+        : 'Cannot remove: Minimum 1 Height measurement point required'
+      );
+      return;
+    }
+
+    setHeaderInfo(prev => ({
+      ...prev,
+      customControlPoints: prev.customControlPoints.filter(cp => cp.id !== lastHeightCp.id),
+      pointOrderList: prev.pointOrderList ? prev.pointOrderList.filter(id => id !== lastHeightCp.id) : undefined
+    }));
+
+    setBatchItems(prev => prev.map(item => {
+      if (!item.customPointValues || !item.customPointValues[lastHeightCp.id]) return item;
+      const copy = { ...item.customPointValues };
+      delete copy[lastHeightCp.id];
+      return { ...item, customPointValues: copy };
+    }));
+
+    const remainingCount = headerInfo.customControlPoints.filter(cp => 
+      (cp.id.startsWith('cp_height_') || (cp.name.includes('ความสูง') && cp.name.includes('H'))) && cp.id !== lastHeightCp.id
+    ).length + 1;
+
+    showNotification(isTh 
+      ? `ลดจุดวัด ${lastHeightCp.name} แล้ว (คงเหลือ ${remainingCount} จุด)` 
+      : `Removed ${lastHeightCp.name} (Remaining: ${remainingCount} points)`
+    );
+  };
+
+
   const handleUpdateCustomPoint = (pointId: string, field: keyof CuttingCustomPointSpec, value: any) => {
     setHeaderInfo(prev => ({
       ...prev,
@@ -1374,14 +1558,32 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
   const showTwist = !hasProfile || Boolean(headerInfo.twistMax && headerInfo.twistMax.trim() !== '');
   const activeCustomPoints = headerInfo.customControlPoints || [];
 
+  // Total active Width & Height points counts
+  const totalWidthPoints = useMemo(() => {
+    const customCount = (headerInfo.customControlPoints || []).filter(cp => 
+      cp.id.startsWith('cp_width_') || (cp.name.includes('ความกว้าง') && cp.name.includes('W'))
+    ).length;
+    return (showWidth ? 1 : 0) + customCount;
+  }, [headerInfo.customControlPoints, showWidth]);
+
+  const totalHeightPoints = useMemo(() => {
+    const customCount = (headerInfo.customControlPoints || []).filter(cp => 
+      cp.id.startsWith('cp_height_') || (cp.name.includes('ความสูง') && cp.name.includes('H'))
+    ).length;
+    return (showHeight ? 1 : 0) + customCount;
+  }, [headerInfo.customControlPoints, showHeight]);
+
   // Active points computation: Standard + Custom sorted by order
   const orderedActivePoints: ActiveCuttingPoint[] = useMemo(() => {
     const list: ActiveCuttingPoint[] = [];
 
     if (showWidth) {
+      const wName = totalWidthPoints > 1
+        ? (headerInfo.widthName && !headerInfo.widthName.includes('W1') ? `${headerInfo.widthName} (W1)` : 'ความกว้าง W1 (Width 1)')
+        : (headerInfo.widthName || 'ความกว้าง (Width)');
       list.push({
         id: 'width',
-        name: headerInfo.widthName || 'ความกว้าง (Width)',
+        name: wName,
         key: 'width',
         isStandard: true,
         isSC: headerInfo.widthIsSC ?? true,
@@ -1397,9 +1599,12 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
     }
 
     if (showHeight) {
+      const hName = totalHeightPoints > 1
+        ? (headerInfo.heightName && !headerInfo.heightName.includes('H1') ? `${headerInfo.heightName} (H1)` : 'ความสูง H1 (Height 1)')
+        : (headerInfo.heightName || 'ความสูง (Height)');
       list.push({
         id: 'height',
-        name: headerInfo.heightName || 'ความสูง (Height)',
+        name: hName,
         key: 'height',
         isStandard: true,
         isSC: headerInfo.heightIsSC ?? true,
@@ -1981,6 +2186,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
           ? `PASS (Standard & ${headerInfo.customControlPoints.length} Custom Points within tolerances)` 
           : `FAIL / Out of Spec: ${failedPoints.length > 0 ? failedPoints.join(', ') : 'Dimensional tolerance exceeded'}`;
 
+        if (headerInfo.inspectorName) saveRecordedInspector(headerInfo.inspectorName);
         onLogNewActivity({
           id: recId,
           timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -2634,6 +2840,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                 <input
                   type="text"
                   name="inspectorName"
+                  list="qa-inspector-list"
                   value={headerInfo.inspectorName}
                   onChange={handleHeaderChange}
                   placeholder={isTh ? 'ชื่อผู้ตรวจสอบ' : 'Inspector name'}
@@ -2726,6 +2933,87 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
               </h3>
 
               <div className="flex items-center gap-2 flex-wrap">
+                {/* Quick Measurement Points Controls for Width and Height */}
+                <div className={`flex items-center gap-2 p-1 rounded-xl border ${
+                  isLight ? 'bg-slate-100 border-slate-300' : 'bg-slate-950/90 border-slate-800'
+                }`}>
+                  {/* Width Points Control */}
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${
+                    isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-950' : 'bg-indigo-950/60 border-indigo-800/60 text-indigo-200'
+                  }`}>
+                    <span className="text-[11px] font-bold flex items-center gap-1">
+                      <span>{isTh ? 'ความกว้าง (Width):' : 'Width:'}</span>
+                      <span className="px-1.5 py-0.2 rounded font-mono font-black text-[10px] bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30">
+                        {totalWidthPoints} {isTh ? 'จุด' : 'pts'}
+                      </span>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleAddWidthPoints(10)}
+                        className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-mono font-bold transition shadow-xs active:scale-95"
+                        title={isTh ? 'เพิ่มจุดวัดความกว้าง +10 จุด' : 'Add +10 Width points'}
+                      >
+                        +10
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddWidthPoints(1)}
+                        className="px-1.5 py-0.5 bg-indigo-700 hover:bg-indigo-600 text-white rounded text-[10px] font-mono font-bold transition shadow-xs active:scale-95"
+                        title={isTh ? 'เพิ่มจุดวัดความกว้าง +1 จุด' : 'Add +1 Width point'}
+                      >
+                        +1
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRemoveWidthPoint}
+                        className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-[10px] font-mono font-bold transition shadow-xs active:scale-95"
+                        title={isTh ? 'ลดจุดวัดความกว้าง -1 จุด' : 'Remove -1 Width point'}
+                      >
+                        -1
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Height Points Control */}
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${
+                    isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-emerald-950/60 border-emerald-800/60 text-emerald-200'
+                  }`}>
+                    <span className="text-[11px] font-bold flex items-center gap-1">
+                      <span>{isTh ? 'ความสูง (Height):' : 'Height:'}</span>
+                      <span className="px-1.5 py-0.2 rounded font-mono font-black text-[10px] bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-400/30">
+                        {totalHeightPoints} {isTh ? 'จุด' : 'pts'}
+                      </span>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleAddHeightPoints(10)}
+                        className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-mono font-bold transition shadow-xs active:scale-95"
+                        title={isTh ? 'เพิ่มจุดวัดความสูง +10 จุด' : 'Add +10 Height points'}
+                      >
+                        +10
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddHeightPoints(1)}
+                        className="px-1.5 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-[10px] font-mono font-bold transition shadow-xs active:scale-95"
+                        title={isTh ? 'เพิ่มจุดวัดความสูง +1 จุด' : 'Add +1 Height point'}
+                      >
+                        +1
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRemoveHeightPoint}
+                        className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-[10px] font-mono font-bold transition shadow-xs active:scale-95"
+                        title={isTh ? 'ลดจุดวัดความสูง -1 จุด' : 'Remove -1 Height point'}
+                      >
+                        -1
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={handleAutoFillSpecs}
@@ -2758,6 +3046,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
 
                 <button
                   onClick={addRow}
+                  data-add-row="true"
                   className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-3 py-2 rounded-xl border border-slate-700 flex items-center gap-1.5 transition"
                 >
                   <Plus className="w-4 h-4 text-indigo-400" />
@@ -2858,6 +3147,114 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                             <div className="text-[9px] font-mono text-slate-400 font-normal mt-0.5">
                               {point.specText}
                             </div>
+
+                            {/* Quick +10, +1, -1 Controls for Width column */}
+                            {point.id === 'width' && (
+                              <div className="mt-1.5 flex items-center justify-center gap-1 bg-slate-900/90 dark:bg-slate-950 p-1 rounded-lg border border-slate-700/80 shadow-xs">
+                                <span className="text-[9px] font-bold text-indigo-300">W:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddWidthPoints(10)}
+                                  title={isTh ? 'เพิ่มจุดวัดความกว้าง +10 จุด' : 'Add +10 Width points'}
+                                  className="px-1.5 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-mono font-bold text-[9px] transition active:scale-95 shadow-xs"
+                                >
+                                  +10
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddWidthPoints(1)}
+                                  title={isTh ? 'เพิ่มจุดวัดความกว้าง +1 จุด' : 'Add +1 Width point'}
+                                  className="px-1.5 py-0.5 bg-indigo-700 hover:bg-indigo-600 text-white rounded font-mono font-bold text-[9px] transition active:scale-95 shadow-xs"
+                                >
+                                  +1
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveWidthPoint}
+                                  title={isTh ? 'ลดจุดวัดความกว้าง -1 จุด' : 'Remove -1 Width point'}
+                                  className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white rounded font-mono font-bold text-[9px] transition active:scale-95 shadow-xs"
+                                >
+                                  -1
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Controls for extra Width points */}
+                            {point.id.startsWith('cp_width_') && (
+                              <div className="mt-1.5 flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddWidthPoints(1)}
+                                  title={isTh ? 'เพิ่มจุดวัดความกว้าง +1 จุด' : 'Add +1 Width point'}
+                                  className="px-1.5 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[9px] font-mono font-bold transition shadow-xs"
+                                >
+                                  +1
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveCustomPoint(point.id)}
+                                  title={isTh ? `ลบจุดวัด ${point.name}` : `Delete ${point.name}`}
+                                  className="px-1.5 py-0.5 bg-rose-950/90 text-rose-300 hover:bg-rose-900 hover:text-white border border-rose-800/80 rounded text-[9px] font-bold transition flex items-center gap-0.5 shadow-2xs"
+                                >
+                                  <Trash2 className="w-2.5 h-2.5" />
+                                  <span>{isTh ? 'ลบ' : 'Del'}</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Quick +10, +1, -1 Controls for Height column */}
+                            {point.id === 'height' && (
+                              <div className="mt-1.5 flex items-center justify-center gap-1 bg-slate-900/90 dark:bg-slate-950 p-1 rounded-lg border border-slate-700/80 shadow-xs">
+                                <span className="text-[9px] font-bold text-emerald-300">H:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddHeightPoints(10)}
+                                  title={isTh ? 'เพิ่มจุดวัดความสูง +10 จุด' : 'Add +10 Height points'}
+                                  className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-mono font-bold text-[9px] transition active:scale-95 shadow-xs"
+                                >
+                                  +10
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddHeightPoints(1)}
+                                  title={isTh ? 'เพิ่มจุดวัดความสูง +1 จุด' : 'Add +1 Height point'}
+                                  className="px-1.5 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded font-mono font-bold text-[9px] transition active:scale-95 shadow-xs"
+                                >
+                                  +1
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveHeightPoint}
+                                  title={isTh ? 'ลดจุดวัดความสูง -1 จุด' : 'Remove -1 Height point'}
+                                  className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white rounded font-mono font-bold text-[9px] transition active:scale-95 shadow-xs"
+                                >
+                                  -1
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Controls for extra Height points */}
+                            {point.id.startsWith('cp_height_') && (
+                              <div className="mt-1.5 flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddHeightPoints(1)}
+                                  title={isTh ? 'เพิ่มจุดวัดความสูง +1 จุด' : 'Add +1 Height point'}
+                                  className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[9px] font-mono font-bold transition shadow-xs"
+                                >
+                                  +1
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveCustomPoint(point.id)}
+                                  title={isTh ? `ลบจุดวัด ${point.name}` : `Delete ${point.name}`}
+                                  className="px-1.5 py-0.5 bg-rose-950/90 text-rose-300 hover:bg-rose-900 hover:text-white border border-rose-800/80 rounded text-[9px] font-bold transition flex items-center gap-0.5 shadow-2xs"
+                                >
+                                  <Trash2 className="w-2.5 h-2.5" />
+                                  <span>{isTh ? 'ลบ' : 'Del'}</span>
+                                </button>
+                              </div>
+                            )}
 
                             {point.evalType === 'pass_fail' && (
                               <div className="mt-1 flex items-center justify-center">
@@ -5066,6 +5463,7 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Inspector Name</label>
                   <input
                     type="text"
+                    list="qa-inspector-list"
                     value={editingHistoryItem.inspectorName || ''}
                     onChange={(e) => setEditingHistoryItem({ ...editingHistoryItem, inspectorName: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"

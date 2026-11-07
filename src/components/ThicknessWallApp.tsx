@@ -41,6 +41,7 @@ import {
 } from '../types';
 import { extractThicknessWallClient } from '../services/geminiClient';
 import { useCloudState } from '../services/firestoreSync';
+import { InspectorDatalist, saveRecordedInspector } from '../utils/inspectorStorage';
 import { ProcessSelector, MachineSelector } from './common/ProcessMachineSelector';
 import { STANDARD_PROCESS_OPTIONS, STANDARD_MACHINE_OPTIONS } from '../constants/processOptions';
 
@@ -558,7 +559,8 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
       : `FAIL / Out of Spec: ${outOfSpecDetails || 'Exceeded tolerance limits'}`;
 
     if (onLogNewActivity) {
-      onLogNewActivity({
+      if (inspectorInput) saveRecordedInspector(inspectorInput);
+        onLogNewActivity({
         id: newRecord.docId!,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         moduleCode: 'IPQA-07',
@@ -1031,6 +1033,7 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
                           <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Inspector Name</label>
                           <input
                             type="text"
+                            list="qa-inspector-list"
                             value={inspectorInput}
                             onChange={(e) => setInspectorInput(e.target.value)}
                             className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"

@@ -656,6 +656,45 @@ export const INITIAL_MODULES: QAModule[] = [
         'Printable ISO 9001 standard A4 certificate layout with QA seal and digital verification'
       ]
     }
+  },
+  {
+    id: 'mod-ins-01',
+    code: 'INS-01',
+    titleTh: 'จัดการผู้ตรวจสอบคุณภาพ (QA Inspector Staff Management)',
+    titleEn: 'QA Inspector Management & Staff Roster',
+    descriptionTh: 'เพิ่มและจัดการรายชื่อพนักงานตรวจคุณภาพ, รหัสพนักงาน, วันที่เริ่มทำงาน, แผนก (IQA, IPQA, OQA) พร้อมซิงค์รายชื่อพนักงานอัตโนมัติไปยังทุกแอปย่อยแบบเรียลไทม์',
+    descriptionEn: 'Manage QA inspection staff roster (Name, Employee ID, Start Date, Department) with real-time sync across all IQA, IPQA, and OQA sub-apps.',
+    category: 'STAFF',
+    iconName: 'Users',
+    status: 'ACTIVE',
+    pinned: true,
+    isPopular: true,
+    version: 'v2.0.0 (Live App)',
+    badgeType: 'info',
+    metrics: [
+      { labelTh: 'ระบบรายชื่อ', labelEn: 'Roster System', value: 'Live Cloud', trend: 'Online', trendUp: true },
+      { labelTh: 'สถานะเชื่อมโยง', labelEn: 'Sync Status', value: '100% Active', trend: 'Live', trendUp: true }
+    ],
+    specs: {
+      targetUsersTh: 'หัวหน้างานประกันคุณภาพ (QA Supervisor), QA Manager, เจ้าหน้าที่ฝ่ายบุคคล QA',
+      targetUsersEn: 'QA Supervisor, QA Manager, QA Operations Lead',
+      checklistItemsCount: 10,
+      estimatedTimeMin: 2,
+      outputReportTypeTh: 'รายงานทำเนียบพนักงานตรวจคุณภาพ QA Roster (CSV/Print)',
+      outputReportTypeEn: 'QA Inspector Staff Roster & Competency Log (CSV/Print)',
+      keyFeaturesTh: [
+        'เพิ่ม/แก้ไข รายชื่อพนักงาน, รหัสพนักงาน (Employee ID), วันที่เริ่มทำงาน, แผนก และตำแหน่ง',
+        'คำนวณอายุงาน (Tenure / Years of Service) อัตโนมัติจากวันที่เริ่มทำงาน',
+        'ซิงค์รายชื่อพนักงานไปยังกล่องเลือกผู้ตรวจสอบ (Inspector Select) ในทุกแอปย่อย IQA, IPQA, OQA',
+        'ระบบสลับสถานะ ปฏิบัติงาน (Active) / พักงาน (Inactive) พร้อมส่งออกรายชื่อ CSV'
+      ],
+      keyFeaturesEn: [
+        'Add/Edit staff name, Employee ID, Start Work Date, Department, and Role',
+        'Automated Years of Service & Tenure calculation based on Start Date',
+        'Real-time population into Inspector dropdown selectors across all IQA, IPQA, OQA sub-apps',
+        'Active/Inactive status toggle with CSV export and printable roster sheet'
+      ]
+    }
   }
 ];
 
