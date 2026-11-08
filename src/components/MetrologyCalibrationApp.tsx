@@ -6,6 +6,9 @@ import {
   AlertCircle, 
   Clock, 
   Plus, 
+  Minus,
+  Ruler,
+  Layers,
   Search, 
   FileSpreadsheet, 
   Printer, 
@@ -32,6 +35,7 @@ import {
 
 import { 
   InstrumentRecord, 
+  MeasurementRangeItem,
   InstrumentCalHistoryItem, 
   InstrumentRepairLog, 
   Language, 
@@ -64,6 +68,8 @@ const INITIAL_INSTRUMENTS: InstrumentRecord[] = [
     startDate: '2025-01-15',
     lastCalDate: '2026-01-15',
     frequency: 12,
+    calType: 'EXTERNAL',
+    instrumentClass: 'A',
     lastResult: 'PASS',
     lastError: 0.008,
     isRepairing: false,
@@ -97,6 +103,8 @@ const INITIAL_INSTRUMENTS: InstrumentRecord[] = [
     startDate: '2025-02-05',
     lastCalDate: '2025-08-10',
     frequency: 6,
+    calType: 'EXTERNAL',
+    instrumentClass: 'A',
     lastResult: 'PASS',
     lastError: 0.0015,
     isRepairing: false,
@@ -130,6 +138,8 @@ const INITIAL_INSTRUMENTS: InstrumentRecord[] = [
     startDate: '2024-06-20',
     lastCalDate: '2025-07-20',
     frequency: 12,
+    calType: 'INTERNAL',
+    instrumentClass: 'B',
     lastResult: 'PASS',
     lastError: 0.45,
     isRepairing: false,
@@ -149,6 +159,8 @@ const INITIAL_INSTRUMENTS: InstrumentRecord[] = [
     startDate: '2024-09-05',
     lastCalDate: '2025-02-10',
     frequency: 6,
+    calType: 'EXTERNAL',
+    instrumentClass: 'B',
     lastResult: 'FAIL',
     lastError: 0.0028,
     isRepairing: true,
@@ -186,6 +198,8 @@ const INITIAL_INSTRUMENTS: InstrumentRecord[] = [
     startDate: '2025-03-05',
     lastCalDate: '2025-03-05',
     frequency: 12,
+    calType: 'INTERNAL',
+    instrumentClass: 'C',
     lastResult: 'PASS',
     lastError: 0.015,
     isRepairing: false,
@@ -211,6 +225,8 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'DUE_SOON' | 'EXPIRED' | 'REPAIRING'>('ALL');
+  const [classFilter, setClassFilter] = useState<'ALL' | 'A' | 'B' | 'C' | 'D'>('ALL');
+  const [calTypeFilter, setCalTypeFilter] = useState<'ALL' | 'EXTERNAL' | 'INTERNAL'>('ALL');
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
@@ -254,6 +270,86 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
     instId: null
   });
 
+  // Range Helper Functions
+  const parseRangeStringToItems = (rangeStr: string): { ranges: { id: string; min: string; max: string; unit: string }[]; globalUnit: string } => {
+    if (!rangeStr || !rangeStr.trim()) {
+      return {
+        ranges: [{ id: '1', min: '0', max: '150', unit: 'mm' }],
+        globalUnit: 'mm'
+      };
+    }
+
+    const parts = rangeStr.split(/[,;]+/).map(p => p.trim()).filter(Boolean);
+    if (parts.length === 0) {
+      return {
+        ranges: [{ id: '1', min: '0', max: '150', unit: 'mm' }],
+        globalUnit: 'mm'
+      };
+    }
+
+    let detectedGlobalUnit = 'mm';
+    const parsedRanges: { id: string; min: string; max: string; unit: string }[] = [];
+
+    parts.forEach((part, idx) => {
+      const match = part.match(/^([+-]?\d+(?:\.\d+)?)\s*(?:[-~–]|to)\s*([+-]?\d+(?:\.\d+)?)\s*([a-zA-Zµ°Ω/·]+)?$/i);
+      if (match) {
+        let unit = match[3] ? match[3].trim() : 'mm';
+        if (unit.toLowerCase() === 'um') unit = 'µm';
+        if (idx === 0) detectedGlobalUnit = unit;
+        parsedRanges.push({
+          id: String(idx + 1),
+          min: match[1],
+          max: match[2],
+          unit: unit
+        });
+      } else {
+        const singleMatch = part.match(/^([+-]?\d+(?:\.\d+)?)\s*([a-zA-Zµ°Ω/·]+)?$/i);
+        if (singleMatch) {
+          let unit = singleMatch[2] ? singleMatch[2].trim() : 'mm';
+          if (unit.toLowerCase() === 'um') unit = 'µm';
+          if (idx === 0) detectedGlobalUnit = unit;
+          parsedRanges.push({
+            id: String(idx + 1),
+            min: '0',
+            max: singleMatch[1],
+            unit: unit
+          });
+        } else {
+          parsedRanges.push({
+            id: String(idx + 1),
+            min: '0',
+            max: part,
+            unit: 'mm'
+          });
+        }
+      }
+    });
+
+    return {
+      ranges: parsedRanges.length > 0 ? parsedRanges : [{ id: '1', min: '0', max: '150', unit: 'mm' }],
+      globalUnit: detectedGlobalUnit
+    };
+  };
+
+  const formatItemsToRangeString = (ranges: { min: string; max: string; unit: string }[]): string => {
+    if (!ranges || ranges.length === 0) return '';
+    return ranges
+      .filter(r => (r.max && r.max.trim() !== '') || (r.min && r.min.trim() !== ''))
+      .map(r => {
+        const minVal = r.min.trim();
+        const maxVal = r.max.trim();
+        const u = r.unit ? r.unit.trim() : '';
+        if (minVal && maxVal) {
+          return `${minVal}-${maxVal} ${u}`.trim();
+        } else if (maxVal) {
+          return `0-${maxVal} ${u}`.trim();
+        } else {
+          return `${minVal} ${u}`.trim();
+        }
+      })
+      .join(', ');
+  };
+
   // Add / Edit Form State
   const [formData, setFormData] = useState({
     id: '',
@@ -262,11 +358,19 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
     model: '',
     serialNo: '',
     location: '',
-    range: '',
+    range: '0-150 mm',
+    ranges: [
+      { id: '1', min: '0', max: '150', unit: 'mm' }
+    ] as { id: string; min: string; max: string; unit: string }[],
+    globalUnit: 'mm',
+    isCustomUnit: false,
+    customUnitText: '',
     spec: '0.02',
     entryDate: new Date().toISOString().split('T')[0],
     startDate: new Date().toISOString().split('T')[0],
-    frequency: '12'
+    frequency: '12',
+    calType: 'EXTERNAL' as 'EXTERNAL' | 'INTERNAL',
+    instrumentClass: 'A' as 'A' | 'B' | 'C' | 'D'
   });
 
   // Cal Entry Form State
@@ -407,21 +511,30 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
         inst.name.toLowerCase().includes(q) ||
         (inst.serialNo && inst.serialNo.toLowerCase().includes(q)) ||
         (inst.brand && inst.brand.toLowerCase().includes(q)) ||
-        (inst.location && inst.location.toLowerCase().includes(q));
+        (inst.location && inst.location.toLowerCase().includes(q)) ||
+        (inst.instrumentClass && `class ${inst.instrumentClass}`.toLowerCase().includes(q)) ||
+        (inst.calType && inst.calType.toLowerCase().includes(q));
 
       if (!matchesSearch) return false;
 
-      if (statusFilter === 'ALL') return true;
-      const statusInfo = getStatusInfo(inst);
+      // Status filter
+      if (statusFilter !== 'ALL') {
+        const statusInfo = getStatusInfo(inst);
+        if (statusFilter === 'ACTIVE' && statusInfo.label !== 'Active') return false;
+        if (statusFilter === 'DUE_SOON' && statusInfo.label !== 'Due Soon') return false;
+        if (statusFilter === 'EXPIRED' && statusInfo.label !== 'Expired') return false;
+        if (statusFilter === 'REPAIRING' && statusInfo.label !== 'Repairing') return false;
+      }
 
-      if (statusFilter === 'ACTIVE') return statusInfo.label === 'Active';
-      if (statusFilter === 'DUE_SOON') return statusInfo.label === 'Due Soon';
-      if (statusFilter === 'EXPIRED') return statusInfo.label === 'Expired';
-      if (statusFilter === 'REPAIRING') return statusInfo.label === 'Repairing';
+      // Class filter (A, B, C, D)
+      if (classFilter !== 'ALL' && (inst.instrumentClass || 'A') !== classFilter) return false;
+
+      // Cal Type filter (EXTERNAL, INTERNAL)
+      if (calTypeFilter !== 'ALL' && (inst.calType || 'EXTERNAL') !== calTypeFilter) return false;
 
       return true;
     });
-  }, [instruments, searchQuery, statusFilter]);
+  }, [instruments, searchQuery, statusFilter, classFilter, calTypeFilter]);
 
   // Dashboard Metrics
   const stats = useMemo(() => {
@@ -456,6 +569,14 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
       return trimmed;
     })();
 
+    const finalRanges = formData.ranges.filter(r => (r.max && r.max.trim() !== '') || (r.min && r.min.trim() !== ''));
+    const combinedRange = finalRanges.length > 0 
+      ? formatItemsToRangeString(finalRanges) 
+      : formData.range.trim();
+    const cleanUnit = formData.isCustomUnit 
+      ? (formData.customUnitText.trim() || 'mm') 
+      : (formData.globalUnit || 'mm');
+
     if (editingInst) {
       // Edit mode
       setInstruments(prev => prev.map(item => {
@@ -468,11 +589,15 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
             model: formData.model.trim(),
             serialNo: formData.serialNo.trim(),
             location: formData.location.trim(),
-            range: formData.range.trim(),
+            range: combinedRange,
+            ranges: finalRanges,
+            unit: cleanUnit,
             spec: parseFloat(formData.spec) || 0.02,
             entryDate: formData.entryDate,
             startDate: formData.startDate,
-            frequency: cleanFrequency
+            frequency: cleanFrequency,
+            calType: formData.calType,
+            instrumentClass: formData.instrumentClass
           };
         }
         return item;
@@ -492,12 +617,16 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
         model: formData.model.trim(),
         serialNo: formData.serialNo.trim(),
         location: formData.location.trim(),
-        range: formData.range.trim(),
+        range: combinedRange,
+        ranges: finalRanges,
+        unit: cleanUnit,
         spec: parseFloat(formData.spec) || 0.02,
         entryDate: formData.entryDate,
         startDate: formData.startDate,
         lastCalDate: formData.startDate,
         frequency: cleanFrequency,
+        calType: formData.calType,
+        instrumentClass: formData.instrumentClass,
         lastResult: 'NEW',
         lastError: 0,
         isRepairing: false,
@@ -518,13 +647,13 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
           batchLot: `New Instrument: ${newInst.id} - ${newInst.name}`,
           result: 'PASS',
           defectCount: 0,
-          remarks: `Added to Master List. Spec: ±${newInst.spec}`
+          remarks: `Added to Master List. Spec: ±${newInst.spec}, Cal Type: ${newInst.calType}, Class: ${newInst.instrumentClass}`
         });
       }
 
       setStatusMsg({
         type: 'success',
-        message: isTh ? `เพิ่มเครื่องมือวัด ${newInst.id} เข้าสู่ Master List สำเร็จ` : `Added instrument ${newInst.id}`
+        message: isTh ? `เพิ่มเครื่องมือวัด ${newInst.id} (Class ${newInst.instrumentClass || 'A'} - ${newInst.calType}) สำเร็จ` : `Added instrument ${newInst.id}`
       });
     }
 
@@ -822,7 +951,7 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
     if (instruments.length === 0) return;
 
     const headers = [
-      "Tool ID", "Instrument Name", "Brand", "Model", "Serial No.",
+      "Tool ID", "Class", "Cal Type", "Instrument Name", "Brand", "Model", "Serial No.",
       "Location", "Range", "Spec (±)", "Entry Date", "Start Date",
       "Frequency (Months)", "Last Cal Date", "Next Cal Date", "Last Result", "Last Error",
       "Is Repairing", "Repair Symptom", "Status"
@@ -833,6 +962,8 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
       const st = getStatusInfo(inst);
       return [
         inst.id,
+        `Class ${inst.instrumentClass || 'A'}`,
+        inst.calType === 'INTERNAL' ? 'Internal (สอบเทียบภายใน)' : 'External (สอบเทียบภายนอก)',
         inst.name,
         inst.brand || "-",
         inst.model || "-",
@@ -870,8 +1001,10 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
   const handlePrintTag = (inst: InstrumentRecord) => {
     const nextCal = calculateNextCal(inst.lastCalDate, inst.frequency) || '-';
     const statusInfo = getStatusInfo(inst);
+    const classLabel = `Class ${inst.instrumentClass || 'A'}`;
+    const calTypeLabel = inst.calType === 'INTERNAL' ? 'Internal (สอบเทียบภายใน)' : 'External (สอบเทียบภายนอก)';
 
-    const qrData = `APP:EQP-01\nID:${inst.id}\nNAME:${inst.name}\nSERIAL:${inst.serialNo || '-'}\nSPEC:±${inst.spec}\nNEXT_CAL:${nextCal}\nSTATUS:${statusInfo.label}`;
+    const qrData = `APP:EQP-01\nID:${inst.id}\nCLASS:${classLabel}\nTYPE:${inst.calType || 'EXTERNAL'}\nNAME:${inst.name}\nSERIAL:${inst.serialNo || '-'}\nSPEC:±${inst.spec}\nNEXT_CAL:${nextCal}\nSTATUS:${statusInfo.label}`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}`;
 
     const printWindow = window.open('', '_blank', 'width=520,height=420');
@@ -906,6 +1039,9 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
             .qr-area img { width: 100%; height: 100%; border-radius: 4px; }
             .info-area { flex: 1; font-size: 11px; line-height: 1.6; font-weight: 600; color: #e2e8f0; }
             .info-label { color: #64748b; font-size: 9px; text-transform: uppercase; font-weight: 800; display: block; }
+            .badge-pill { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; margin-right: 4px; }
+            .class-badge { background: #312e81; color: #a5b4fc; border: 1px solid #4338ca; }
+            .type-badge { background: #042f2e; color: #5eead4; border: 1px solid #0f766e; }
             .status-stamp {
               position: absolute;
               top: 14px;
@@ -923,7 +1059,7 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
             .next-cal-box {
               margin-top: 12px;
               background: #1e293b;
-              border: 1px border #334155;
+              border: 1px solid #334155;
               border-radius: 8px;
               padding: 8px;
               text-align: center;
@@ -945,9 +1081,14 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
               </div>
               <div class="info-area">
                 <div><span class="info-label">TOOL ID:</span> <b>${inst.id}</b></div>
+                <div style="margin: 3px 0;">
+                  <span class="badge-pill class-badge">${classLabel}</span>
+                  <span class="badge-pill type-badge">${inst.calType === 'INTERNAL' ? 'INTERNAL' : 'EXTERNAL'}</span>
+                </div>
                 <div><span class="info-label">NAME:</span> ${inst.name}</div>
                 <div><span class="info-label">SERIAL:</span> ${inst.serialNo || '-'}</div>
                 <div><span class="info-label">SPEC LIMIT:</span> ±${inst.spec}</div>
+                <div><span class="info-label">CAL TYPE:</span> ${calTypeLabel}</div>
                 <div><span class="info-label">LOCATION:</span> ${inst.location || '-'}</div>
               </div>
             </div>
@@ -958,7 +1099,6 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
             <div class="footer">Verified by EQP-01 Metrology System | ${new Date().toLocaleDateString('th-TH')}</div>
           </div>
         </body>
-      </html>
     `);
 
     printWindow.document.close();
@@ -1125,11 +1265,17 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
                 model: '',
                 serialNo: '',
                 location: '',
-                range: '',
+                range: '0-150 mm',
+                ranges: [{ id: '1', min: '0', max: '150', unit: 'mm' }],
+                globalUnit: 'mm',
+                isCustomUnit: false,
+                customUnitText: '',
                 spec: '0.02',
                 entryDate: new Date().toISOString().split('T')[0],
                 startDate: new Date().toISOString().split('T')[0],
-                frequency: '12'
+                frequency: '12',
+                calType: 'EXTERNAL',
+                instrumentClass: 'A'
               });
               setShowAddModal(true);
             }}
@@ -1191,37 +1337,107 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
       </div>
 
       {/* Filter & Search Toolbar */}
-      <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={isTh ? 'ค้นหารหัส, ชื่อเครื่องมือ, Serial, Location...' : 'Search ID, Name, Serial, Location...'}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-          />
+      <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={isTh ? 'ค้นหารหัส, ชื่อเครื่องมือ, Serial, Location...' : 'Search ID, Name, Serial, Location...'}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
+            <Filter className="w-3.5 h-3.5 text-slate-500 mr-1 hidden sm:block" />
+            {(['ALL', 'ACTIVE', 'DUE_SOON', 'EXPIRED', 'REPAIRING'] as const).map(st => (
+              <button
+                key={st}
+                onClick={() => setStatusFilter(st)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap border ${
+                  statusFilter === st
+                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                }`}
+              >
+                {st === 'ALL' && (isTh ? 'ทั้งหมด' : 'All')}
+                {st === 'ACTIVE' && (isTh ? 'ปกติ (Active)' : 'Active')}
+                {st === 'DUE_SOON' && (isTh ? 'ใกล้กำหนด (Due Soon)' : 'Due Soon')}
+                {st === 'EXPIRED' && (isTh ? 'หมดอายุ (Expired)' : 'Expired')}
+                {st === 'REPAIRING' && (isTh ? 'ส่งซ่อม (Repairing)' : 'Repairing')}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
-          <Filter className="w-3.5 h-3.5 text-slate-500 mr-1 hidden sm:block" />
-          {(['ALL', 'ACTIVE', 'DUE_SOON', 'EXPIRED', 'REPAIRING'] as const).map(st => (
-            <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap border ${
-                statusFilter === st
-                  ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
-                  : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
-              }`}
-            >
-              {st === 'ALL' && (isTh ? 'ทั้งหมด' : 'All')}
-              {st === 'ACTIVE' && (isTh ? 'ปกติ (Active)' : 'Active')}
-              {st === 'DUE_SOON' && (isTh ? 'ใกล้กำหนด (Due Soon)' : 'Due Soon')}
-              {st === 'EXPIRED' && (isTh ? 'หมดอายุ (Expired)' : 'Expired')}
-              {st === 'REPAIRING' && (isTh ? 'ส่งซ่อม (Repairing)' : 'Repairing')}
-            </button>
-          ))}
+        {/* Secondary Filter Row: Class & Cal Type */}
+        <div className="pt-2 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3 text-xs">
+          {/* Class Filter */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+              {isTh ? 'ระดับความสำคัญ (Class):' : 'Class:'}
+            </span>
+            {(['ALL', 'A', 'B', 'C', 'D'] as const).map(cls => {
+              const active = classFilter === cls;
+              const colorCls = 
+                cls === 'A' ? (active ? 'bg-rose-600 text-white border-rose-500' : 'text-rose-400 border-rose-900/60 bg-rose-950/30 hover:bg-rose-950/60') :
+                cls === 'B' ? (active ? 'bg-amber-600 text-white border-amber-500' : 'text-amber-400 border-amber-900/60 bg-amber-950/30 hover:bg-amber-950/60') :
+                cls === 'C' ? (active ? 'bg-indigo-600 text-white border-indigo-500' : 'text-indigo-400 border-indigo-900/60 bg-indigo-950/30 hover:bg-indigo-950/60') :
+                cls === 'D' ? (active ? 'bg-teal-600 text-white border-teal-500' : 'text-teal-400 border-teal-900/60 bg-teal-950/30 hover:bg-teal-950/60') :
+                active ? 'bg-slate-700 text-white border-slate-600' : 'text-slate-400 border-slate-800 bg-slate-950 hover:text-slate-200';
+
+              return (
+                <button
+                  key={cls}
+                  onClick={() => setClassFilter(cls)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${colorCls}`}
+                >
+                  {cls === 'ALL' ? (isTh ? 'ทุก Class' : 'All Classes') : `Class ${cls}`}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Cal Type Filter */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+              {isTh ? 'การสอบเทียบ:' : 'Cal Type:'}
+            </span>
+            {(['ALL', 'EXTERNAL', 'INTERNAL'] as const).map(type => {
+              const active = calTypeFilter === type;
+              return (
+                <button
+                  key={type}
+                  onClick={() => setCalTypeFilter(type)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                    active
+                      ? type === 'EXTERNAL' ? 'bg-purple-600 text-white border-purple-500' : type === 'INTERNAL' ? 'bg-cyan-600 text-white border-cyan-500' : 'bg-slate-700 text-white border-slate-600'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  {type === 'ALL' && (isTh ? 'ทั้งหมด (All)' : 'All')}
+                  {type === 'EXTERNAL' && (isTh ? 'ภายนอก (External)' : 'External')}
+                  {type === 'INTERNAL' && (isTh ? 'ภายใน (Internal)' : 'Internal')}
+                </button>
+              );
+            })}
+
+            {(classFilter !== 'ALL' || calTypeFilter !== 'ALL' || statusFilter !== 'ALL' || searchQuery) && (
+              <button
+                onClick={() => {
+                  setClassFilter('ALL');
+                  setCalTypeFilter('ALL');
+                  setStatusFilter('ALL');
+                  setSearchQuery('');
+                }}
+                className="text-[10px] font-bold text-slate-500 hover:text-rose-400 underline ml-2 transition"
+              >
+                {isTh ? 'ล้างตัวกรอง' : 'Clear Filters'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1268,7 +1484,24 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
                   return (
                     <tr key={inst.docId} className="hover:bg-slate-800/40 transition">
                       <td className="px-4 py-3.5">
-                        <div className="font-mono font-bold text-indigo-300">{inst.id}</div>
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                          <span className="font-mono font-bold text-indigo-300">{inst.id}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                            inst.instrumentClass === 'A' || !inst.instrumentClass ? 'bg-rose-950/80 text-rose-300 border-rose-800' :
+                            inst.instrumentClass === 'B' ? 'bg-amber-950/80 text-amber-300 border-amber-800' :
+                            inst.instrumentClass === 'C' ? 'bg-indigo-950/80 text-indigo-300 border-indigo-800' :
+                            'bg-teal-950/80 text-teal-300 border-teal-800'
+                          }`}>
+                            Class {inst.instrumentClass || 'A'}
+                          </span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
+                            inst.calType === 'INTERNAL' 
+                              ? 'bg-cyan-950/80 text-cyan-300 border-cyan-800' 
+                              : 'bg-purple-950/80 text-purple-300 border-purple-800'
+                          }`}>
+                            {inst.calType === 'INTERNAL' ? (isTh ? 'ภายใน (Internal)' : 'Internal') : (isTh ? 'ภายนอก (External)' : 'External')}
+                          </span>
+                        </div>
                         <div className="font-semibold text-slate-200">{inst.name}</div>
                         <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
                           <Building2 className="w-3 h-3 text-slate-600" />
@@ -1282,8 +1515,14 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
                       </td>
 
                       <td className="px-4 py-3.5">
-                        <div className="text-slate-300">{inst.range || '-'}</div>
-                        <div className="text-[10px] font-mono text-amber-400 font-bold">Spec: ±{inst.spec}</div>
+                        <div className="text-slate-200 font-medium">{inst.range || '-'}</div>
+                        {((inst.ranges && inst.ranges.length > 1) || (inst.range && inst.range.includes(','))) && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800 font-semibold inline-flex items-center gap-1 mt-0.5">
+                            <Layers className="w-2.5 h-2.5" />
+                            {inst.ranges?.length || inst.range?.split(',').length} {isTh ? 'ช่วงวัด' : 'ranges'}
+                          </span>
+                        )}
+                        <div className="text-[10px] font-mono text-amber-400 font-bold mt-0.5">Spec: ±{inst.spec}</div>
                       </td>
 
                       <td className="px-4 py-3.5 font-mono text-slate-300">
@@ -1426,6 +1665,13 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
                           <button
                             onClick={() => requestSecurityCheck(() => {
                               setEditingInst(inst);
+                              const parsed = parseRangeStringToItems(inst.range || '');
+                              const initialRanges = (inst.ranges && inst.ranges.length > 0)
+                                ? inst.ranges
+                                : parsed.ranges;
+                              const currentUnit = inst.unit || (initialRanges[0]?.unit) || parsed.globalUnit || 'mm';
+                              const isPreset = ['mm', 'µm', 'g', 'kg'].includes(currentUnit);
+
                               setFormData({
                                 id: inst.id,
                                 name: inst.name,
@@ -1433,11 +1679,22 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
                                 model: inst.model || '',
                                 serialNo: inst.serialNo || '',
                                 location: inst.location || '',
-                                range: inst.range || '',
+                                range: inst.range || formatItemsToRangeString(initialRanges),
+                                ranges: initialRanges.map((r, idx) => ({
+                                  id: r.id || String(idx + 1),
+                                  min: r.min || '0',
+                                  max: r.max || '',
+                                  unit: r.unit || currentUnit
+                                })),
+                                globalUnit: isPreset ? currentUnit : 'CUSTOM',
+                                isCustomUnit: !isPreset,
+                                customUnitText: !isPreset ? currentUnit : '',
                                 spec: String(inst.spec),
                                 entryDate: inst.entryDate || new Date().toISOString().split('T')[0],
                                 startDate: inst.startDate || new Date().toISOString().split('T')[0],
-                                frequency: String(inst.frequency || 12)
+                                frequency: String(inst.frequency || 12),
+                                calType: inst.calType || 'EXTERNAL',
+                                instrumentClass: inst.instrumentClass || 'A'
                               });
                               setShowAddModal(true);
                             })}
@@ -1491,6 +1748,100 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
             </div>
 
             <form onSubmit={handleSaveInstrument} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              {/* Classification & Calibration Mode Configuration */}
+              <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-950/80 rounded-2xl border border-indigo-900/40">
+                {/* 1. External / Internal Calibration Selection */}
+                <div>
+                  <label className="text-[10px] font-bold text-slate-300 uppercase block mb-1.5 flex items-center justify-between">
+                    <span>{isTh ? 'ประเภทการสอบเทียบ (Calibration Type) *' : 'Calibration Type *'}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${
+                      formData.calType === 'INTERNAL'
+                        ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
+                        : 'bg-purple-950 text-purple-300 border-purple-800'
+                    }`}>
+                      {formData.calType === 'INTERNAL' ? 'INTERNAL (ภายใน)' : 'EXTERNAL (ภายนอก)'}
+                    </span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, calType: 'EXTERNAL' }))}
+                      className={`p-2.5 rounded-xl text-left border transition flex flex-col justify-between ${
+                        formData.calType === 'EXTERNAL'
+                          ? 'bg-purple-950/80 border-purple-500 text-white shadow-md shadow-purple-950/50 ring-1 ring-purple-500'
+                          : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-purple-300">🏢 External</span>
+                        {formData.calType === 'EXTERNAL' && <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />}
+                      </div>
+                      <span className="text-[9px] text-slate-400 mt-1 leading-tight">
+                        {isTh ? 'ส่งสอบเทียบภายนอก (ISO/IEC 17025)' : 'Outsourced Accredited Lab'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, calType: 'INTERNAL' }))}
+                      className={`p-2.5 rounded-xl text-left border transition flex flex-col justify-between ${
+                        formData.calType === 'INTERNAL'
+                          ? 'bg-cyan-950/80 border-cyan-500 text-white shadow-md shadow-cyan-950/50 ring-1 ring-cyan-500'
+                          : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-cyan-300">🔬 Internal</span>
+                        {formData.calType === 'INTERNAL' && <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />}
+                      </div>
+                      <span className="text-[9px] text-slate-400 mt-1 leading-tight">
+                        {isTh ? 'สอบเทียบภายใน (QA In-House Lab)' : 'In-House Calibration'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Instrument Class Selection (A, B, C, D) */}
+                <div>
+                  <label className="text-[10px] font-bold text-slate-300 uppercase block mb-1.5 flex items-center justify-between">
+                    <span>{isTh ? 'ระดับความสำคัญ (Instrument Class) *' : 'Instrument Class *'}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${
+                      formData.instrumentClass === 'A' ? 'bg-rose-950 text-rose-300 border-rose-800' :
+                      formData.instrumentClass === 'B' ? 'bg-amber-950 text-amber-300 border-amber-800' :
+                      formData.instrumentClass === 'C' ? 'bg-indigo-950 text-indigo-300 border-indigo-800' :
+                      'bg-teal-950 text-teal-300 border-teal-800'
+                    }`}>
+                      Class {formData.instrumentClass}
+                    </span>
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      { classVal: 'A' as const, label: 'Class A', desc: 'Critical', descTh: 'วิกฤต/สูง', activeCls: 'bg-rose-950 border-rose-500 text-rose-200 ring-1 ring-rose-500' },
+                      { classVal: 'B' as const, label: 'Class B', desc: 'Standard', descTh: 'มาตรฐาน/ผลิต', activeCls: 'bg-amber-950 border-amber-500 text-amber-200 ring-1 ring-amber-500' },
+                      { classVal: 'C' as const, label: 'Class C', desc: 'Reference', descTh: 'อ้างอิง/ตรวจ', activeCls: 'bg-indigo-950 border-indigo-500 text-indigo-200 ring-1 ring-indigo-500' },
+                      { classVal: 'D' as const, label: 'Class D', desc: 'Auxiliary', descTh: 'เสริม/ทั่วไป', activeCls: 'bg-teal-950 border-teal-500 text-teal-200 ring-1 ring-teal-500' }
+                    ].map(item => {
+                      const isSel = formData.instrumentClass === item.classVal;
+                      return (
+                        <button
+                          key={item.classVal}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, instrumentClass: item.classVal }))}
+                          className={`p-2 rounded-xl text-center border transition flex flex-col items-center justify-center cursor-pointer ${
+                            isSel
+                              ? item.activeCls
+                              : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                          }`}
+                        >
+                          <span className="font-black text-xs">{item.label}</span>
+                          <span className="text-[8px] opacity-80 mt-0.5">{isTh ? item.descTh : item.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">รหัสเครื่องมือ (Instrument ID) *</label>
                 <input
@@ -1560,17 +1911,6 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">ช่วงการวัด (Measurement Range)</label>
-                <input
-                  type="text"
-                  value={formData.range}
-                  onChange={(e) => setFormData(prev => ({ ...prev, range: e.target.value }))}
-                  placeholder="เช่น 0-150 mm, 0-220 g"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Permission Error / Spec (±) *</label>
                 <input
                   type="number"
@@ -1581,6 +1921,311 @@ export const MetrologyCalibrationApp: React.FC<MetrologyCalibrationAppProps> = (
                   placeholder="เช่น 0.02"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-mono font-bold text-amber-300 focus:outline-none focus:border-indigo-500"
                 />
+              </div>
+
+              {/* Dynamic Measurement Range Builder (Supports +1 / -1 Multi-Range & Flexible Units) */}
+              <div className="md:col-span-2 space-y-3 bg-slate-950/80 p-4 rounded-2xl border border-indigo-900/40">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg border border-indigo-500/20">
+                      <Ruler className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>{isTh ? 'ช่วงการวัด (Measurement Ranges) & หน่วยวัด' : 'Measurement Ranges & Units'}</span>
+                        <span className="text-[10px] text-cyan-400 bg-cyan-950/80 border border-cyan-800/80 px-2 py-0.5 rounded-full font-mono font-bold">
+                          {formData.ranges.length} {isTh ? 'ช่วงวัด' : 'Range(s)'}
+                        </span>
+                      </span>
+                      <p className="text-[9px] text-slate-400 mt-0.5">
+                        {isTh 
+                          ? 'เพิ่ม/ลดช่วงการวัดได้ (+1 / -1) สำหรับเครื่องมือที่มีหลายช่วงวัด และเลือกหรือพิมพ์หน่วยวัดได้อิสระ'
+                          : 'Dynamic +1 / -1 multi-range support with flexible unit selection'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Header quick summary badge */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 font-semibold">{isTh ? 'ช่วงวัดรวม:' : 'Total Range:'}</span>
+                    <span className="text-xs font-mono font-bold text-amber-300 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
+                      {formatItemsToRangeString(formData.ranges) || formData.range || '-'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 1. Measurement Unit Selector */}
+                <div className="bg-slate-900/90 p-3 rounded-xl border border-slate-800/80 space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <label className="text-[10px] font-bold uppercase text-slate-300 tracking-wider">
+                      {isTh ? 'เลือกหน่วยการวัด (Measurement Unit):' : 'Select Measurement Unit:'}
+                    </label>
+                    <span className="text-[9px] text-indigo-400 font-medium">
+                      {isTh ? 'เลือก mm, µm, g, kg หรือพิมพ์หน่วยที่ต้องการ' : 'Select mm, um, g, kg or custom text'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { unit: 'mm', label: 'mm (มิลลิเมตร)' },
+                      { unit: 'µm', label: 'µm / um (ไมโครเมตร)' },
+                      { unit: 'g', label: 'g (กรัม)' },
+                      { unit: 'kg', label: 'kg (กิโลกรัม)' }
+                    ].map(uItem => {
+                      const isSel = !formData.isCustomUnit && formData.globalUnit === uItem.unit;
+                      return (
+                        <button
+                          key={uItem.unit}
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => {
+                              const updatedRanges = prev.ranges.map(r => ({ ...r, unit: uItem.unit }));
+                              return {
+                                ...prev,
+                                globalUnit: uItem.unit,
+                                isCustomUnit: false,
+                                ranges: updatedRanges,
+                                range: formatItemsToRangeString(updatedRanges)
+                              };
+                            });
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 cursor-pointer ${
+                            isSel
+                              ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30 ring-1 ring-indigo-400'
+                              : 'bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-800'
+                          }`}
+                        >
+                          {isSel && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                          <span>{uItem.label}</span>
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          isCustomUnit: true,
+                          customUnitText: prev.customUnitText || ''
+                        }));
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 cursor-pointer ${
+                        formData.isCustomUnit
+                          ? 'bg-cyan-600 text-white border-cyan-500 shadow-md shadow-cyan-600/30 ring-1 ring-cyan-400'
+                          : 'bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-800'
+                      }`}
+                    >
+                      {formData.isCustomUnit && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                      <span>✍️ {isTh ? 'พิมพ์หน่วยเอง (Custom)' : 'Custom Unit'}</span>
+                    </button>
+                  </div>
+
+                  {formData.isCustomUnit && (
+                    <div className="pt-1.5 animate-in fade-in slide-in-from-top-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                          {isTh ? 'ระบุหน่วยการวัดเอง:' : 'Specify Custom Unit:'}
+                        </span>
+                        <input
+                          type="text"
+                          required={formData.isCustomUnit}
+                          value={formData.customUnitText}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormData(prev => {
+                              const updatedRanges = prev.ranges.map(r => ({ ...r, unit: val }));
+                              return {
+                                ...prev,
+                                customUnitText: val,
+                                ranges: updatedRanges,
+                                range: formatItemsToRangeString(updatedRanges)
+                              };
+                            });
+                          }}
+                          placeholder={isTh ? 'พิมพ์หน่วย เช่น N·m, inch, °C, bar, psi, mg, rpm...' : 'e.g. N·m, inch, °C, bar...'}
+                          className="w-full max-w-xs bg-slate-950 border border-cyan-500/80 rounded-xl px-3 py-1.5 text-xs font-bold text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Range Rows List */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                    <span>{isTh ? 'รายการช่วงการวัด (Measurement Range Rows):' : 'Range Rows:'}</span>
+                    <span className="text-slate-500">{isTh ? 'กด +1 เพื่อเพิ่มช่วงวัด หรือ -1 เพื่อลบ' : 'Use +1 to add or -1 to remove'}</span>
+                  </div>
+
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {formData.ranges.map((rangeItem, idx) => {
+                      return (
+                        <div
+                          key={rangeItem.id || idx}
+                          className="bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl flex flex-wrap sm:flex-nowrap items-center gap-2.5 transition hover:border-slate-700"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-[75px]">
+                            <span className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-800 text-indigo-300 text-[10px] font-mono font-bold flex items-center justify-center">
+                              {idx + 1}
+                            </span>
+                            <span className="text-xs font-bold text-slate-300 whitespace-nowrap">
+                              {isTh ? `ช่วงที่ ${idx + 1}` : `Range ${idx + 1}`}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                            <div className="relative flex-1">
+                              <span className="absolute left-2.5 top-2 text-[9px] font-bold text-slate-500 uppercase">Min</span>
+                              <input
+                                type="text"
+                                value={rangeItem.min}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setFormData(prev => {
+                                    const updated = prev.ranges.map((r, i) => i === idx ? { ...r, min: val } : r);
+                                    return {
+                                      ...prev,
+                                      ranges: updated,
+                                      range: formatItemsToRangeString(updated)
+                                    };
+                                  });
+                                }}
+                                placeholder="0"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-2 py-1.5 text-xs font-mono font-bold text-white focus:outline-none focus:border-indigo-500"
+                              />
+                            </div>
+
+                            <span className="text-slate-500 font-bold text-xs">-</span>
+
+                            <div className="relative flex-1">
+                              <span className="absolute left-2.5 top-2 text-[9px] font-bold text-slate-500 uppercase">Max</span>
+                              <input
+                                type="text"
+                                value={rangeItem.max}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setFormData(prev => {
+                                    const updated = prev.ranges.map((r, i) => i === idx ? { ...r, max: val } : r);
+                                    return {
+                                      ...prev,
+                                      ranges: updated,
+                                      range: formatItemsToRangeString(updated)
+                                    };
+                                  });
+                                }}
+                                placeholder="150"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-2 py-1.5 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-indigo-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="w-24 sm:w-28">
+                            <input
+                              type="text"
+                              value={rangeItem.unit}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setFormData(prev => {
+                                  const updated = prev.ranges.map((r, i) => i === idx ? { ...r, unit: val } : r);
+                                  return {
+                                    ...prev,
+                                    ranges: updated,
+                                    range: formatItemsToRangeString(updated)
+                                  };
+                                });
+                              }}
+                              placeholder="unit"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-bold text-indigo-300 text-center focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+
+                          {formData.ranges.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => {
+                                  const updated = prev.ranges.filter((_, i) => i !== idx);
+                                  return {
+                                    ...prev,
+                                    ranges: updated,
+                                    range: formatItemsToRangeString(updated)
+                                  };
+                                });
+                              }}
+                              className="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-950/80 border border-rose-900/60 transition cursor-pointer"
+                              title={isTh ? 'ลบช่วงวัดนี้ (-1)' : 'Remove range (-1)'}
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. Action Buttons (+1 and -1) */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+                  <div className="flex items-center gap-2">
+                    {/* +1 Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => {
+                          const lastItem = prev.ranges[prev.ranges.length - 1];
+                          const nextMin = lastItem && lastItem.max ? lastItem.max : '0';
+                          const defaultUnit = prev.isCustomUnit 
+                            ? (prev.customUnitText || 'mm') 
+                            : (lastItem?.unit || prev.globalUnit || 'mm');
+                          const updated = [
+                            ...prev.ranges,
+                            { id: String(Date.now() + Math.random()), min: nextMin, max: '', unit: defaultUnit }
+                          ];
+                          return {
+                            ...prev,
+                            ranges: updated,
+                            range: formatItemsToRangeString(updated)
+                          };
+                        });
+                      }}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/30 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>{isTh ? '+1 เพิ่มช่วงวัด (Add Range)' : '+1 Add Range'}</span>
+                    </button>
+
+                    {/* -1 Button */}
+                    <button
+                      type="button"
+                      disabled={formData.ranges.length <= 1}
+                      onClick={() => {
+                        if (formData.ranges.length <= 1) return;
+                        setFormData(prev => {
+                          const updated = prev.ranges.slice(0, -1);
+                          return {
+                            ...prev,
+                            ranges: updated,
+                            range: formatItemsToRangeString(updated)
+                          };
+                        });
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+                        formData.ranges.length > 1
+                          ? 'bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border-rose-800 cursor-pointer'
+                          : 'bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                      <span>{isTh ? '-1 ลบช่วงวัดล่าสุด (-1 Range)' : '-1 Remove Last'}</span>
+                    </button>
+                  </div>
+
+                  <div className="text-[10px] text-slate-400 font-mono">
+                    {isTh ? 'ผลลัพธ์ที่จะบันทึก:' : 'Saved Format:'}{' '}
+                    <b className="text-emerald-400">{formData.range || formatItemsToRangeString(formData.ranges) || '-'}</b>
+                  </div>
+                </div>
               </div>
 
               <div>

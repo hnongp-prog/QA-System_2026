@@ -704,6 +704,13 @@ export interface InstrumentRepairLog {
   date: string;
 }
 
+export interface MeasurementRangeItem {
+  id?: string;
+  min: string;
+  max: string;
+  unit: string;
+}
+
 export interface InstrumentRecord {
   docId?: string;
   id: string; // Tool ID e.g. CAL-001
@@ -713,6 +720,8 @@ export interface InstrumentRecord {
   serialNo?: string;
   location?: string;
   range?: string;
+  ranges?: MeasurementRangeItem[];
+  unit?: string;
   spec: number; // Permission Error e.g. 0.02
   entryDate?: string;
   startDate?: string;
@@ -724,6 +733,8 @@ export interface InstrumentRecord {
   currentRepair?: InstrumentRepairLog | null;
   history?: InstrumentCalHistoryItem[];
   category?: string;
+  calType?: 'EXTERNAL' | 'INTERNAL'; // ประเภทการสอบเทียบ: EXTERNAL (ภายนอก) / INTERNAL (ภายใน)
+  instrumentClass?: 'A' | 'B' | 'C' | 'D'; // ระดับความสำคัญของเครื่องมือวัด: Class A, B, C, D
 }
 
 export interface FgCoilItem {
