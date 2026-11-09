@@ -322,15 +322,15 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
             <Boxes className="w-6 h-6" />
           </div>
           <div>
-            <span className={`text-[10px] font-extrabold uppercase tracking-wider block ${
-              isLight ? 'text-slate-700' : 'text-slate-400'
+            <span className={`text-[10px] font-black uppercase tracking-wider block ${
+              isLight ? 'text-black' : 'text-slate-400'
             }`}>
               {isTh ? 'ยอดตัดรวม (Total Q\'ty)' : 'Total Cut Q\'ty'}
             </span>
-            <div className={`text-2xl font-black ${isLight ? 'text-slate-950' : 'text-white'}`}>
-              {summaryMetrics.totalQty.toLocaleString()} <span className={`text-xs font-semibold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Pcs</span>
+            <div className={`text-2xl font-black ${isLight ? 'text-black' : 'text-white'}`}>
+              {summaryMetrics.totalQty.toLocaleString()} <span className={`text-xs font-black ${isLight ? 'text-black' : 'text-slate-400'}`}>Pcs</span>
             </div>
-            <span className={`text-[10px] font-mono ${isLight ? 'text-slate-600 font-bold' : 'text-slate-500'}`}>{summaryMetrics.totalLots} Lots Inspected</span>
+            <span className={`text-[10px] font-mono ${isLight ? 'text-black font-bold' : 'text-slate-500'}`}>{summaryMetrics.totalLots} Lots Inspected</span>
           </div>
         </div>
 
@@ -343,15 +343,15 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
-            <span className={`text-[10px] font-extrabold uppercase tracking-wider block ${
-              isLight ? 'text-emerald-900' : 'text-emerald-400'
+            <span className={`text-[10px] font-black uppercase tracking-wider block ${
+              isLight ? 'text-black' : 'text-emerald-400'
             }`}>
               {isTh ? 'ผ่านเกณฑ์ (Passed Q\'ty)' : 'Passed Q\'ty'}
             </span>
-            <div className={`text-2xl font-black ${isLight ? 'text-emerald-800' : 'text-emerald-300'}`}>
-              {summaryMetrics.passedQty.toLocaleString()} <span className={`text-xs font-semibold ${isLight ? 'text-emerald-700' : 'text-emerald-500'}`}>Pcs</span>
+            <div className={`text-2xl font-black ${isLight ? 'text-black' : 'text-emerald-300'}`}>
+              {summaryMetrics.passedQty.toLocaleString()} <span className={`text-xs font-black ${isLight ? 'text-black' : 'text-emerald-500'}`}>Pcs</span>
             </div>
-            <span className={`text-[10px] font-mono font-bold ${isLight ? 'text-emerald-800' : 'text-emerald-500'}`}>Rate: {summaryMetrics.passRate}%</span>
+            <span className={`text-[10px] font-mono font-black ${isLight ? 'text-black' : 'text-emerald-500'}`}>Rate: {summaryMetrics.passRate}%</span>
           </div>
         </div>
 
@@ -364,15 +364,15 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
             <XCircle className="w-6 h-6" />
           </div>
           <div>
-            <span className={`text-[10px] font-extrabold uppercase tracking-wider block ${
-              isLight ? 'text-rose-900' : 'text-rose-400'
+            <span className={`text-[10px] font-black uppercase tracking-wider block ${
+              isLight ? 'text-black' : 'text-rose-400'
             }`}>
               {isTh ? 'งานเสีย (Defect Q\'ty)' : 'Defect Q\'ty'}
             </span>
-            <div className={`text-2xl font-black ${isLight ? 'text-rose-800' : 'text-rose-300'}`}>
-              {summaryMetrics.defectQty.toLocaleString()} <span className={`text-xs font-semibold ${isLight ? 'text-rose-700' : 'text-rose-500'}`}>Pcs</span>
+            <div className={`text-2xl font-black ${isLight ? 'text-black' : 'text-rose-300'}`}>
+              {summaryMetrics.defectQty.toLocaleString()} <span className={`text-xs font-black ${isLight ? 'text-black' : 'text-rose-500'}`}>Pcs</span>
             </div>
-            <span className={`text-[10px] font-mono font-bold ${isLight ? 'text-rose-800' : 'text-rose-500'}`}>
+            <span className={`text-[10px] font-mono font-black ${isLight ? 'text-black' : 'text-rose-500'}`}>
               {summaryMetrics.defectQty === 0 ? 'Zero Defect' : 'Requires Review'}
             </span>
           </div>
@@ -387,13 +387,13 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
             <TrendingUp className="w-6 h-6" />
           </div>
           <div>
-            <span className={`text-[10px] font-extrabold uppercase tracking-wider block ${
-              isLight ? 'text-amber-950' : 'text-amber-400'
+            <span className={`text-[10px] font-black uppercase tracking-wider block ${
+              isLight ? 'text-black' : 'text-amber-400'
             }`}>
               {isTh ? 'อัตราผ่านรวม (Pass %)' : 'Overall Pass Rate'}
             </span>
-            <div className={`text-2xl font-black ${isLight ? 'text-amber-900' : 'text-amber-300'}`}>{summaryMetrics.passRate}%</div>
-            <span className={`text-[10px] font-mono font-bold ${isLight ? 'text-amber-900' : 'text-amber-500'}`}>Target: ≥ 99.0%</span>
+            <div className={`text-2xl font-black ${isLight ? 'text-black' : 'text-amber-300'}`}>{summaryMetrics.passRate}%</div>
+            <span className={`text-[10px] font-mono font-black ${isLight ? 'text-black' : 'text-amber-500'}`}>Target: ≥ 99.0%</span>
           </div>
         </div>
       </div>
@@ -427,17 +427,27 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={gradeData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#cbd5e1' : '#1e293b'} />
-                  <XAxis dataKey="grade" stroke={isLight ? '#475569' : '#94a3b8'} fontSize={11} fontWeight={600} />
-                  <YAxis stroke={isLight ? '#475569' : '#94a3b8'} fontSize={11} />
+                  <XAxis 
+                    dataKey="grade" 
+                    stroke={isLight ? '#000000' : '#94a3b8'} 
+                    tick={{ fill: isLight ? '#000000' : '#94a3b8', fontSize: 11, fontWeight: 800 }} 
+                    fontSize={11} 
+                    fontWeight={800} 
+                  />
+                  <YAxis 
+                    stroke={isLight ? '#000000' : '#94a3b8'} 
+                    tick={{ fill: isLight ? '#000000' : '#94a3b8', fontSize: 11, fontWeight: 800 }} 
+                    fontSize={11} 
+                  />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: isLight ? '#ffffff' : '#0f172a', 
                       borderColor: isLight ? '#cbd5e1' : '#334155', 
                       borderRadius: '12px', 
                       fontSize: '11px',
-                      color: isLight ? '#0f172a' : '#ffffff'
+                      color: isLight ? '#000000' : '#ffffff'
                     }}
-                    labelStyle={{ color: isLight ? '#0f172a' : '#ffffff', fontWeight: 'bold' }}
+                    labelStyle={{ color: isLight ? '#000000' : '#ffffff', fontWeight: 'bold' }}
                   />
                   <Bar dataKey="qty" fill="#6366f1" radius={[8, 8, 0, 0]} name={isTh ? "จำนวนชิ้น (Pcs)" : "Quantity (Pcs)"} />
                 </BarChart>
@@ -452,8 +462,8 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
           {/* Table Breakdown */}
           <div className="overflow-x-auto">
             <table className="w-full text-[11px] text-left">
-              <thead className={`font-extrabold uppercase ${
-                isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-400'
+              <thead className={`font-black uppercase ${
+                isLight ? 'bg-blue-100 text-black border-b-2 border-blue-300' : 'bg-slate-950 text-slate-400'
               }`}>
                 <tr>
                   <th className="p-2 rounded-l-lg">Grade</th>
@@ -462,13 +472,13 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
                   <th className="p-2 text-right rounded-r-lg">Defect</th>
                 </tr>
               </thead>
-              <tbody className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-slate-800'}`}>
+              <tbody className={`divide-y ${isLight ? 'divide-slate-300 font-bold' : 'divide-slate-800'}`}>
                 {gradeData.map((g, idx) => (
-                  <tr key={idx} className={isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-800/50'}>
-                    <td className={`p-2 font-mono font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{g.grade}</td>
-                    <td className={`p-2 text-right font-mono font-bold ${isLight ? 'text-indigo-800' : 'text-indigo-300'}`}>{g.qty.toLocaleString()}</td>
-                    <td className={`p-2 text-right font-mono font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>{g.passedQty.toLocaleString()}</td>
-                    <td className={`p-2 text-right font-mono font-bold ${isLight ? 'text-rose-700' : 'text-rose-400'}`}>{g.defectQty.toLocaleString()}</td>
+                  <tr key={idx} className={isLight ? 'hover:bg-blue-50/60' : 'hover:bg-slate-800/50'}>
+                    <td className={`p-2 font-mono font-black ${isLight ? 'text-black' : 'text-white'}`}>{g.grade}</td>
+                    <td className={`p-2 text-right font-mono font-black ${isLight ? 'text-black' : 'text-indigo-300'}`}>{g.qty.toLocaleString()}</td>
+                    <td className={`p-2 text-right font-mono font-black ${isLight ? 'text-black' : 'text-emerald-400'}`}>{g.passedQty.toLocaleString()}</td>
+                    <td className={`p-2 text-right font-mono font-black ${isLight ? 'text-black' : 'text-rose-400'}`}>{g.defectQty.toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -478,7 +488,7 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
 
         {/* Supplier Distribution */}
         <div className={`rounded-3xl p-6 space-y-4 shadow-xl border ${
-          isLight ? 'bg-white border-slate-200 shadow-slate-200/50' : 'bg-slate-900 border-slate-800'
+          isLight ? 'bg-white border-slate-300 shadow-slate-200/50' : 'bg-slate-900 border-slate-800'
         }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -487,13 +497,13 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
               }`}>
                 <Truck className="w-4 h-4" />
               </div>
-              <h4 className={`text-xs font-extrabold uppercase tracking-wider ${
-                isLight ? 'text-slate-900' : 'text-white'
+              <h4 className={`text-xs font-black uppercase tracking-wider ${
+                isLight ? 'text-black' : 'text-white'
               }`}>
                 {isTh ? 'สรุปตาม Supplier & Pass Rate' : 'Summary by Supplier & Quality'}
               </h4>
             </div>
-            <span className={`text-[10px] font-mono font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+            <span className={`text-[10px] font-mono font-black ${isLight ? 'text-black' : 'text-slate-400'}`}>
               {supplierData.length} Suppliers
             </span>
           </div>
@@ -524,13 +534,13 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
                       borderColor: isLight ? '#cbd5e1' : '#334155', 
                       borderRadius: '12px', 
                       fontSize: '11px',
-                      color: isLight ? '#0f172a' : '#ffffff'
+                      color: isLight ? '#000000' : '#ffffff'
                     }}
                   />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">
+              <div className="h-full flex items-center justify-center text-xs text-slate-500 font-bold">
                 {isTh ? 'ไม่พบข้อมูลในช่วงที่เลือก' : 'No data available'}
               </div>
             )}
@@ -539,8 +549,8 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
           {/* Supplier Breakdown */}
           <div className="overflow-x-auto">
             <table className="w-full text-[11px] text-left">
-              <thead className={`font-extrabold uppercase ${
-                isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-400'
+              <thead className={`font-black uppercase ${
+                isLight ? 'bg-blue-100 text-black border-b-2 border-blue-300' : 'bg-slate-950 text-slate-400'
               }`}>
                 <tr>
                   <th className="p-2 rounded-l-lg">Supplier</th>
@@ -548,15 +558,15 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
                   <th className="p-2 text-right rounded-r-lg">Pass Rate %</th>
                 </tr>
               </thead>
-              <tbody className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-slate-800'}`}>
+              <tbody className={`divide-y ${isLight ? 'divide-slate-300 font-bold' : 'divide-slate-800'}`}>
                 {supplierData.map((s, idx) => (
-                  <tr key={idx} className={isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-800/50'}>
-                    <td className={`p-2 font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  <tr key={idx} className={isLight ? 'hover:bg-blue-50/60' : 'hover:bg-slate-800/50'}>
+                    <td className={`p-2 font-black flex items-center gap-2 ${isLight ? 'text-black' : 'text-white'}`}>
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
                       <span>{s.supplier}</span>
                     </td>
-                    <td className={`p-2 text-right font-mono font-bold ${isLight ? 'text-indigo-800' : 'text-indigo-300'}`}>{s.qty.toLocaleString()}</td>
-                    <td className={`p-2 text-right font-mono font-extrabold ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>{s.passRate}%</td>
+                    <td className={`p-2 text-right font-mono font-black ${isLight ? 'text-black' : 'text-indigo-300'}`}>{s.qty.toLocaleString()}</td>
+                    <td className={`p-2 text-right font-mono font-black ${isLight ? 'text-black' : 'text-emerald-400'}`}>{s.passRate}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -567,7 +577,7 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
 
       {/* 3. Cutting Length Distribution */}
       <div className={`rounded-3xl p-6 space-y-4 shadow-xl border ${
-        isLight ? 'bg-white border-slate-200 shadow-slate-200/50' : 'bg-slate-900 border-slate-800'
+        isLight ? 'bg-white border-slate-300 shadow-slate-200/50' : 'bg-slate-900 border-slate-800'
       }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -576,8 +586,8 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
             }`}>
               <Ruler className="w-4 h-4" />
             </div>
-            <h4 className={`text-xs font-extrabold uppercase tracking-wider ${
-              isLight ? 'text-slate-900' : 'text-white'
+            <h4 className={`text-xs font-black uppercase tracking-wider ${
+              isLight ? 'text-black' : 'text-white'
             }`}>
               {isTh ? 'สรุปตามความยาวตัด (Cutting Length Breakdown)' : 'Cutting Length Summary'}
             </h4>
@@ -587,17 +597,17 @@ export const BilletCuttingDashboard: React.FC<BilletCuttingDashboardProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {lengthData.map((l, idx) => (
             <div key={idx} className={`p-4 rounded-2xl border space-y-1 ${
-              isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+              isLight ? 'bg-slate-50 border-slate-300 shadow-xs' : 'bg-slate-950 border-slate-800'
             }`}>
-              <span className={`text-[10px] font-extrabold uppercase block ${
-                isLight ? 'text-slate-600' : 'text-slate-500'
+              <span className={`text-[10px] font-black uppercase block ${
+                isLight ? 'text-black' : 'text-slate-500'
               }`}>Length</span>
-              <div className={`text-lg font-black font-mono ${isLight ? 'text-pink-700' : 'text-pink-400'}`}>{l.length}</div>
-              <div className={`text-xs font-mono font-semibold ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>{l.qty.toLocaleString()} Pcs ({l.count} lots)</div>
+              <div className={`text-lg font-black font-mono ${isLight ? 'text-black' : 'text-pink-400'}`}>{l.length}</div>
+              <div className={`text-xs font-mono font-bold ${isLight ? 'text-black' : 'text-slate-300'}`}>{l.qty.toLocaleString()} Pcs ({l.count} lots)</div>
             </div>
           ))}
           {lengthData.length === 0 && (
-            <div className="col-span-full py-8 text-center text-xs text-slate-500">
+            <div className="col-span-full py-8 text-center text-xs text-slate-500 font-bold">
               {isTh ? 'ไม่มีข้อมูลความยาวตัด' : 'No length data recorded'}
             </div>
           )}

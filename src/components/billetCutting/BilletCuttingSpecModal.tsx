@@ -183,22 +183,22 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
               <Sliders className="w-6 h-6" />
             </div>
             <div>
-              <h3 className={`text-lg font-extrabold flex items-center gap-2 ${
-                isLight ? 'text-slate-900' : 'text-white'
+              <h3 className={`text-lg font-black flex items-center gap-2 ${
+                isLight ? 'text-black' : 'text-white'
               }`}>
                 <span>{isTh ? 'จัดการมาตรฐาน Billet Cutting Spec (IPQA-08)' : 'Billet Cutting Spec Manager (IPQA-08)'}</span>
                 {isAuthenticated && (
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 border ${
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black flex items-center gap-1 border-2 ${
                     isLight 
-                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                      ? 'bg-emerald-100 text-black border-emerald-400' 
                       : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                   }`}>
-                    <ShieldCheck className="w-3 h-3" />
+                    <ShieldCheck className="w-3 h-3 text-emerald-700" />
                     <span>Admin Unlocked</span>
                   </span>
                 )}
               </h3>
-              <p className={`text-xs font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+              <p className={`text-xs font-bold ${isLight ? 'text-black' : 'text-slate-400'}`}>
                 {isTh 
                   ? 'กำหนดเกณฑ์มาตรฐาน Length, Diameter, Bending (Lx0.15%), Cutting Surface (<2mm) และ Surface Defect' 
                   : 'Configure standard specs for Length, Diameter, Bending, Cutting surface & Surface defect'}
@@ -208,7 +208,7 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
           <button
             onClick={onClose}
             className={`p-2 rounded-xl transition ${
-              isLight ? 'text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200' : 'text-slate-400 hover:text-white bg-slate-800/80'
+              isLight ? 'text-black hover:text-black bg-slate-200 hover:bg-slate-300 border border-slate-300' : 'text-slate-400 hover:text-white bg-slate-800/80'
             }`}
           >
             <X className="w-5 h-5" />
@@ -287,9 +287,8 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
           /* AUTHENTICATED SPEC CONTENT */
           <div className="space-y-6">
             {/* Top Toolbar */}
-            {/* Top Toolbar */}
             <div className="flex items-center justify-between">
-              <div className={`text-xs font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+              <div className={`text-xs font-black ${isLight ? 'text-black' : 'text-slate-400'}`}>
                 {isTh ? `พบทั้งหมด ${Object.keys(specs).length} รายการเกณฑ์ Supplier` : `Total ${Object.keys(specs).length} Supplier Specs`}
               </div>
               <button
@@ -601,31 +600,31 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold uppercase ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                        <span className={`text-[10px] font-black uppercase ${isLight ? 'text-black' : 'text-slate-400'}`}>
                           {isTh ? 'Supplier:' : 'Supplier:'}
                         </span>
-                        <span className={`text-sm font-black font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                        <span className={`text-sm font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>
                           {spec.name}
                         </span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border-2 ${
                           isLight 
-                            ? 'bg-indigo-100 text-indigo-900 border-indigo-200' 
+                            ? 'bg-blue-100 text-black border-blue-400' 
                             : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
                         }`}>
                           Grade: {spec.billetGrade}
                         </span>
                       </div>
                       {spec.remarks && (
-                        <p className={`text-[11px] mt-1 ${isLight ? 'text-slate-600 font-medium' : 'text-slate-400'}`}>{spec.remarks}</p>
+                        <p className={`text-[11px] mt-1 ${isLight ? 'text-black font-bold' : 'text-slate-400'}`}>{spec.remarks}</p>
                       )}
                     </div>
 
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => startEdit(key, spec)}
-                        className={`p-1.5 rounded-lg border transition ${
+                        className={`p-1.5 rounded-lg border-2 transition ${
                           isLight 
-                            ? 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border-slate-300' 
+                            ? 'bg-white hover:bg-blue-100 text-black hover:text-blue-900 border-slate-300' 
                             : 'bg-slate-900 hover:bg-indigo-600/30 text-slate-300 hover:text-indigo-300 border-slate-800'
                         }`}
                         title="Edit Spec"
@@ -654,9 +653,9 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                       ) : (
                         <button
                           onClick={() => setConfirmDeleteKey(key)}
-                          className={`p-1.5 rounded-lg border transition ${
+                          className={`p-1.5 rounded-lg border-2 transition ${
                             isLight
-                              ? 'bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border-slate-300'
+                              ? 'bg-white hover:bg-rose-50 text-black hover:text-rose-600 border-slate-300'
                               : 'bg-slate-900 hover:bg-rose-600/30 text-slate-300 hover:text-rose-300 border-slate-800'
                           }`}
                           title="Delete Spec"
@@ -668,30 +667,30 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                   </div>
 
                   <div className={`grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t font-mono text-[11px] ${
-                    isLight ? 'border-slate-200' : 'border-slate-900'
+                    isLight ? 'border-slate-300' : 'border-slate-900'
                   }`}>
-                    <div className={`p-2 rounded-xl ${isLight ? 'bg-white border border-slate-200' : 'bg-slate-900'}`}>
-                      <span className={`text-[9px] block ${isLight ? 'text-slate-600 font-bold' : 'text-slate-500'}`}>Length (mm)</span>
-                      <span className={`font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>{spec.lengthMin}-{spec.lengthMax}</span>
+                    <div className={`p-2 rounded-xl ${isLight ? 'bg-white border-2 border-slate-300 shadow-xs' : 'bg-slate-900'}`}>
+                      <span className={`text-[9px] block ${isLight ? 'text-black font-black' : 'text-slate-500'}`}>Length (mm)</span>
+                      <span className={`font-black ${isLight ? 'text-black' : 'text-emerald-400'}`}>{spec.lengthMin}-{spec.lengthMax}</span>
                     </div>
-                    <div className={`p-2 rounded-xl ${isLight ? 'bg-white border border-slate-200' : 'bg-slate-900'}`}>
-                      <span className={`text-[9px] block ${isLight ? 'text-slate-600 font-bold' : 'text-slate-500'}`}>Diameter (mm)</span>
-                      <span className={`font-bold ${isLight ? 'text-sky-700' : 'text-sky-400'}`}>{spec.diameterMin}-{spec.diameterMax}</span>
+                    <div className={`p-2 rounded-xl ${isLight ? 'bg-white border-2 border-slate-300 shadow-xs' : 'bg-slate-900'}`}>
+                      <span className={`text-[9px] block ${isLight ? 'text-black font-black' : 'text-slate-500'}`}>Diameter (mm)</span>
+                      <span className={`font-black ${isLight ? 'text-black' : 'text-sky-400'}`}>{spec.diameterMin}-{spec.diameterMax}</span>
                     </div>
-                    <div className={`p-2 rounded-xl ${isLight ? 'bg-white border border-slate-200' : 'bg-slate-900'}`}>
-                      <span className={`text-[9px] block ${isLight ? 'text-slate-600 font-bold' : 'text-slate-500'}`}>Bending Max</span>
-                      <span className={`font-bold ${isLight ? 'text-amber-800' : 'text-amber-400'}`}>≤{spec.bendingMax || (parseFloat(spec.lengthNominal || '500')*0.0015).toFixed(2)}</span>
+                    <div className={`p-2 rounded-xl ${isLight ? 'bg-white border-2 border-slate-300 shadow-xs' : 'bg-slate-900'}`}>
+                      <span className={`text-[9px] block ${isLight ? 'text-black font-black' : 'text-slate-500'}`}>Bending Max</span>
+                      <span className={`font-black ${isLight ? 'text-black' : 'text-amber-400'}`}>≤{spec.bendingMax || (parseFloat(spec.lengthNominal || '500')*0.0015).toFixed(2)}</span>
                     </div>
-                    <div className={`p-2 rounded-xl ${isLight ? 'bg-white border border-slate-200' : 'bg-slate-900'}`}>
-                      <span className={`text-[9px] block ${isLight ? 'text-slate-600 font-bold' : 'text-slate-500'}`}>Cutting Surface</span>
-                      <span className={`font-bold ${isLight ? 'text-rose-700' : 'text-pink-400'}`}>&lt;{spec.cuttingSurfaceMax} mm</span>
+                    <div className={`p-2 rounded-xl ${isLight ? 'bg-white border-2 border-slate-300 shadow-xs' : 'bg-slate-900'}`}>
+                      <span className={`text-[9px] block ${isLight ? 'text-black font-black' : 'text-slate-500'}`}>Cutting Surface</span>
+                      <span className={`font-black ${isLight ? 'text-black' : 'text-pink-400'}`}>&lt;{spec.cuttingSurfaceMax} mm</span>
                     </div>
                   </div>
 
-                  <div className={`text-[10px] flex items-center justify-between pt-1 ${
-                    isLight ? 'text-slate-700' : 'text-slate-500'
+                  <div className={`text-[10px] flex items-center justify-between pt-1 font-bold ${
+                    isLight ? 'text-black' : 'text-slate-500'
                   }`}>
-                    <span>Defect Spec: <strong className={isLight ? 'text-purple-800' : 'text-purple-300'}>{spec.surfaceDefectSpecText || '≤ 2x50x100 mm'}</strong></span>
+                    <span>Defect Spec: <strong className={isLight ? 'text-purple-800 font-black' : 'text-purple-300'}>{spec.surfaceDefectSpecText || '≤ 2x50x100 mm'}</strong></span>
                     <span>Nominal L: {spec.lengthNominal || '500'} mm</span>
                   </div>
                 </div>

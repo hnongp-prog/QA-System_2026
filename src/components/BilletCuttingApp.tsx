@@ -380,7 +380,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
     <div
       data-app="IPQA-08"
       className={`ipqa-08-container min-h-screen font-sans pb-20 selection:bg-indigo-500 selection:text-white relative transition-colors ${
-        isLight ? 'bg-slate-100 text-black' : 'bg-slate-950 text-slate-100'
+        isLight ? 'bg-slate-100 text-black theme-light' : 'bg-slate-950 text-slate-100'
       }`}
     >
       {/* Toast Notification */}
@@ -438,7 +438,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                 activeTab === 'ENTRY'
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
                   : isLight
-                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 border border-slate-200'
+                    ? 'bg-white text-black font-extrabold hover:bg-slate-100 border-2 border-slate-300 shadow-xs'
                     : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
             >
@@ -452,7 +452,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                 activeTab === 'DASHBOARD'
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
                   : isLight
-                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 border border-slate-200'
+                    ? 'bg-white text-black font-extrabold hover:bg-slate-100 border-2 border-slate-300 shadow-xs'
                     : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
             >
@@ -466,7 +466,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                 activeTab === 'HISTORY'
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
                   : isLight
-                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 border border-slate-200'
+                    ? 'bg-white text-black font-extrabold hover:bg-slate-100 border-2 border-slate-300 shadow-xs'
                     : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
             >
@@ -476,9 +476,9 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
 
             <button
               onClick={() => setIsSpecModalOpen(true)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 ml-1 border ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 ml-1 border-2 ${
                 isLight 
-                  ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300' 
+                  ? 'bg-amber-100 hover:bg-amber-200 text-black font-black border-amber-400' 
                   : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
               }`}
               title="Admin Spec Manager"

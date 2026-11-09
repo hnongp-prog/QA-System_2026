@@ -271,12 +271,12 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
               <History className="w-5 h-5" />
             </div>
             <div>
-              <h3 className={`text-sm font-extrabold uppercase tracking-wider ${
-                isLight ? 'text-slate-900' : 'text-white'
+              <h3 className={`text-sm font-black uppercase tracking-wider ${
+                isLight ? 'text-black' : 'text-white'
               }`}>
                 {isTh ? 'ประวัติการบันทึกการตัดท่อนบิลเล็ต (IPQA-08 History)' : 'Billet Cutting Inspection History'}
               </h3>
-              <p className={`text-[11px] font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+              <p className={`text-[11px] font-bold ${isLight ? 'text-black' : 'text-slate-400'}`}>
                 {filterMonthMode === 'CURRENT_MONTH' 
                   ? (isTh ? `★ แสดงเบื้องต้น: ข้อมูลในเดือนปัจจุบัน (${currentMonth}/${currentYear}) เพื่อความรวดเร็ว` : `★ Default view: Current Month (${currentMonth}/${currentYear})`) 
                   : (isTh ? 'แสดงข้อมูลทั้งหมดตามตัวกรองที่เลือก' : 'Displaying records based on selected filter')}
@@ -428,13 +428,13 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
         isLight ? 'bg-white border-slate-200 shadow-slate-200/50' : 'bg-slate-900 border-slate-800'
       }`}>
         <div className={`p-4 border-b flex items-center justify-between ${
-          isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+          isLight ? 'bg-slate-50 border-slate-300' : 'bg-slate-950 border-slate-800'
         }`}>
-          <span className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>
+          <span className={`text-xs font-black ${isLight ? 'text-black' : 'text-slate-300'}`}>
             {isTh ? `แสดง ${filteredRecords.length} รายการลอต (จากทั้งหมด ${records.length} ลอต)` : `Showing ${filteredRecords.length} of ${records.length} lots`}
           </span>
-          <span className={`text-[11px] font-mono flex items-center gap-1 font-bold ${
-            isLight ? 'text-amber-800' : 'text-amber-400/90'
+          <span className={`text-[11px] font-mono flex items-center gap-1 font-black ${
+            isLight ? 'text-black' : 'text-amber-400/90'
           }`}>
             <Lock className="w-3.5 h-3.5" />
             <span>{isTh ? 'การลบ / แก้ไข ต้องใช้รหัส admin2026' : 'Edit & Delete require admin2026'}</span>
@@ -443,8 +443,8 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
 
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
-            <thead className={`font-extrabold uppercase tracking-wider text-[10px] border-b ${
-              isLight ? 'bg-slate-100 text-slate-800 border-slate-200' : 'bg-slate-950/80 text-slate-400 border-slate-800'
+            <thead className={`font-black uppercase tracking-wider text-[10px] border-b-2 ${
+              isLight ? 'bg-blue-100 text-black border-blue-300' : 'bg-slate-950/80 text-slate-400 border-slate-800'
             }`}>
               <tr>
                 <th className="px-4 py-3">Date / ID</th>
@@ -460,25 +460,25 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
             <tbody className={`divide-y font-sans ${isLight ? 'divide-slate-200' : 'divide-slate-800/60'}`}>
               {filteredRecords.length > 0 ? (
                 filteredRecords.map(record => (
-                  <tr key={record.id} className={isLight ? 'hover:bg-slate-50 transition' : 'hover:bg-slate-800/40 transition'}>
+                  <tr key={record.id} className={isLight ? 'hover:bg-blue-50/40 transition' : 'hover:bg-slate-800/40 transition'}>
                     <td className="px-4 py-3.5">
-                      <div className={`font-mono font-black ${isLight ? 'text-slate-950' : 'text-white'}`}>{record.id}</div>
-                      <div className={`text-[10px] font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{record.header.date || record.timestamp}</div>
+                      <div className={`font-mono font-black ${isLight ? 'text-black' : 'text-white'}`}>{record.id}</div>
+                      <div className={`text-[10px] font-bold ${isLight ? 'text-black' : 'text-slate-400'}`}>{record.header.date || record.timestamp}</div>
                     </td>
 
                     <td className="px-4 py-3.5">
-                      <div className={`font-mono font-bold ${isLight ? 'text-indigo-900' : 'text-indigo-300'}`}>{record.header.lotNo}</div>
-                      <div className={`text-[10px] font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{record.header.shift}</div>
+                      <div className={`font-mono font-black ${isLight ? 'text-black' : 'text-indigo-300'}`}>{record.header.lotNo}</div>
+                      <div className={`text-[10px] font-bold ${isLight ? 'text-black' : 'text-slate-400'}`}>{record.header.shift}</div>
                     </td>
 
                     <td className="px-4 py-3.5">
-                      <div className={`font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>{record.header.inspectorName}</div>
+                      <div className={`font-black ${isLight ? 'text-black' : 'text-slate-200'}`}>{record.header.inspectorName}</div>
                       {record.header.machine && (
-                        <div className={`text-[10px] font-mono font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{record.header.machine}</div>
+                        <div className={`text-[10px] font-mono font-bold ${isLight ? 'text-black' : 'text-slate-400'}`}>{record.header.machine}</div>
                       )}
                     </td>
 
-                    <td className={`px-4 py-3.5 font-mono font-black ${isLight ? 'text-pink-700' : 'text-pink-400'}`}>
+                    <td className={`px-4 py-3.5 font-mono font-black ${isLight ? 'text-black' : 'text-pink-400'}`}>
                       {record.header.cuttingLength} mm
                     </td>
 
@@ -489,31 +489,31 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                             key={idx} 
                             className={`px-1.5 py-0.5 rounded border text-[10px] font-mono ${
                               isLight 
-                                ? 'bg-slate-50 border-slate-300 text-slate-800' 
+                                ? 'bg-blue-50 border-blue-300 text-black font-bold' 
                                 : 'bg-slate-950 border-slate-800 text-slate-300'
                             }`}
                           >
-                            <strong className={isLight ? 'text-indigo-800 font-extrabold' : 'text-indigo-400'}>{item.billetGrade}</strong>: {item.heatNo} ({item.qty} pcs)
+                            <strong className={isLight ? 'text-black font-black' : 'text-indigo-400'}>{item.billetGrade}</strong>: {item.heatNo} ({item.qty} pcs)
                           </span>
                         ))}
                       </div>
                     </td>
 
-                    <td className={`px-4 py-3.5 text-center font-mono font-black ${isLight ? 'text-slate-950' : 'text-white'}`}>
-                      {record.totalQty} <span className={`text-[10px] font-semibold ${isLight ? 'text-slate-600' : 'text-slate-500'}`}>Pcs</span>
+                    <td className={`px-4 py-3.5 text-center font-mono font-black ${isLight ? 'text-black' : 'text-white'}`}>
+                      {record.totalQty} <span className={`text-[10px] font-black ${isLight ? 'text-black' : 'text-slate-500'}`}>Pcs</span>
                     </td>
 
                     <td className="px-4 py-3.5 text-center">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 border ${
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 border-2 ${
                         record.overallJudgement === 'PASS' 
                           ? isLight 
-                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                            ? 'bg-emerald-100 text-black border-emerald-600' 
                             : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
                           : isLight 
-                            ? 'bg-rose-100 text-rose-800 border-rose-300' 
+                            ? 'bg-rose-100 text-black border-rose-600' 
                             : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                       }`}>
-                        {record.overallJudgement === 'PASS' ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                        {record.overallJudgement === 'PASS' ? <CheckCircle2 className="w-3 h-3 text-emerald-700" /> : <XCircle className="w-3 h-3 text-rose-700" />}
                         <span>{record.overallJudgement}</span>
                       </span>
                     </td>
@@ -524,7 +524,7 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                           onClick={() => setViewingRecord(record)}
                           className={`p-1.5 rounded-lg transition border ${
                             isLight 
-                              ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300' 
+                              ? 'bg-slate-100 hover:bg-slate-200 text-black font-bold border-slate-300' 
                               : 'bg-slate-800 hover:bg-indigo-600/30 text-slate-300 hover:text-indigo-300 border-transparent'
                           }`}
                           title="View Details"
@@ -535,7 +535,7 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                           onClick={() => triggerAuth('EDIT', record.id)}
                           className={`p-1.5 rounded-lg transition border ${
                             isLight 
-                              ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300' 
+                              ? 'bg-amber-50 hover:bg-amber-100 text-black font-bold border-amber-300' 
                               : 'bg-slate-800 hover:bg-amber-600/30 text-slate-300 hover:text-amber-300 border-transparent'
                           }`}
                           title="Edit (Admin Only)"
@@ -544,7 +544,11 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                         </button>
                         <button
                           onClick={() => triggerAuth('DELETE', record.id)}
-                          className="p-1.5 bg-slate-800 hover:bg-rose-600/30 text-slate-300 hover:text-rose-300 rounded-lg transition"
+                          className={`p-1.5 rounded-lg transition border ${
+                            isLight
+                              ? 'bg-rose-50 hover:bg-rose-100 text-black font-bold border-rose-300'
+                              : 'bg-slate-800 hover:bg-rose-600/30 text-slate-300 hover:text-rose-300 border-transparent'
+                          }`}
                           title="Delete (Admin Only)"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -569,10 +573,10 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
       {viewingRecord && (
         <div className="fixed inset-0 z-[120] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className={`w-full max-w-4xl rounded-3xl p-6 space-y-5 shadow-2xl relative my-8 border ${
-            isLight ? 'bg-white border-slate-300 text-slate-900 shadow-slate-300/50' : 'bg-slate-900 border-slate-800 text-slate-100'
+            isLight ? 'bg-white border-slate-300 text-black shadow-slate-300/50' : 'bg-slate-900 border-slate-800 text-slate-100'
           }`}>
             <div className={`flex items-center justify-between pb-3 border-b ${
-              isLight ? 'border-slate-200' : 'border-slate-800'
+              isLight ? 'border-slate-300' : 'border-slate-800'
             }`}>
               <div className="flex items-center gap-2.5">
                 <div className={`p-2 rounded-xl border ${
@@ -581,10 +585,10 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                   <Scissors className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className={`text-base font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  <h3 className={`text-base font-black ${isLight ? 'text-black' : 'text-white'}`}>
                     {isTh ? 'รายละเอียดผลการตรวจตัดท่อนบิลเล็ต' : 'Billet Cutting Inspection Details'}
                   </h3>
-                  <p className={`text-xs font-mono font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                  <p className={`text-xs font-mono font-bold ${isLight ? 'text-black' : 'text-slate-400'}`}>
                     ID: {viewingRecord.id} | Lot: {viewingRecord.header.lotNo}
                   </p>
                 </div>
@@ -592,7 +596,7 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
               <button
                 onClick={() => setViewingRecord(null)}
                 className={`p-1.5 rounded-lg transition ${
-                  isLight ? 'text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200' : 'text-slate-400 hover:text-white bg-slate-800/80'
+                  isLight ? 'text-black hover:bg-slate-200 bg-slate-100' : 'text-slate-400 hover:text-white bg-slate-800/80'
                 }`}
               >
                 <X className="w-5 h-5" />
@@ -601,22 +605,22 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
 
             {/* Header info */}
             <div className={`grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl border font-mono text-xs ${
-              isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-800 text-white'
+              isLight ? 'bg-blue-50/50 border-blue-200 text-black' : 'bg-slate-950 border-slate-800 text-white'
             }`}>
               <div>
-                <span className={`text-[10px] uppercase font-bold block ${isLight ? 'text-slate-700' : 'text-slate-500'}`}>Inspector</span>
-                <span className={`font-black ${isLight ? 'text-slate-950' : 'text-white'}`}>{viewingRecord.header.inspectorName}</span>
+                <span className={`text-[10px] uppercase font-black block ${isLight ? 'text-black' : 'text-slate-500'}`}>Inspector</span>
+                <span className={`font-black ${isLight ? 'text-black' : 'text-white'}`}>{viewingRecord.header.inspectorName}</span>
               </div>
               <div>
-                <span className={`text-[10px] uppercase font-bold block ${isLight ? 'text-slate-700' : 'text-slate-500'}`}>Shift</span>
-                <span className={`font-black ${isLight ? 'text-indigo-950' : 'text-indigo-300'}`}>{viewingRecord.header.shift}</span>
+                <span className={`text-[10px] uppercase font-black block ${isLight ? 'text-black' : 'text-slate-500'}`}>Shift</span>
+                <span className={`font-black ${isLight ? 'text-black' : 'text-indigo-300'}`}>{viewingRecord.header.shift}</span>
               </div>
               <div>
-                <span className={`text-[10px] uppercase font-bold block ${isLight ? 'text-slate-700' : 'text-slate-500'}`}>Cutting Length Spec</span>
-                <span className={`font-black ${isLight ? 'text-pink-900' : 'text-pink-400'}`}>{viewingRecord.header.cuttingLength} mm</span>
+                <span className={`text-[10px] uppercase font-black block ${isLight ? 'text-black' : 'text-slate-500'}`}>Cutting Length Spec</span>
+                <span className={`font-black ${isLight ? 'text-black' : 'text-pink-400'}`}>{viewingRecord.header.cuttingLength} mm</span>
               </div>
               <div>
-                <span className={`text-[10px] uppercase font-bold block ${isLight ? 'text-slate-700' : 'text-slate-500'}`}>Overall Status</span>
+                <span className={`text-[10px] uppercase font-black block ${isLight ? 'text-black' : 'text-slate-500'}`}>Overall Status</span>
                 <span className={`font-black ${viewingRecord.overallJudgement === 'PASS' ? (isLight ? 'text-emerald-900' : 'text-emerald-400') : (isLight ? 'text-rose-900' : 'text-rose-400')}`}>
                   {viewingRecord.overallJudgement} ({viewingRecord.totalQty} Pcs)
                 </span>
@@ -624,12 +628,12 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
             </div>
 
             {/* Items Table */}
-            <div className={`overflow-x-auto rounded-xl border ${
-              isLight ? 'border-slate-300 bg-white' : 'border-slate-800 bg-slate-950'
+            <div className={`overflow-x-auto rounded-xl border-2 ${
+              isLight ? 'border-blue-300 bg-white' : 'border-slate-800 bg-slate-950'
             }`}>
               <table className="w-full text-xs text-left">
-                <thead className={`font-black uppercase text-[10px] border-b ${
-                  isLight ? 'bg-slate-200 text-slate-950 border-slate-300' : 'bg-slate-950 text-slate-400 border-slate-800'
+                <thead className={`font-black uppercase text-[10px] border-b-2 ${
+                  isLight ? 'bg-blue-100 text-black border-blue-300' : 'bg-slate-950 text-slate-400 border-slate-800'
                 }`}>
                   <tr>
                     <th className="p-2.5">#</th>
@@ -646,20 +650,20 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                   </tr>
                 </thead>
                 <tbody className={`divide-y font-mono ${
-                  isLight ? 'divide-slate-200 text-slate-900' : 'divide-slate-800 text-slate-200'
+                  isLight ? 'divide-slate-200 text-black' : 'divide-slate-800 text-slate-200'
                 }`}>
                   {viewingRecord.items.map((item, idx) => (
-                    <tr key={idx} className={isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-800/40'}>
-                      <td className={`p-2.5 font-bold ${isLight ? 'text-slate-700' : 'text-slate-500'}`}>{idx + 1}</td>
-                      <td className={`p-2.5 font-black ${isLight ? 'text-indigo-950' : 'text-indigo-400'}`}>{item.billetGrade}</td>
-                      <td className={`p-2.5 font-bold ${isLight ? 'text-slate-900' : 'text-slate-300'}`}>{item.heatNo}</td>
-                      <td className={`p-2.5 font-sans font-bold ${isLight ? 'text-slate-900' : 'text-slate-300'}`}>{item.supplier}</td>
-                      <td className={`p-2.5 text-right font-black ${isLight ? 'text-slate-950' : 'text-white'}`}>{item.qty}</td>
-                      <td className={`p-2.5 text-right font-black ${isLight ? 'text-emerald-950' : 'text-emerald-400'}`}>{item.length} mm</td>
-                      <td className={`p-2.5 text-right font-black ${isLight ? 'text-sky-950' : 'text-sky-400'}`}>{item.diameter} mm</td>
-                      <td className={`p-2.5 text-right font-black ${isLight ? 'text-amber-950' : 'text-amber-400'}`}>{item.bending} mm <span className={`text-[10px] font-medium ${isLight ? 'text-slate-600' : 'text-slate-500'}`}>(max {item.bendingLimit || (parseFloat(item.length || '500')*0.0015).toFixed(2)})</span></td>
-                      <td className={`p-2.5 text-right font-black ${isLight ? 'text-rose-950' : 'text-pink-400'}`}>{item.cuttingSurface} mm</td>
-                      <td className={`p-2.5 text-[11px] font-sans font-bold ${isLight ? 'text-purple-950' : 'text-purple-300'}`}>{item.surfaceDefect || 'OK'}</td>
+                    <tr key={idx} className={isLight ? 'hover:bg-blue-50/40' : 'hover:bg-slate-800/40'}>
+                      <td className={`p-2.5 font-black ${isLight ? 'text-black' : 'text-slate-500'}`}>{idx + 1}</td>
+                      <td className={`p-2.5 font-black ${isLight ? 'text-black' : 'text-indigo-400'}`}>{item.billetGrade}</td>
+                      <td className={`p-2.5 font-bold ${isLight ? 'text-black' : 'text-slate-300'}`}>{item.heatNo}</td>
+                      <td className={`p-2.5 font-sans font-black ${isLight ? 'text-black' : 'text-slate-300'}`}>{item.supplier}</td>
+                      <td className={`p-2.5 text-right font-black ${isLight ? 'text-black' : 'text-white'}`}>{item.qty}</td>
+                      <td className={`p-2.5 text-right font-black ${isLight ? 'text-black' : 'text-emerald-400'}`}>{item.length} mm</td>
+                      <td className={`p-2.5 text-right font-black ${isLight ? 'text-black' : 'text-sky-400'}`}>{item.diameter} mm</td>
+                      <td className={`p-2.5 text-right font-black ${isLight ? 'text-black' : 'text-amber-400'}`}>{item.bending} mm <span className={`text-[10px] font-black ${isLight ? 'text-black' : 'text-slate-500'}`}>(max {item.bendingLimit || (parseFloat(item.length || '500')*0.0015).toFixed(2)})</span></td>
+                      <td className={`p-2.5 text-right font-black ${isLight ? 'text-black' : 'text-pink-400'}`}>{item.cuttingSurface} mm</td>
+                      <td className={`p-2.5 text-[11px] font-sans font-black ${isLight ? 'text-black' : 'text-purple-300'}`}>{item.surfaceDefect || 'OK'}</td>
                       <td className="p-2.5 text-center">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${
                           item.judgement === 'PASS' 
@@ -955,8 +959,8 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                               newItems[idx].qty = parseInt(e.target.value) || 0;
                               setEditingRecord({ ...editingRecord, items: newItems });
                             }}
-                            className={`w-full rounded-lg px-2 py-1 font-bold text-xs text-center border ${
-                              isLight ? 'bg-white border-slate-300 text-slate-950' : 'bg-slate-950 border-slate-800 text-white'
+                            className={`w-full rounded-lg px-2 py-1 font-black text-xs text-center border-2 ${
+                              isLight ? 'bg-white border-blue-600 text-black' : 'bg-slate-950 border-slate-800 text-white'
                             }`}
                           />
                         </td>
@@ -973,8 +977,8 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                               }
                               setEditingRecord({ ...editingRecord, items: newItems });
                             }}
-                            className={`w-full rounded-lg px-2 py-1 font-bold text-xs text-center border ${
-                              isLight ? 'bg-emerald-50/50 border-emerald-300 text-emerald-950' : 'bg-slate-950 border-slate-800 text-emerald-400'
+                            className={`w-full rounded-lg px-2 py-1 font-black text-xs text-center border-2 ${
+                              isLight ? 'bg-white border-blue-600 text-black' : 'bg-slate-950 border-slate-800 text-emerald-400'
                             }`}
                           />
                         </td>
@@ -987,8 +991,8 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                               newItems[idx].diameter = e.target.value;
                               setEditingRecord({ ...editingRecord, items: newItems });
                             }}
-                            className={`w-full rounded-lg px-2 py-1 font-bold text-xs text-center border ${
-                              isLight ? 'bg-sky-50/50 border-sky-300 text-sky-950' : 'bg-slate-950 border-slate-800 text-sky-400'
+                            className={`w-full rounded-lg px-2 py-1 font-black text-xs text-center border-2 ${
+                              isLight ? 'bg-white border-blue-600 text-black' : 'bg-slate-950 border-slate-800 text-sky-400'
                             }`}
                           />
                         </td>
@@ -1001,8 +1005,8 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                               newItems[idx].bending = e.target.value;
                               setEditingRecord({ ...editingRecord, items: newItems });
                             }}
-                            className={`w-full rounded-lg px-2 py-1 font-bold text-xs text-center border ${
-                              isLight ? 'bg-amber-50/50 border-amber-300 text-amber-950' : 'bg-slate-950 border-slate-800 text-amber-400'
+                            className={`w-full rounded-lg px-2 py-1 font-black text-xs text-center border-2 ${
+                              isLight ? 'bg-white border-blue-600 text-black' : 'bg-slate-950 border-slate-800 text-amber-400'
                             }`}
                           />
                         </td>
@@ -1015,8 +1019,8 @@ export const BilletCuttingHistory: React.FC<BilletCuttingHistoryProps> = ({
                               newItems[idx].cuttingSurface = e.target.value;
                               setEditingRecord({ ...editingRecord, items: newItems });
                             }}
-                            className={`w-full rounded-lg px-2 py-1 font-bold text-xs text-center border ${
-                              isLight ? 'bg-pink-50/50 border-pink-300 text-pink-950' : 'bg-slate-950 border-slate-800 text-pink-400'
+                            className={`w-full rounded-lg px-2 py-1 font-black text-xs text-center border-2 ${
+                              isLight ? 'bg-white border-blue-600 text-black' : 'bg-slate-950 border-slate-800 text-pink-400'
                             }`}
                           />
                         </td>

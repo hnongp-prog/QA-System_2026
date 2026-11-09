@@ -356,24 +356,152 @@ html.theme-light .border-emerald-600 {
   border-color: #059669 !important;
 }
 
-/* High-priority rules for IPQA-08 in Light Theme: Black text & Blue 2px borders */
-html.theme-light [data-app="IPQA-08"] input:not([type="checkbox"]):not([type="radio"]),
-html.theme-light [data-app="IPQA-08"] select,
-html.theme-light .ipqa-08-container input:not([type="checkbox"]):not([type="radio"]),
-html.theme-light .ipqa-08-container select {
-  border-color: #2563eb !important;
-  border-width: 2px !important;
+/* =========================================================================
+   High-priority rules for IPQA-08 in Light Theme: Solid Black Text & Blue Borders
+   ========================================================================= */
+html.theme-light [data-app="IPQA-08"],
+html.theme-light .ipqa-08-container,
+[data-app="IPQA-08"].theme-light,
+.ipqa-08-container.theme-light,
+.theme-light [data-app="IPQA-08"],
+.theme-light .ipqa-08-container {
   color: #000000 !important;
+}
+
+/* Force all text elements, headings, labels, paragraphs, table elements in IPQA-08 to solid black */
+html.theme-light [data-app="IPQA-08"] h1,
+html.theme-light [data-app="IPQA-08"] h2,
+html.theme-light [data-app="IPQA-08"] h3,
+html.theme-light [data-app="IPQA-08"] h4,
+html.theme-light [data-app="IPQA-08"] h5,
+html.theme-light [data-app="IPQA-08"] h6,
+html.theme-light [data-app="IPQA-08"] p,
+html.theme-light [data-app="IPQA-08"] label,
+html.theme-light [data-app="IPQA-08"] span:not(.keep-white),
+html.theme-light [data-app="IPQA-08"] td,
+html.theme-light [data-app="IPQA-08"] th,
+html.theme-light [data-app="IPQA-08"] strong,
+html.theme-light [data-app="IPQA-08"] b,
+html.theme-light [data-app="IPQA-08"] small,
+html.theme-light .ipqa-08-container h1,
+html.theme-light .ipqa-08-container h2,
+html.theme-light .ipqa-08-container h3,
+html.theme-light .ipqa-08-container h4,
+html.theme-light .ipqa-08-container h5,
+html.theme-light .ipqa-08-container h6,
+html.theme-light .ipqa-08-container p,
+html.theme-light .ipqa-08-container label,
+html.theme-light .ipqa-08-container span:not(.keep-white),
+html.theme-light .ipqa-08-container td,
+html.theme-light .ipqa-08-container th,
+html.theme-light .ipqa-08-container strong,
+html.theme-light .ipqa-08-container b,
+html.theme-light .ipqa-08-container small,
+.theme-light [data-app="IPQA-08"] td,
+.theme-light [data-app="IPQA-08"] th,
+.theme-light [data-app="IPQA-08"] span:not(.keep-white),
+.theme-light [data-app="IPQA-08"] strong,
+.theme-light .ipqa-08-container td,
+.theme-light .ipqa-08-container th,
+.theme-light .ipqa-08-container span:not(.keep-white),
+.theme-light .ipqa-08-container strong {
+  color: #000000 !important;
+}
+
+/* Ensure all numbers (font-mono, input[type="number"], digits) are crisp solid black in Light Mode */
+html.theme-light [data-app="IPQA-08"] input,
+html.theme-light .ipqa-08-container input,
+.theme-light [data-app="IPQA-08"] input,
+.theme-light .ipqa-08-container input,
+[data-app="IPQA-08"].theme-light input,
+.ipqa-08-container.theme-light input,
+html.theme-light [data-app="IPQA-08"] input[type="number"],
+html.theme-light .ipqa-08-container input[type="number"],
+.theme-light [data-app="IPQA-08"] input[type="number"],
+.theme-light .ipqa-08-container input[type="number"],
+[data-app="IPQA-08"].theme-light input[type="number"],
+.ipqa-08-container.theme-light input[type="number"] {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
   font-weight: 800 !important;
 }
 
+/* Numbers in monospace / badges */
+html.theme-light [data-app="IPQA-08"] .font-mono,
+html.theme-light .ipqa-08-container .font-mono,
+.theme-light [data-app="IPQA-08"] .font-mono,
+.theme-light .ipqa-08-container .font-mono,
+[data-app="IPQA-08"].theme-light .font-mono,
+.ipqa-08-container.theme-light .font-mono {
+  color: #000000 !important;
+}
+
+/* Recharts text / labels / ticks / numbers in charts */
+html.theme-light [data-app="IPQA-08"] .recharts-text,
+html.theme-light [data-app="IPQA-08"] .recharts-pie-label-text,
+html.theme-light [data-app="IPQA-08"] .recharts-cartesian-axis-tick text,
+html.theme-light [data-app="IPQA-08"] text,
+html.theme-light .ipqa-08-container .recharts-text,
+html.theme-light .ipqa-08-container .recharts-pie-label-text,
+html.theme-light .ipqa-08-container .recharts-cartesian-axis-tick text,
+html.theme-light .ipqa-08-container text,
+.theme-light [data-app="IPQA-08"] text,
+.theme-light .ipqa-08-container text,
+[data-app="IPQA-08"].theme-light text,
+.ipqa-08-container.theme-light text {
+  fill: #000000 !important;
+  color: #000000 !important;
+  font-weight: 700 !important;
+}
+
+/* Override any faded slate/gray color classes in IPQA-08 light theme */
+html.theme-light [data-app="IPQA-08"] [class*="text-slate-"],
+html.theme-light [data-app="IPQA-08"] [class*="text-gray-"],
+html.theme-light .ipqa-08-container [class*="text-slate-"],
+html.theme-light .ipqa-08-container [class*="text-gray-"],
+.theme-light [data-app="IPQA-08"] [class*="text-slate-"],
+.theme-light .ipqa-08-container [class*="text-slate-"] {
+  color: #000000 !important;
+}
+
+/* Form inputs & select dropdowns */
+html.theme-light [data-app="IPQA-08"] input:not([type="checkbox"]):not([type="radio"]),
+html.theme-light [data-app="IPQA-08"] select,
+html.theme-light [data-app="IPQA-08"] textarea,
+html.theme-light .ipqa-08-container input:not([type="checkbox"]):not([type="radio"]),
+html.theme-light .ipqa-08-container select,
+html.theme-light .ipqa-08-container textarea,
+.theme-light [data-app="IPQA-08"] input:not([type="checkbox"]):not([type="radio"]),
+.theme-light .ipqa-08-container input:not([type="checkbox"]):not([type="radio"]) {
+  border-color: #2563eb !important;
+  border-width: 2px !important;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  font-weight: 800 !important;
+  background-color: #ffffff !important;
+}
+
+/* Clear and crisp input placeholder */
+html.theme-light [data-app="IPQA-08"] input::placeholder,
+html.theme-light [data-app="IPQA-08"] textarea::placeholder,
+html.theme-light .ipqa-08-container input::placeholder,
+html.theme-light .ipqa-08-container textarea::placeholder {
+  color: #334155 !important;
+  -webkit-text-fill-color: #334155 !important;
+  font-weight: 700 !important;
+}
+
+/* Error inputs */
 html.theme-light [data-app="IPQA-08"] input.border-rose-600,
 html.theme-light .ipqa-08-container input.border-rose-600 {
   border-color: #e11d48 !important;
   background-color: #ffe4e6 !important;
   color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  font-weight: 800 !important;
 }
 
+/* Table headers & cells */
 html.theme-light [data-app="IPQA-08"] thead,
 html.theme-light .ipqa-08-container thead {
   background-color: #dbeafe !important;
@@ -386,6 +514,26 @@ html.theme-light .ipqa-08-container thead th {
   color: #000000 !important;
   border-color: #93c5fd !important;
   font-weight: 900 !important;
+}
+
+/* Preserve white text for filled action buttons */
+html.theme-light [data-app="IPQA-08"] button.bg-indigo-600,
+html.theme-light [data-app="IPQA-08"] button.bg-emerald-600,
+html.theme-light [data-app="IPQA-08"] button.bg-rose-600,
+html.theme-light [data-app="IPQA-08"] button.bg-blue-600,
+html.theme-light [data-app="IPQA-08"] button.bg-purple-600,
+html.theme-light .ipqa-08-container button.bg-indigo-600,
+html.theme-light .ipqa-08-container button.bg-emerald-600,
+html.theme-light .ipqa-08-container button.bg-rose-600,
+html.theme-light .ipqa-08-container button.bg-blue-600,
+html.theme-light .ipqa-08-container button.bg-purple-600,
+html.theme-light [data-app="IPQA-08"] .bg-indigo-600 span,
+html.theme-light [data-app="IPQA-08"] .bg-emerald-600 span,
+html.theme-light [data-app="IPQA-08"] .bg-rose-600 span,
+html.theme-light .ipqa-08-container .bg-indigo-600 span,
+html.theme-light .ipqa-08-container .bg-emerald-600 span,
+html.theme-light .ipqa-08-container .bg-rose-600 span {
+  color: #ffffff !important;
 }
 
 html.theme-light input:not([type="checkbox"]):not([type="radio"]):focus,
