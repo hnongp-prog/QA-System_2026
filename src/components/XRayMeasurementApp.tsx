@@ -2290,9 +2290,9 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
               </span>
 
               <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                {savedProfiles.map((p) => (
+                {savedProfiles.map((p, idx) => (
                   <div
-                    key={p.name}
+                    key={p.id || `${p.name}-${idx}`}
                     className={`p-3 rounded-xl border flex items-center justify-between transition cursor-pointer ${
                       headerInfo.profileName === p.name 
                         ? 'bg-indigo-950/80 border-indigo-500 text-indigo-200' 

@@ -1992,9 +1992,9 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
                 {isTh ? 'รายการ Profile ที่บันทึกไว้' : 'Saved Profiles'}
               </h4>
               <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {effectiveProfiles.map((p) => (
+                {effectiveProfiles.map((p, idx) => (
                   <div
-                    key={p.name}
+                    key={p.id || `${p.name}-${idx}`}
                     onClick={() => selectProfile(p)}
                     className={`p-3 rounded-xl border cursor-pointer transition flex items-center justify-between ${
                       headerInfo.profileName === p.name

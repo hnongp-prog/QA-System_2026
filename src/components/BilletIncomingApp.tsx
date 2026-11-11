@@ -45,7 +45,10 @@ import {
   Copy,
   ExternalLink,
   Building2,
-  Maximize2
+  Maximize2,
+  Minus,
+  Tag,
+  Package
 } from 'lucide-react';
 import { useCloudState } from '../services/firestoreSync';
 
@@ -259,6 +262,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   // Printing & History
   const [activePrintItem, setActivePrintItem] = useState<BilletInspectionItem | null>(null);
   const [activeBatchPrintItems, setActiveBatchPrintItems] = useState<BilletInspectionItem[] | null>(null);
+  const [batchPrintQuantities, setBatchPrintQuantities] = useState<Record<string, number>>({});
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<string[]>([]);
   const [batchPrintLayout, setBatchPrintLayout] = useState<'roll' | 'grid'>('roll');
   const [batchCopiedInfo, setBatchCopiedInfo] = useState(false);
@@ -975,16 +979,63 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
     );
   }, [filteredHistory, selectedHistoryIds]);
 
+  interface BilletTagPrintEntry {
+    item: BilletInspectionItem;
+    bundleIndex?: number;
+    bundleTotal?: number;
+  }
+
+  // Helper functions for print copies / bundles per Heat
+  const getItemPrintQuantity = (item: BilletInspectionItem, index: number): number => {
+    const key = item.id || `${item.heat_number}-${index}`;
+    return Math.max(1, batchPrintQuantities[key] || 1);
+  };
+
+  const setItemPrintQuantity = (item: BilletInspectionItem, index: number, qty: number) => {
+    const key = item.id || `${item.heat_number}-${index}`;
+    const validQty = Math.max(1, Math.min(99, isNaN(qty) ? 1 : qty));
+    setBatchPrintQuantities(prev => ({
+      ...prev,
+      [key]: validQty
+    }));
+  };
+
+  const setAllPrintQuantities = (qty: number) => {
+    if (!activeBatchPrintItems) return;
+    const validQty = Math.max(1, Math.min(99, qty));
+    const updated: Record<string, number> = {};
+    activeBatchPrintItems.forEach((it, idx) => {
+      const key = it.id || `${it.heat_number}-${idx}`;
+      updated[key] = validQty;
+    });
+    setBatchPrintQuantities(updated);
+  };
+
+  const totalBatchTagsCount = useMemo(() => {
+    if (!activeBatchPrintItems) return 0;
+    return activeBatchPrintItems.reduce((sum, item, idx) => sum + getItemPrintQuantity(item, idx), 0);
+  }, [activeBatchPrintItems, batchPrintQuantities]);
+
   // Open Batch Print Modal for selected items
   const handlePrintBatchTags = (itemsToPrint?: BilletInspectionItem[]) => {
     const targetItems = itemsToPrint && itemsToPrint.length > 0 ? itemsToPrint : selectedHistoryItems;
     if (targetItems.length === 0) return;
     setActiveBatchPrintItems(targetItems);
+    const initialQtys: Record<string, number> = {};
+    targetItems.forEach((it, idx) => {
+      const key = it.id || `${it.heat_number}-${idx}`;
+      initialQtys[key] = 1;
+    });
+    setBatchPrintQuantities(initialQtys);
     setBatchCopiedInfo(false);
   };
 
   // Generate Individual Tag Card Inner HTML
-  const generateTagContentHtml = (item: BilletInspectionItem, mode: QrDataMode = qrDataMode) => {
+  const generateTagContentHtml = (
+    item: BilletInspectionItem, 
+    mode: QrDataMode = qrDataMode,
+    bundleInfo?: { index: number; total: number }
+  ) => {
     const spec = findMatchingSpec(item.grade);
     const tagColor = spec?.color || "#2563eb";
     const jg = item.judgement || performJudgement(item);
@@ -993,7 +1044,10 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
     return `
       <div class="tag-box" style="border: 2.5px solid ${tagColor};">
-        <div class="header" style="background: ${tagColor};">QUALITY APPROVED BILLET TAG</div>
+        <div class="header" style="background: ${tagColor}; display: flex; justify-content: space-between; align-items: center; padding: 4px 8px;">
+          <span>QUALITY APPROVED BILLET TAG</span>
+          ${bundleInfo && bundleInfo.total > 1 ? `<span style="background: rgba(0,0,0,0.25); font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: bold; letter-spacing: 0.5px;">BUNDLE ${bundleInfo.index}/${bundleInfo.total}</span>` : ''}
+        </div>
         <div class="body-grid">
           <div class="qr-placeholder">
             <div class="qr-svg-wrap">
@@ -1007,6 +1061,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
             <div><strong>SIZE:</strong> ${item.billet_size || '-'}</div>
             <div><strong>SUPPLIER:</strong> ${item.supplier_name || '-'}</div>
             <div><strong>QTY / WT:</strong> ${item.quantity_pcs || '0'} pcs / ${item.weight_kg || '0'} kg</div>
+            ${bundleInfo && bundleInfo.total > 1 ? `<div><strong>BUNDLE:</strong> <span style="font-weight:bold; color:${tagColor};">มัดที่ ${bundleInfo.index} จาก ${bundleInfo.total} มัด (Bundle ${bundleInfo.index} of ${bundleInfo.total})</span></div>` : ''}
             <div><strong>INSPECTOR:</strong> ${item.inspector_name || 'QA Team'}</div>
             <div><strong>STATUS:</strong> <span class="badge" style="background: ${isPass ? '#10b981' : '#ef4444'};">${jg}</span></div>
           </div>
@@ -1023,14 +1078,18 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   };
 
   // Generate Print Tag HTML (Single or Batch with page breaks)
-  const generateMultipleTagsHtml = (items: BilletInspectionItem[], layout: 'roll' | 'grid' = 'roll', mode: QrDataMode = qrDataMode) => {
+  const generateMultipleTagsHtml = (
+    tagEntries: BilletTagPrintEntry[], 
+    layout: 'roll' | 'grid' = 'roll', 
+    mode: QrDataMode = qrDataMode
+  ) => {
     const isGrid = layout === 'grid';
     return `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
-          <title>Billet Approved QR Tags (${items.length} Heats)</title>
+          <title>Billet Approved QR Tags (${tagEntries.length} Tags)</title>
           <style>
             * { box-sizing: border-box; }
             body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; }
@@ -1079,17 +1138,25 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
         </head>
         <body>
           ${isGrid ? (
-            chunkArray(items, 4).map(chunk => `
+            chunkArray(tagEntries, 4).map(chunk => `
               <div class="grid-page">
                 <div class="sheet-grid">
-                  ${chunk.map(item => generateTagContentHtml(item, mode)).join('')}
+                  ${chunk.map(entry => generateTagContentHtml(
+                    entry.item, 
+                    mode, 
+                    entry.bundleTotal && entry.bundleTotal > 1 ? { index: entry.bundleIndex || 1, total: entry.bundleTotal } : undefined
+                  )).join('')}
                 </div>
               </div>
             `).join('')
           ) : (
-            items.map(item => `
+            tagEntries.map(entry => `
               <div class="tag-page">
-                ${generateTagContentHtml(item, mode)}
+                ${generateTagContentHtml(
+                  entry.item, 
+                  mode, 
+                  entry.bundleTotal && entry.bundleTotal > 1 ? { index: entry.bundleIndex || 1, total: entry.bundleTotal } : undefined
+                )}
               </div>
             `).join('')
           )}
@@ -1099,13 +1166,33 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
   };
 
   const generateTagHtml = (item: BilletInspectionItem) => {
-    return generateMultipleTagsHtml([item], 'roll', qrDataMode);
+    return generateMultipleTagsHtml([{ item }], 'roll', qrDataMode);
   };
 
   // Direct Print for Single or Multiple Tags via hidden iframe
-  const triggerDirectMultiplePrint = (items: BilletInspectionItem[], layout: 'roll' | 'grid' = 'roll', mode: QrDataMode = qrDataMode) => {
+  const triggerDirectMultiplePrint = (
+    items: BilletInspectionItem[], 
+    layout: 'roll' | 'grid' = 'roll', 
+    mode: QrDataMode = qrDataMode,
+    quantitiesMap?: Record<string, number>
+  ) => {
     if (items.length === 0) return;
-    const htmlContent = generateMultipleTagsHtml(items, layout, mode);
+
+    // Expand tags according to specified copies / bundles for each heat
+    const tagEntries: BilletTagPrintEntry[] = [];
+    items.forEach((item, idx) => {
+      const key = item.id || `${item.heat_number}-${idx}`;
+      const qty = quantitiesMap ? Math.max(1, quantitiesMap[key] || 1) : 1;
+      for (let b = 1; b <= qty; b++) {
+        tagEntries.push({
+          item,
+          bundleIndex: b,
+          bundleTotal: qty
+        });
+      }
+    });
+
+    const htmlContent = generateMultipleTagsHtml(tagEntries, layout, mode);
 
     try {
       let iframe = document.getElementById('billet-print-iframe') as HTMLIFrameElement;
@@ -3803,18 +3890,22 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                   <Printer className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className={`text-base font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
                       {isTh ? 'พิมพ์แท็กรับรองคุณภาพ Billet แบบกลุ่ม (Batch QR Tag Printing)' : 'Batch Billet QR Tag Printing'}
                     </h3>
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white">
-                      {activeBatchPrintItems.length} {isTh ? 'แท็ก' : 'Tags'}
+                      {activeBatchPrintItems.length} {isTh ? 'Heats' : 'Heats'}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white flex items-center gap-1 shadow-xs">
+                      <Tag className="w-3 h-3" />
+                      {totalBatchTagsCount} {isTh ? 'แท็กทั้งหมด' : 'Total Tags'}
                     </span>
                   </div>
                   <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     {isTh 
-                      ? `พิมพ์แท็กระบุ Heat Number ทั้งหมด ${activeBatchPrintItems.length} รายการพร้อมกันในคำสั่งเดียว`
-                      : `Simultaneously print ${activeBatchPrintItems.length} Heat identification tags in one single print job`}
+                      ? `พิมพ์แท็กระบุ Heat ทั้งหมด ${activeBatchPrintItems.length} Heat รวม ${totalBatchTagsCount} แท็ก (สามารถเพิ่มจำนวนแท็กตามจำนวน Bundle ของแต่ละ Heat ได้)`
+                      : `Simultaneously print ${activeBatchPrintItems.length} Heats (${totalBatchTagsCount} tags total). Customize print copies per Heat to match bundle counts.`}
                   </p>
                 </div>
               </div>
@@ -3890,11 +3981,37 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                     </button>
                   </div>
                 </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className={`text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isTh ? 'จำนวนพิมพ์ทุก Heat:' : 'Copies for all:'}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map(q => (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => setAllPrintQuantities(q)}
+                        className={`px-2 py-0.5 text-xs font-bold rounded-lg border transition ${
+                          isLight
+                            ? 'bg-white hover:bg-blue-50 border-slate-300 text-slate-700 hover:text-blue-600 hover:border-blue-400'
+                            : 'bg-slate-800 hover:bg-blue-950/50 border-slate-700 text-slate-300 hover:text-blue-300 hover:border-blue-500'
+                        }`}
+                        title={isTh ? `ตั้งทุก Heat เป็น ${q} มัด` : `Set all to ${q} bundles`}
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              <div className="text-xs font-mono flex items-center gap-3">
+              <div className="text-xs font-mono flex items-center gap-3 flex-wrap">
                 <span className={isLight ? 'text-slate-600' : 'text-slate-400'}>
                   Heats: <strong className={isLight ? 'text-slate-900' : 'text-white'}>{activeBatchPrintItems.length}</strong>
+                </span>
+                <span className={isLight ? 'text-emerald-700' : 'text-emerald-400'}>
+                  {isTh ? 'แท็กที่จะพิมพ์:' : 'Total Tags:'} <strong className="font-bold text-sm">{totalBatchTagsCount}</strong>
                 </span>
                 <span className={isLight ? 'text-slate-600' : 'text-slate-400'}>
                   Qty: <strong className={isLight ? 'text-slate-900' : 'text-white'}>
@@ -3917,6 +4034,7 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                   const tagColor = spec?.color || "#2563eb";
                   const jg = item.judgement || performJudgement(item);
                   const isPass = jg === 'PASS';
+                  const itemCopies = getItemPrintQuantity(item, index);
 
                   return (
                     <div
@@ -3931,7 +4049,14 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                           style={{ backgroundColor: tagColor }}
                         >
                           <span>QUALITY APPROVED BILLET TAG</span>
-                          <span className="text-[10px] bg-black/20 px-2 py-0.5 rounded font-mono">#{index + 1}</span>
+                          <div className="flex items-center gap-1.5">
+                            {itemCopies > 1 && (
+                              <span className="text-[10px] bg-black/30 px-2 py-0.5 rounded font-mono font-bold text-amber-200">
+                                {itemCopies} {isTh ? 'มัด' : 'Bundles'}
+                              </span>
+                            )}
+                            <span className="text-[10px] bg-black/20 px-2 py-0.5 rounded font-mono">#{index + 1}</span>
+                          </div>
                         </div>
 
                         <div className="flex gap-3 items-stretch">
@@ -3985,6 +4110,55 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
                             </div>
                           </div>
                         </div>
+
+                        {/* Bundle / Print Quantity Field for this Heat */}
+                        <div className="mt-3 p-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <Package className="w-4 h-4 text-blue-600 shrink-0" />
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-800 block leading-tight">
+                                {isTh ? 'จำนวนพิมพ์ / มัด (Bundles):' : 'Print Copies / Bundles:'}
+                              </span>
+                              <span className="text-[9px] text-slate-500">
+                                {isTh ? `พิมพ์ ${itemCopies} ใบ สำหรับติด ${itemCopies} มัด` : `Print ${itemCopies} tag${itemCopies > 1 ? 's' : ''} for bundles`}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setItemPrintQuantity(item, index, itemCopies - 1)}
+                              disabled={itemCopies <= 1}
+                              className={`w-7 h-7 rounded-lg font-bold flex items-center justify-center transition border ${
+                                itemCopies <= 1
+                                  ? 'opacity-40 cursor-not-allowed bg-slate-200 text-slate-400 border-slate-300'
+                                  : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300 active:scale-95 shadow-xs'
+                              }`}
+                              title={isTh ? 'ลด 1 ใบ' : 'Decrease 1'}
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+
+                            <input
+                              type="number"
+                              min="1"
+                              max="99"
+                              value={itemCopies}
+                              onChange={(e) => setItemPrintQuantity(item, index, parseInt(e.target.value) || 1)}
+                              className="w-12 h-7 text-center font-bold font-mono text-xs rounded-lg border border-blue-400 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() => setItemPrintQuantity(item, index, itemCopies + 1)}
+                              className="w-7 h-7 rounded-lg font-bold flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white transition active:scale-95 shadow-xs"
+                              title={isTh ? 'เพิ่ม 1 ใบ' : 'Increase 1'}
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
 
                       <div className="mt-2 pt-1.5 border-t border-dashed border-slate-200 text-[8px] text-slate-400 flex items-center justify-between">
@@ -4004,9 +4178,15 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  const allText = activeBatchPrintItems.map((it, i) => 
-                    `[TAG #${i + 1}] Heat: ${it.heat_number} | Grade: ${it.grade} | Size: ${it.billet_size} | Supplier: ${it.supplier_name || '-'} | Qty: ${it.quantity_pcs} pcs | Wt: ${it.weight_kg} kg | Status: ${it.judgement || 'PASS'}`
-                  ).join('\n');
+                  const allText = activeBatchPrintItems.flatMap((it, i) => {
+                    const qty = getItemPrintQuantity(it, i);
+                    if (qty <= 1) {
+                      return [`[TAG #${i + 1}] Heat: ${it.heat_number} | Grade: ${it.grade} | Size: ${it.billet_size} | Supplier: ${it.supplier_name || '-'} | Qty: ${it.quantity_pcs} pcs | Wt: ${it.weight_kg} kg | Status: ${it.judgement || 'PASS'}`];
+                    }
+                    return Array.from({ length: qty }, (_, b) => 
+                      `[TAG #${i + 1} Bundle ${b + 1}/${qty}] Heat: ${it.heat_number} | Grade: ${it.grade} | Size: ${it.billet_size} | Supplier: ${it.supplier_name || '-'} | Qty: ${it.quantity_pcs} pcs | Wt: ${it.weight_kg} kg | Status: ${it.judgement || 'PASS'}`
+                    );
+                  }).join('\n');
                   navigator.clipboard.writeText(allText);
                   setBatchCopiedInfo(true);
                   setTimeout(() => setBatchCopiedInfo(false), 2000);
@@ -4023,14 +4203,14 @@ export const BilletIncomingApp: React.FC<BilletIncomingAppProps> = ({
 
               <button
                 type="button"
-                onClick={() => triggerDirectMultiplePrint(activeBatchPrintItems, batchPrintLayout, qrDataMode)}
+                onClick={() => triggerDirectMultiplePrint(activeBatchPrintItems, batchPrintLayout, qrDataMode, batchPrintQuantities)}
                 className="flex-1 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-md shadow-blue-600/20 flex items-center justify-center gap-2"
               >
                 <Printer className="w-4 h-4" />
                 <span>
                   {isTh 
-                    ? `สั่งพิมพ์ทั้งหมด ${activeBatchPrintItems.length} แท็กทันที (${batchPrintLayout === 'roll' ? 'ม้วนสติกเกอร์' : 'กระดาษ A4'})` 
-                    : `Print All ${activeBatchPrintItems.length} Tags Now (${batchPrintLayout === 'roll' ? 'Roll' : 'A4 Sheet'})`}
+                    ? `สั่งพิมพ์ทั้งหมด ${totalBatchTagsCount} แท็กทันที (${activeBatchPrintItems.length} Heats) (${batchPrintLayout === 'roll' ? 'ม้วนสติกเกอร์' : 'กระดาษ A4'})` 
+                    : `Print All ${totalBatchTagsCount} Tags (${activeBatchPrintItems.length} Heats) (${batchPrintLayout === 'roll' ? 'Roll' : 'A4 Sheet'})`}
                 </span>
               </button>
 

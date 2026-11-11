@@ -3611,9 +3611,9 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
                 </h4>
 
                 <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                  {savedProfiles.map(p => (
+                  {savedProfiles.map((p, idx) => (
                     <div
-                      key={p.name}
+                      key={p.id || `${p.name}-${idx}`}
                       onClick={() => selectProfile(p)}
                       className={`p-3 rounded-xl border cursor-pointer transition flex items-center justify-between ${
                         headerInfo.profileName === p.name
@@ -4993,8 +4993,8 @@ export const CuttingDimensionApp: React.FC<CuttingDimensionAppProps> = ({
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {dashboardStats.profileSummaries.map(p => (
-                  <div key={p.name} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                {dashboardStats.profileSummaries.map((p, idx) => (
+                  <div key={`${p.name}-${idx}`} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
                     <div className="flex justify-between items-center pb-2 border-b border-slate-800">
                       <span className="font-bold text-xs text-white">{p.name}</span>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
