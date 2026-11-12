@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Lock, 
   Plus, 
@@ -10,16 +10,24 @@ import {
   AlertCircle, 
   CheckCircle2, 
   Calculator,
-  Sliders
+  Sliders,
+  RefreshCw,
+  Zap,
+  Tag,
+  Building2
 } from 'lucide-react';
 import { BilletCuttingSpec, Language, ThemeMode } from '../../types';
-import { ADMIN_PASSWORD, checkAdminPassword } from './mockBilletData';
+import { ADMIN_PASSWORD, checkAdminPassword, DEFAULT_IQA_SUPPLIERS, DEFAULT_IQA_GRADES, IQA_SUPPLIER_GRADE_MAP } from './mockBilletData';
 
 interface BilletCuttingSpecModalProps {
   isOpen: boolean;
   onClose: () => void;
   specs: Record<string, BilletCuttingSpec>;
   onSaveSpecs: (newSpecs: Record<string, BilletCuttingSpec>) => void;
+  iqaSuppliers?: string[];
+  iqaGrades?: string[];
+  iqaHistory?: any[];
+  onSyncFromIqa?: () => void;
   language?: Language;
   theme?: ThemeMode;
 }
@@ -29,6 +37,10 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
   onClose,
   specs,
   onSaveSpecs,
+  iqaSuppliers = [],
+  iqaGrades = [],
+  iqaHistory = [],
+  onSyncFromIqa,
   language = 'th',
   theme = 'light'
 }) => {
@@ -69,7 +81,20 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
     return '0.75';
   }, [lengthNominal]);
 
-  if (!isOpen) return null;
+  // Effective list of suppliers and grades from IQA-01
+  const effectiveIqaSuppliers = useMemo(() => {
+    const set = new Set<string>();
+    (iqaSuppliers || []).forEach(s => s && set.add(s.trim()));
+    DEFAULT_IQA_SUPPLIERS.forEach(s => set.add(s.trim()));
+    return Array.from(set);
+  }, [iqaSuppliers]);
+
+  const effectiveIqaGrades = useMemo(() => {
+    const set = new Set<string>();
+    (iqaGrades || []).forEach(g => g && set.add(g.trim()));
+    DEFAULT_IQA_GRADES.forEach(g => set.add(g.trim()));
+    return Array.from(set);
+  }, [iqaGrades]);
 
   const handleVerifyPassword = (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,13 +125,34 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
     setRemarks(spec.remarks || '');
   };
 
-  const startAddNew = () => {
+  const handleSelectSupplierPreset = (supName: string) => {
+    setName(supName);
+    // Auto-detect grade from IQA-01 mapping or IQA history
+    const mapped = IQA_SUPPLIER_GRADE_MAP[supName];
+    if (mapped) {
+      setBilletGrade(mapped);
+    } else if (Array.isArray(iqaHistory)) {
+      const found = iqaHistory.find((item: any) => item.supplier_name?.trim()?.toLowerCase() === supName.trim().toLowerCase());
+      if (found?.grade) {
+        setBilletGrade(found.grade.trim());
+      }
+    }
+  };
+
+  const startAddNew = (presetSupplier?: string, presetGrade?: string) => {
     setIsAddingNew(true);
     setEditingKey(null);
     setFormError(null);
     setConfirmDeleteKey(null);
-    setName('');
-    setBilletGrade('6063');
+    const initialSup = presetSupplier || '';
+    setName(initialSup);
+    if (presetGrade) {
+      setBilletGrade(presetGrade);
+    } else if (initialSup && IQA_SUPPLIER_GRADE_MAP[initialSup]) {
+      setBilletGrade(IQA_SUPPLIER_GRADE_MAP[initialSup]);
+    } else {
+      setBilletGrade('6063');
+    }
     setLengthNominal('500');
     setLengthMin('498.0');
     setLengthMax('502.0');
@@ -115,7 +161,7 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
     setDiameterMax('128.5');
     setCuttingSurfaceMax('2.0');
     setSurfaceDefectSpecText('≤ 2x50x100 mm');
-    setRemarks('');
+    setRemarks(initialSup ? `Auto-linked from IQA-01 Billet Incoming (${initialSup})` : '');
   };
 
   const handleSaveSpec = (e: React.FormEvent) => {
@@ -166,6 +212,8 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
     setToastMessage(isTh ? `ลบ Supplier Spec "${key}" สำเร็จแล้ว` : `Supplier Spec "${key}" deleted successfully`);
     setTimeout(() => setToastMessage(null), 3000);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[120] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
@@ -286,13 +334,54 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
         ) : (
           /* AUTHENTICATED SPEC CONTENT */
           <div className="space-y-6">
+            {/* IQA-01 Automatic Integration Banner */}
+            <div className={`p-3.5 rounded-2xl border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              isLight ? 'bg-blue-50 border-blue-300 text-blue-950' : 'bg-blue-950/40 border-blue-800/60 text-blue-200'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-600 text-white rounded-xl shrink-0 shadow-md">
+                  <RefreshCw className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black">
+                      {isTh ? 'เชื่อมโยงข้อมูล Supplier & Grade จาก IQA-01 อัตโนมัติ' : 'Auto-linked with IQA-01 Billet Incoming'}
+                    </span>
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-blue-200 text-blue-900 border border-blue-400">
+                      IQA-01 Active
+                    </span>
+                  </div>
+                  <p className={`text-[11px] font-semibold mt-0.5 ${isLight ? 'text-blue-900' : 'text-blue-300'}`}>
+                    {isTh 
+                      ? `ดึง Supplier (${effectiveIqaSuppliers.length} ราย) และ Billet Grade จากระบบตรวจรับวัตถุดิบ Billet นำมาสร้างเกณฑ์ตัดให้อัตโนมัติ`
+                      : `Suppliers (${effectiveIqaSuppliers.length}) & Grades synced from Billet Incoming inspection`}
+                  </p>
+                </div>
+              </div>
+
+              {onSyncFromIqa && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSyncFromIqa();
+                    setToastMessage(isTh ? 'ซิงค์ข้อมูล Supplier และ Grade จาก IQA-01 เรียบร้อยแล้ว' : 'Synced from IQA-01 successfully');
+                    setTimeout(() => setToastMessage(null), 3000);
+                  }}
+                  className="px-3.5 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-md shadow-blue-700/20 shrink-0 self-start sm:self-auto cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-300" />
+                  <span>{isTh ? 'ซิงค์เกณฑ์จาก IQA-01 ทันที' : 'Sync from IQA-01'}</span>
+                </button>
+              )}
+            </div>
+
             {/* Top Toolbar */}
             <div className="flex items-center justify-between">
               <div className={`text-xs font-black ${isLight ? 'text-black' : 'text-slate-400'}`}>
                 {isTh ? `พบทั้งหมด ${Object.keys(specs).length} รายการเกณฑ์ Supplier` : `Total ${Object.keys(specs).length} Supplier Specs`}
               </div>
               <button
-                onClick={startAddNew}
+                onClick={() => startAddNew()}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-indigo-600/20"
               >
                 <Plus className="w-4 h-4" />
@@ -339,9 +428,10 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                     </label>
                     <input
                       type="text"
+                      list="spec-modal-iqa-suppliers"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder={isTh ? 'เช่น ALCOA, CAPCO, THAI HONG ฯลฯ' : 'e.g. ALCOA, CAPCO, THAI HONG'}
+                      onChange={(e) => handleSelectSupplierPreset(e.target.value)}
+                      placeholder={isTh ? 'เช่น Siam Aluminum, ALCOA, CAPCO' : 'e.g. Siam Aluminum, ALCOA'}
                       className={`w-full rounded-xl px-3 py-2 font-mono font-bold focus:outline-none border-2 ${
                         isLight
                           ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:border-blue-700'
@@ -349,6 +439,32 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                       }`}
                       required
                     />
+                    <datalist id="spec-modal-iqa-suppliers">
+                      {effectiveIqaSuppliers.map(sup => (
+                        <option key={sup} value={sup} />
+                      ))}
+                    </datalist>
+
+                    {/* Quick Supplier Chips from IQA-01 */}
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      <span className={`text-[9px] font-black self-center mr-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>IQA:</span>
+                      {effectiveIqaSuppliers.slice(0, 4).map(sup => (
+                        <button
+                          key={sup}
+                          type="button"
+                          onClick={() => handleSelectSupplierPreset(sup)}
+                          className={`text-[9px] px-1.5 py-0.5 rounded font-bold border transition ${
+                            name === sup
+                              ? 'bg-blue-600 text-white border-blue-700'
+                              : isLight
+                                ? 'bg-white text-black border-slate-300 hover:bg-blue-50'
+                                : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'
+                          }`}
+                        >
+                          {sup.replace(' Co., Ltd.', '').replace(' Industry', '').replace(' Supply', '')}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div>
@@ -371,15 +487,36 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                       required
                     />
                     <datalist id="spec-modal-billet-grades">
-                      <option value="6063">6063 (Standard)</option>
-                      <option value="6061">6061 (Structural)</option>
-                      <option value="6082">6082 (High Strength)</option>
-                      <option value="6005A">6005A (Medium Strength)</option>
-                      <option value="6060">6060 (Architectural)</option>
-                      <option value="1050">1050 (Pure Al)</option>
-                      <option value="3003">3003 (Al-Mn)</option>
-                      <option value="7075">7075 (Aerospace)</option>
+                      {effectiveIqaGrades.map(grd => (
+                        <option key={grd} value={grd} />
+                      ))}
+                      <option value="6005A">6005A</option>
+                      <option value="6060">6060</option>
+                      <option value="1050">1050</option>
+                      <option value="3003">3003</option>
+                      <option value="7075">7075</option>
                     </datalist>
+
+                    {/* Quick Grade Chips */}
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      <span className={`text-[9px] font-black self-center mr-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Grade:</span>
+                      {effectiveIqaGrades.map(grd => (
+                        <button
+                          key={grd}
+                          type="button"
+                          onClick={() => setBilletGrade(grd)}
+                          className={`text-[9px] px-1.5 py-0.5 rounded font-black border transition ${
+                            billetGrade === grd
+                              ? 'bg-emerald-600 text-white border-emerald-700'
+                              : isLight
+                                ? 'bg-white text-black border-slate-300 hover:bg-emerald-50'
+                                : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'
+                          }`}
+                        >
+                          {grd}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div>
@@ -599,7 +736,7 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className={`text-[10px] font-black uppercase ${isLight ? 'text-black' : 'text-slate-400'}`}>
                           {isTh ? 'Supplier:' : 'Supplier:'}
                         </span>
@@ -613,6 +750,16 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                         }`}>
                           Grade: {spec.billetGrade}
                         </span>
+                        {(spec.remarks?.includes('IQA-01') || spec.id?.includes('iqa')) && (
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-black border flex items-center gap-1 ${
+                            isLight
+                              ? 'bg-cyan-100 text-cyan-900 border-cyan-400'
+                              : 'bg-cyan-950 text-cyan-300 border-cyan-700'
+                          }`}>
+                            <Zap className="w-2.5 h-2.5 text-amber-500" />
+                            <span>IQA-01 Sync</span>
+                          </span>
+                        )}
                       </div>
                       {spec.remarks && (
                         <p className={`text-[11px] mt-1 ${isLight ? 'text-black font-bold' : 'text-slate-400'}`}>{spec.remarks}</p>
