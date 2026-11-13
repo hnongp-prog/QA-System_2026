@@ -257,29 +257,37 @@ export function buildIqaCuttingSpecs(
   const result: Record<string, BilletCuttingSpec> = {};
   const pairs = new Map<string, { supplier: string; grade: string; size?: string }>();
 
-  // 1. Defaults first
-  Object.entries(IQA_SUPPLIER_GRADE_MAP).forEach(([sup, grd]) => {
-    pairs.set(`${sup.trim()}__${grd.trim()}`, { supplier: sup.trim(), grade: grd.trim() });
+  // 1. Collect active grades strictly from IQA-01 Grade Spec (`billet_qc_grade_specs`)
+  const activeGradeLookup = new Map<string, string>();
+  Object.keys(gradeSpecsMap || {}).forEach(grd => {
+    const cleanGrd = grd.trim();
+    if (cleanGrd && cleanGrd !== 'NEW_GRADE_PENDING') {
+      activeGradeLookup.set(cleanGrd.toLowerCase(), cleanGrd);
+    }
   });
+  const hasActiveGradeSpecs = activeGradeLookup.size > 0;
 
-  // 2. Scan IQA-01 incoming inspection history
+  // 2. Scan IQA-01 incoming inspection history only for grades that still exist in IQA-01 Grade Spec
   if (Array.isArray(historyItems)) {
     historyItems.forEach(item => {
       const sup = (item.supplier_name || '').trim();
-      const grd = (item.grade || '').trim();
-      if (sup && grd) {
-        pairs.set(`${sup}__${grd}`, { supplier: sup, grade: grd, size: item.billet_size });
-      } else if (sup) {
-        pairs.set(`${sup}__6063`, { supplier: sup, grade: '6063' });
+      const rawGrd = (item.grade || '').trim();
+      if (!sup) return;
+
+      if (hasActiveGradeSpecs) {
+        const canonicalGrade = rawGrd ? activeGradeLookup.get(rawGrd.toLowerCase()) : undefined;
+        if (!canonicalGrade) return; // Skip deleted grades from IQA-01 Grade Spec
+        pairs.set(`${sup}__${canonicalGrade}`, { supplier: sup, grade: canonicalGrade, size: item.billet_size });
+      } else if (rawGrd) {
+        pairs.set(`${sup}__${rawGrd}`, { supplier: sup, grade: rawGrd, size: item.billet_size });
       }
     });
   }
 
-  // 3. Include any standalone grades from gradeSpecsMap
-  const existingGrades = Array.from(pairs.values()).map(p => p.grade);
-  Object.keys(gradeSpecsMap || {}).forEach(grd => {
-    const cleanGrd = grd.trim();
-    if (cleanGrd && cleanGrd !== 'NEW_GRADE_PENDING' && !existingGrades.includes(cleanGrd)) {
+  // 3. Include any standalone active grades from IQA-01 Grade Spec
+  const existingGradesLower = new Set(Array.from(pairs.values()).map(p => p.grade.toLowerCase()));
+  activeGradeLookup.forEach((cleanGrd, lowerGrd) => {
+    if (!existingGradesLower.has(lowerGrd)) {
       pairs.set(`Standard Grade__${cleanGrd}`, { supplier: 'Standard Grade', grade: cleanGrd });
     }
   });

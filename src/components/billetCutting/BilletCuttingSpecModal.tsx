@@ -81,18 +81,22 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
     return '0.75';
   }, [lengthNominal]);
 
-  // Effective list of suppliers and grades from IQA-01
+  // Effective list of suppliers and grades strictly from IQA-01
   const effectiveIqaSuppliers = useMemo(() => {
     const set = new Set<string>();
     (iqaSuppliers || []).forEach(s => s && set.add(s.trim()));
-    DEFAULT_IQA_SUPPLIERS.forEach(s => set.add(s.trim()));
+    if (set.size === 0) {
+      DEFAULT_IQA_SUPPLIERS.forEach(s => set.add(s.trim()));
+    }
     return Array.from(set);
   }, [iqaSuppliers]);
 
   const effectiveIqaGrades = useMemo(() => {
     const set = new Set<string>();
     (iqaGrades || []).forEach(g => g && set.add(g.trim()));
-    DEFAULT_IQA_GRADES.forEach(g => set.add(g.trim()));
+    if (set.size === 0) {
+      DEFAULT_IQA_GRADES.forEach(g => set.add(g.trim()));
+    }
     return Array.from(set);
   }, [iqaGrades]);
 
@@ -490,11 +494,6 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                       {effectiveIqaGrades.map(grd => (
                         <option key={grd} value={grd} />
                       ))}
-                      <option value="6005A">6005A</option>
-                      <option value="6060">6060</option>
-                      <option value="1050">1050</option>
-                      <option value="3003">3003</option>
-                      <option value="7075">7075</option>
                     </datalist>
 
                     {/* Quick Grade Chips */}

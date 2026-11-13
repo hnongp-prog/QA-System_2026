@@ -76,28 +76,43 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
 
   // Specs & Records State synced to Firebase Cloud Firestore
-  const [specs, setSpecs] = useCloudState<Record<string, BilletCuttingSpec>>('ipqa08_billet_specs', INITIAL_BILLET_SPECS);
+  const [specs, setSpecs, isSpecsReady] = useCloudState<Record<string, BilletCuttingSpec>>('ipqa08_billet_specs', INITIAL_BILLET_SPECS);
   const [records, setRecords] = useCloudState<BilletCuttingRecord[]>('ipqa08_billet_records', INITIAL_BILLET_RECORDS);
 
   // Sync with IQA-01 (Billet Incoming Inspection) Cloud State
-  const [iqaHistory] = useCloudState<any[]>('billet_qc_history', []);
-  const [iqaGradeSpecs] = useCloudState<Record<string, any>>('billet_qc_grade_specs', {});
+  const [iqaHistory, , isIqaHistoryReady] = useCloudState<any[]>('billet_qc_history', []);
+  const [iqaGradeSpecs, , isIqaGradeSpecsReady] = useCloudState<Record<string, any>>('billet_qc_grade_specs', {});
 
-  // Extract dynamic Suppliers, Grades, and Heat records from IQA-01 incoming history and specs
+  // Active Grade list derived strictly from IQA-01 Grade Spec (`billet_qc_grade_specs`)
+  const activeIqaGrades = React.useMemo(() => {
+    return Object.keys(iqaGradeSpecs || {})
+      .map(k => k.trim())
+      .filter(k => k.length > 0 && k !== 'NEW_GRADE_PENDING');
+  }, [iqaGradeSpecs]);
+
+  const activeIqaGradeSet = React.useMemo(
+    () => new Set(activeIqaGrades.map(g => g.toLowerCase())),
+    [activeIqaGrades]
+  );
+
+  // Extract dynamic Suppliers, Grades, and Heat records from IQA-01 Grade Spec & incoming history
   const { iqaSuppliers, iqaGrades, iqaHeatMap, iqaSupplierGradeMap } = React.useMemo(() => {
-    const supplierSet = new Set<string>(DEFAULT_IQA_SUPPLIERS);
-    const gradeSet = new Set<string>(DEFAULT_IQA_GRADES);
+    const supplierSet = new Set<string>();
+    const gradeSet = new Set<string>(activeIqaGrades);
     const heatMap: Record<string, { supplier: string; grade: string; size?: string }> = {};
-    const supGradeMap: Record<string, string> = { ...IQA_SUPPLIER_GRADE_MAP };
+    const supGradeMap: Record<string, string> = {};
+    const hasGradeFilter = activeIqaGradeSet.size > 0;
 
     if (Array.isArray(iqaHistory)) {
       iqaHistory.forEach((item: any) => {
         const sup = (item.supplier_name || '').trim();
         const grd = (item.grade || '').trim();
-        const heat = (item.heat_no || '').trim();
-        if (sup) supplierSet.add(sup);
-        if (grd) gradeSet.add(grd);
-        if (sup && grd) supGradeMap[sup] = grd;
+        const heat = (item.heat_number || item.heat_no || '').trim();
+        const isGradeAllowed = !hasGradeFilter || (grd !== '' && activeIqaGradeSet.has(grd.toLowerCase()));
+
+        if (sup && isGradeAllowed) supplierSet.add(sup);
+        if (grd && !hasGradeFilter) gradeSet.add(grd);
+        if (sup && grd && isGradeAllowed) supGradeMap[sup] = grd;
         if (heat) {
           heatMap[heat.toUpperCase()] = { supplier: sup, grade: grd, size: item.billet_size };
           heatMap[heat] = { supplier: sup, grade: grd, size: item.billet_size };
@@ -105,71 +120,123 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
       });
     }
 
-    if (iqaGradeSpecs && typeof iqaGradeSpecs === 'object') {
-      Object.keys(iqaGradeSpecs).forEach(g => {
-        if (g) gradeSet.add(g.trim());
+    // Only fallback to default lists if cloud IQA-01 data has not been populated at all
+    if (!hasGradeFilter && gradeSet.size === 0) {
+      DEFAULT_IQA_GRADES.forEach(g => gradeSet.add(g));
+    }
+    if (supplierSet.size === 0 && (!Array.isArray(iqaHistory) || iqaHistory.length === 0)) {
+      DEFAULT_IQA_SUPPLIERS.forEach(s => {
+        const mappedG = IQA_SUPPLIER_GRADE_MAP[s];
+        if (!hasGradeFilter || (mappedG && activeIqaGradeSet.has(mappedG.toLowerCase()))) {
+          supplierSet.add(s);
+        }
       });
     }
 
     return {
-      iqaSuppliers: Array.from(supplierSet),
-      iqaGrades: Array.from(gradeSet),
+      iqaSuppliers: Array.from(supplierSet).sort((a, b) => a.localeCompare(b)),
+      iqaGrades: Array.from(gradeSet).sort((a, b) => a.localeCompare(b)),
       iqaHeatMap: heatMap,
       iqaSupplierGradeMap: supGradeMap
     };
-  }, [iqaHistory, iqaGradeSpecs]);
+  }, [iqaHistory, activeIqaGrades, activeIqaGradeSet]);
 
-  // Sync specs from IQA-01 into IPQA-08 Cutting Specs automatically
-  const handleSyncFromIqa = React.useCallback(() => {
+  // Reconcile IPQA-08 Billet Specs with live IQA-01 Grade Spec (add new, remove deleted grades/stale IQA specs)
+  const reconcileSpecsWithIqa = React.useCallback((prev: Record<string, BilletCuttingSpec>): { next: Record<string, BilletCuttingSpec>; changed: boolean } => {
     const iqaSpecs = buildIqaCuttingSpecs(iqaHistory, iqaGradeSpecs);
-    setSpecs(prev => {
-      const merged = { ...prev };
-      let added = 0;
-      Object.entries(iqaSpecs).forEach(([k, spec]) => {
-        if (!merged[k]) {
-          merged[k] = spec;
-          added++;
-        }
-      });
-      return merged;
+    const hasActiveGrades = activeIqaGradeSet.size > 0;
+    const next: Record<string, BilletCuttingSpec> = {};
+    let changed = false;
+
+    Object.entries(prev || {}).forEach(([k, spec]) => {
+      const specGradeLower = (spec?.billetGrade || '').trim().toLowerCase();
+      const isAutoSyncedIqa = Boolean(spec?.id?.startsWith('spec-iqa-') || spec?.remarks?.includes('Auto-synced from IQA-01'));
+
+      // Remove specs whose Billet Grade was deleted from IQA-01 Grade Spec
+      if (hasActiveGrades && (!specGradeLower || !activeIqaGradeSet.has(specGradeLower))) {
+        changed = true;
+        return;
+      }
+
+      // Remove stale auto-synced IQA-01 specs no longer present in IQA-01 Grade Spec / History
+      if (hasActiveGrades && isAutoSyncedIqa && !iqaSpecs[k]) {
+        changed = true;
+        return;
+      }
+
+      next[k] = spec;
     });
-    setToastMessage(isTh ? 'ซิงค์ข้อมูล Supplier และ Billet Grade จาก IQA-01 สำเร็จแล้ว' : 'Synced Supplier & Grade from IQA-01');
-    setTimeout(() => setToastMessage(null), 3000);
-  }, [iqaHistory, iqaGradeSpecs, isTh, setSpecs]);
 
-  // Auto-merge IQA-01 specs whenever IQA data changes or loads
+    // Add missing active IQA-01 specs
+    Object.entries(iqaSpecs).forEach(([k, spec]) => {
+      if (!next[k]) {
+        next[k] = spec;
+        changed = true;
+      }
+    });
+
+    return { next, changed };
+  }, [iqaHistory, iqaGradeSpecs, activeIqaGradeSet]);
+
+  // Sync specs from IQA-01 into IPQA-08 Cutting Specs manually
+  const handleSyncFromIqa = React.useCallback(() => {
+    setSpecs(prev => reconcileSpecsWithIqa(prev).next);
+    setToastMessage(
+      isTh
+        ? 'ซิงค์และปรับปรุงข้อมูล Supplier / Billet Grade ตาม IQA-01 (Grade Spec) ล่าสุดเรียบร้อยแล้ว'
+        : 'Synced Supplier & Grade strictly with latest IQA-01 Grade Spec'
+    );
+    setTimeout(() => setToastMessage(null), 3000);
+  }, [reconcileSpecsWithIqa, isTh, setSpecs]);
+
+  // Auto-sync & prune stale specs whenever cloud IQA-01 Grade Spec or History updates
   useEffect(() => {
-    const iqaSpecs = buildIqaCuttingSpecs(iqaHistory, iqaGradeSpecs);
+    if (!isSpecsReady || !isIqaGradeSpecsReady || !isIqaHistoryReady) return;
     setSpecs(prev => {
-      let changed = false;
-      const next = { ...prev };
-      Object.entries(iqaSpecs).forEach(([k, spec]) => {
-        if (!next[k]) {
-          next[k] = spec;
-          changed = true;
-        }
-      });
+      const { next, changed } = reconcileSpecsWithIqa(prev);
       return changed ? next : prev;
     });
-  }, [iqaHistory, iqaGradeSpecs]);
+  }, [isSpecsReady, isIqaGradeSpecsReady, isIqaHistoryReady, reconcileSpecsWithIqa, setSpecs]);
 
   // Selected Profile Spec (Empty by default for fresh key-in)
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
-  const activeSpec = selectedProfileId ? specs[selectedProfileId] || null : null;
 
-  // Derived Billet Grades & Suppliers linked directly from Billet Spec (`specs`)
-  const specEntries = React.useMemo(
-    () => (Object.entries(specs || {}) as [string, BilletCuttingSpec][]),
-    [specs]
-  );
+  // Derived Billet Grades & Suppliers linked from Billet Spec (`specs`) AND filtered by active IQA-01 Grade Spec
+  const specEntries = React.useMemo(() => {
+    const all = Object.entries(specs || {}) as [string, BilletCuttingSpec][];
+    if (activeIqaGradeSet.size === 0) return all;
+    return all.filter(([, s]) =>
+      activeIqaGradeSet.has((s?.billetGrade || '').trim().toLowerCase())
+    );
+  }, [specs, activeIqaGradeSet]);
+
+  const activeSpec = React.useMemo(() => {
+    if (!selectedProfileId) return null;
+    const found = specEntries.find(([k]) => k === selectedProfileId);
+    return found ? found[1] : null;
+  }, [selectedProfileId, specEntries]);
+
+  useEffect(() => {
+    if (selectedProfileId && isSpecsReady && isIqaGradeSpecsReady && !activeSpec) {
+      setSelectedProfileId('');
+      setHeader(prev => ({
+        ...prev,
+        specProfileId: '',
+        billetGrade: '',
+        supplier: ''
+      }));
+    }
+  }, [selectedProfileId, isSpecsReady, isIqaGradeSpecsReady, activeSpec]);
 
   const specBilletGrades = React.useMemo(() => {
     const set = new Set<string>();
     specEntries.forEach(([, s]) => {
       if (s?.billetGrade?.trim()) set.add(s.billetGrade.trim());
     });
+    // Ensure all active IQA-01 Grade Spec grades are always represented
+    activeIqaGrades.forEach(g => set.add(g));
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [specEntries]);
+  }, [specEntries, activeIqaGrades]);
 
   const specSuppliers = React.useMemo(() => {
     const set = new Set<string>();
@@ -836,8 +903,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                     }`}
                   >
                     <option value="">{isTh ? '-- เลือกเกณฑ์ Billet / Supplier --' : '-- Select Spec Profile --'}</option>
-                    {Object.keys(specs).map(key => {
-                      const spec = specs[key];
+                    {specEntries.map(([key, spec]) => {
                       const displayGrade = spec.billetGrade || key;
                       const isIqa = spec.remarks?.includes('IQA-01') || spec.id?.includes('iqa');
                       const supplierInfo = spec.name && spec.name !== displayGrade ? ` (${spec.name})` : '';
@@ -892,11 +958,11 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                   <label className={`text-[11px] font-black uppercase tracking-wider flex items-center justify-between gap-2 mb-1 ${
                     isLight ? 'text-black' : 'text-slate-400'
                   }`}>
-                    <span>{isTh ? 'Billet Grade (Link จาก Billet Spec) *' : 'Billet Grade (From Billet Spec) *'}</span>
+                    <span>{isTh ? 'Billet Grade (Link จาก IQA-01 Grade Spec) *' : 'Billet Grade (IQA-01 Grade Spec) *'}</span>
                     <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono border ${
                       isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-950/80 text-indigo-300 border-indigo-800'
                     }`}>
-                      {specBilletGrades.length} Specs
+                      {specBilletGrades.length} {isTh ? 'เกรด' : 'Grades'}
                     </span>
                   </label>
                   <select
@@ -909,7 +975,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                     }`}
                     required
                   >
-                    <option value="">{isTh ? '-- เลือก Billet Grade จาก Billet Spec --' : '-- Select Billet Grade --'}</option>
+                    <option value="">{isTh ? '-- เลือก Billet Grade (IQA-01 Grade Spec) --' : '-- Select Billet Grade --'}</option>
                     {specBilletGrades.map(grade => (
                       <option key={grade} value={grade}>{grade}</option>
                     ))}
@@ -920,7 +986,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                   <label className={`text-[11px] font-black uppercase tracking-wider flex items-center justify-between gap-2 mb-1 ${
                     isLight ? 'text-black' : 'text-slate-400'
                   }`}>
-                    <span>{isTh ? 'Supplier (Link จาก Billet Spec) *' : 'Supplier (From Billet Spec) *'}</span>
+                    <span>{isTh ? 'Supplier (Link จาก Billet Spec / IQA-01) *' : 'Supplier (Billet Spec / IQA-01) *'}</span>
                     <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono border ${
                       isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-950/80 text-indigo-300 border-indigo-800'
                     }`}>
@@ -937,7 +1003,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                     }`}
                     required
                   >
-                    <option value="">{isTh ? '-- เลือก Supplier จาก Billet Spec --' : '-- Select Supplier --'}</option>
+                    <option value="">{isTh ? '-- เลือก Supplier (Billet Spec / IQA-01) --' : '-- Select Supplier --'}</option>
                     {header.billetGrade ? (
                       <>
                         <optgroup label={isTh ? `Supplier สำหรับ Grade ${header.billetGrade}` : `Suppliers for ${header.billetGrade}`}>
@@ -1526,7 +1592,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
         theme={theme}
       />
 
-      {/* Datalists linked from Billet Spec & IQA-01 */}
+      {/* Datalists linked from Billet Spec & IQA-01 (Grade Spec) */}
       <datalist id="billet-cutting-heat-list">
         {Object.keys(iqaHeatMap).slice(0, 80).map(heat => (
           <option key={heat} value={heat}>
@@ -1542,7 +1608,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
       </datalist>
 
       <datalist id="billet-cutting-grade-list">
-        {Array.from(new Set([...specBilletGrades, ...iqaGrades, '6063', '6061', '6082', '6005A', '6060', '1050', '3003', '7075'])).map(grade => (
+        {Array.from(new Set([...specBilletGrades, ...iqaGrades])).map(grade => (
           <option key={grade} value={grade} />
         ))}
       </datalist>
