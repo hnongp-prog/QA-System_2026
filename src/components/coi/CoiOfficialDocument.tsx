@@ -160,9 +160,15 @@ export const CoiOfficialDocument: React.FC<CoiOfficialDocumentProps> = ({
                 <td className="border-r border-slate-950 p-1 font-bold">{record.length}</td>
                 <td className="border-r border-slate-950 p-1 font-sans">{record.coatingType || 'Zn Spray + Flux Coat'}</td>
                 <td className="border-r border-slate-950 p-1 font-sans">{record.cutEndType || 'No End Forming'}</td>
-                <td className="border-r border-slate-950 p-1 font-bold text-emerald-800">OK</td>
-                <td className="border-r border-slate-950 p-1 font-bold text-emerald-800">OK</td>
-                <td className="p-1 font-bold text-emerald-800">OK</td>
+                <td className={`border-r border-slate-950 p-1 font-bold ${(detailed?.inspectionDimension || 'OK') === 'OK' ? 'text-emerald-800' : 'text-rose-700'}`}>
+                  {detailed?.inspectionDimension || 'OK'}
+                </td>
+                <td className={`border-r border-slate-950 p-1 font-bold ${(detailed?.inspectionCoating || 'OK') === 'OK' ? 'text-emerald-800' : 'text-rose-700'}`}>
+                  {detailed?.inspectionCoating || 'OK'}
+                </td>
+                <td className={`p-1 font-bold ${(detailed?.inspectionAppearance || 'OK') === 'OK' ? 'text-emerald-800' : 'text-rose-700'}`}>
+                  {detailed?.inspectionAppearance || 'OK'}
+                </td>
               </tr>
             </tbody>
           </table>

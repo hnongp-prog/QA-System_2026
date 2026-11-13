@@ -107,72 +107,461 @@ interface XRayMeasurementAppProps {
   onToggleTheme?: () => void;
 }
 
-// Sparkline SVG Component
-const Sparkline = ({ data, color, label }: { data: number[]; color: string; label: string }) => {
-  const validData = data.filter(v => v > 0);
-  
-  if (!validData || validData.length === 0) {
-    return (
-      <div className="flex flex-col w-full h-full justify-end">
-        <span className="text-[10px] font-bold text-slate-400 uppercase mb-1">{label}</span>
-        <div className="h-16 flex items-center justify-center text-[10px] text-slate-500 bg-slate-950/60 rounded-xl border border-dashed border-slate-800">
-          No trend data
-        </div>
-      </div>
-    );
-  }
-  
-  const width = 300; 
-  const height = 60;  
-  const padding = 8;
-  const innerWidth = width - padding * 2;
-  const innerHeight = height - padding * 2;
-  
-  const maxVal = Math.max(...validData, 0.1);
-  const minVal = Math.max(0, Math.min(...validData) * 0.8); 
-  const range = maxVal - minVal || 1;
+// Trend Data Point interface for X-Ray
+export interface XRayTrendPointItem {
+  index: number;
+  id: string;
+  date: string;
+  timestamp?: string;
+  lotNumber: string;
+  profileName: string;
+  stage?: string;
+  process?: string;
+  status: string;
+  inspector?: string;
+  zn: number;
+  flux: number;
+  coverage: number;
+}
 
-  const getX = (index: number) => {
-    if (validData.length === 1) return width / 2;
-    return padding + (index / (validData.length - 1)) * innerWidth;
+// Full-width parameter row chart component (Zn Weight, Flux Weight, Coverage %)
+interface XRayParameterRowCardProps {
+  paramKey: 'zn' | 'flux' | 'coverage';
+  title: string;
+  thaiTitle: string;
+  descriptionTh: string;
+  descriptionEn: string;
+  color: string;
+  data: XRayTrendPointItem[];
+  unit: string;
+  specMin?: number | null;
+  specMax?: number | null;
+  isLight: boolean;
+  isTh: boolean;
+}
+
+const XRayParameterRowCard: React.FC<XRayParameterRowCardProps> = ({
+  paramKey,
+  title,
+  thaiTitle,
+  descriptionTh,
+  descriptionEn,
+  color,
+  data,
+  unit,
+  specMin = null,
+  specMax = null,
+  isLight,
+  isTh,
+}) => {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  // Extract non-zero / valid data points
+  const validPoints = useMemo(() => {
+    return data
+      .map(item => ({
+        ...item,
+        value: item[paramKey]
+      }))
+      .filter(item => !isNaN(item.value) && item.value > 0);
+  }, [data, paramKey]);
+
+  const count = validPoints.length;
+  const avg = count > 0 ? validPoints.reduce((acc, p) => acc + p.value, 0) / count : 0;
+  const min = count > 0 ? Math.min(...validPoints.map(p => p.value)) : 0;
+  const max = count > 0 ? Math.max(...validPoints.map(p => p.value)) : 0;
+  const last = count > 0 ? validPoints[validPoints.length - 1].value : 0;
+  
+  const outOfSpecCount = useMemo(() => {
+    if (!specMin && !specMax) return 0;
+    return validPoints.filter(p => {
+      if (specMin !== null && specMin !== undefined && p.value < specMin) return true;
+      if (specMax !== null && specMax !== undefined && p.value > specMax) return true;
+      return false;
+    }).length;
+  }, [validPoints, specMin, specMax]);
+
+  // Active hovered point
+  const activePoint = hoveredIdx !== null && hoveredIdx < validPoints.length ? validPoints[hoveredIdx] : null;
+
+  // SVG Chart Dimensions
+  const svgWidth = 1000;
+  const svgHeight = 220;
+  const padLeft = 65;
+  const padRight = 35;
+  const padTop = 25;
+  const padBottom = 35;
+  const plotW = svgWidth - padLeft - padRight;
+  const plotH = svgHeight - padTop - padBottom;
+
+  const minCandidate = specMin !== null && specMin !== undefined ? Math.min(min, specMin) : min;
+  const minVal = Math.max(0, minCandidate * 0.85);
+  const maxCandidate = Math.max(max, specMax || 0, avg, 0.1);
+  const maxVal = maxCandidate * 1.25;
+  const valRange = maxVal - minVal || 1;
+
+  const getX = (idx: number) => {
+    if (validPoints.length <= 1) return padLeft + plotW / 2;
+    return padLeft + (idx / (validPoints.length - 1)) * plotW;
   };
 
   const getY = (val: number) => {
-    return padding + innerHeight - ((val - minVal) / range) * innerHeight;
+    return padTop + plotH - ((val - minVal) / valRange) * plotH;
   };
 
-  const points = validData.map((val, i) => `${getX(i)},${getY(val)}`).join(' ');
+  const linePoints = validPoints.map((p, i) => `${getX(i).toFixed(1)},${getY(p.value).toFixed(1)}`).join(' ');
+  const areaPath = validPoints.length > 0 
+    ? `M ${getX(0).toFixed(1)} ${padTop + plotH} ` + 
+      validPoints.map((p, i) => `L ${getX(i).toFixed(1)} ${getY(p.value).toFixed(1)}`).join(' ') + 
+      ` L ${getX(validPoints.length - 1).toFixed(1)} ${padTop + plotH} Z`
+    : '';
+
+  // Y-axis grid ticks (5 divisions)
+  const yTicks = [0, 0.25, 0.5, 0.75, 1.0].map(pct => {
+    const val = minVal + pct * valRange;
+    return { val, y: getY(val) };
+  });
+
+  // X-axis label step
+  const xStep = Math.max(1, Math.floor(validPoints.length / 8));
 
   return (
-    <div className="flex flex-col w-full">
-      <div className="flex justify-between items-center mb-1.5">
-         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
-         <span className="text-[10px] text-indigo-300 font-mono font-bold">Last: {validData[validData.length-1].toFixed(2)}</span>
+    <div className={`p-5 rounded-2xl border transition-all ${
+      isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+    }`}>
+      {/* Parameter Row Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span 
+              className="px-2.5 py-1 rounded-xl text-xs font-black uppercase font-mono tracking-wide border"
+              style={{
+                backgroundColor: isLight ? `${color}15` : `${color}25`,
+                color: color,
+                borderColor: `${color}40`
+              }}
+            >
+              {title}
+            </span>
+            <span className={`text-sm font-bold ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
+              {isTh ? thaiTitle : title}
+            </span>
+            {(specMin !== null && specMin !== undefined) || (specMax !== null && specMax !== undefined) ? (
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                Spec: {specMin ? `Min ≥ ${specMin}` : ''} {specMin && specMax ? '•' : ''} {specMax ? `Max ≤ ${specMax}` : ''} {unit}
+              </span>
+            ) : null}
+          </div>
+          <p className={`text-[11px] mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            {isTh ? descriptionTh : descriptionEn}
+          </p>
+        </div>
+
+        {/* Statistical Badges */}
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+          <div className={`px-2.5 py-1 rounded-lg border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950 border-slate-800 text-slate-300'
+          }`}>
+            <span className="text-[9px] block text-slate-400 font-sans uppercase font-bold">Samples (N)</span>
+            <strong className="text-xs">{count}</strong>
+          </div>
+
+          <div className={`px-2.5 py-1 rounded-lg border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+          }`}>
+            <span className="text-[9px] block text-slate-400 font-sans uppercase font-bold">Avg (เฉลี่ย)</span>
+            <strong style={{ color }}>{count > 0 ? avg.toFixed(2) : '-'} {unit}</strong>
+          </div>
+
+          <div className={`px-2.5 py-1 rounded-lg border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950 border-slate-800 text-slate-300'
+          }`}>
+            <span className="text-[9px] block text-slate-400 font-sans uppercase font-bold">Min (ต่ำสุด)</span>
+            <strong>{count > 0 ? min.toFixed(2) : '-'}</strong>
+          </div>
+
+          <div className={`px-2.5 py-1 rounded-lg border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950 border-slate-800 text-slate-300'
+          }`}>
+            <span className="text-[9px] block text-slate-400 font-sans uppercase font-bold">Max (สูงสุด)</span>
+            <strong>{count > 0 ? max.toFixed(2) : '-'}</strong>
+          </div>
+
+          <div className={`px-2.5 py-1 rounded-lg border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950 border-slate-800 text-slate-300'
+          }`}>
+            <span className="text-[9px] block text-slate-400 font-sans uppercase font-bold">Last (ล่าสุด)</span>
+            <strong style={{ color }}>{count > 0 ? last.toFixed(2) : '-'}</strong>
+          </div>
+
+          {(specMin !== null || specMax !== null) && (
+            <div className={`px-2.5 py-1 rounded-lg border text-center ${
+              outOfSpecCount > 0 
+                ? 'bg-rose-500/10 border-rose-500/30 text-rose-500 font-bold' 
+                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 font-bold'
+            }`}>
+              <span className="text-[9px] block text-slate-400 font-sans uppercase font-bold">Out of Spec</span>
+              <strong>{outOfSpecCount} ({count > 0 ? ((outOfSpecCount / count) * 100).toFixed(1) : 0}%)</strong>
+            </div>
+          )}
+        </div>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-16 overflow-visible bg-slate-950/80 rounded-xl border border-slate-800">
-        {validData.length > 1 && (
-          <polyline 
-            points={points} 
-            fill="none" 
-            stroke={color} 
-            strokeWidth="2.5" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-          />
-        )}
-        {validData.map((val, i) => (
-           <circle 
-             key={i} 
-             cx={getX(i)} 
-             cy={getY(val)} 
-             r="3.5" 
-             fill="#0f172a" 
-             stroke={color} 
-             strokeWidth="2" 
-             className="hover:r-5 transition-all" 
-           />
-        ))}
-      </svg>
+
+      {/* Hover Inspection Detail Banner */}
+      {activePoint ? (
+        <div className={`my-2.5 p-2.5 rounded-xl border flex flex-wrap items-center justify-between text-xs animate-fade-in ${
+          isLight ? 'bg-blue-50/90 border-blue-200 text-slate-800' : 'bg-slate-950 border-indigo-900/50 text-slate-200'
+        }`}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-bold font-mono text-indigo-600 dark:text-indigo-400">#{activePoint.index}</span>
+            <span><strong>วันที่:</strong> {activePoint.date} {activePoint.timestamp}</span>
+            <span><strong>Coil / Lot:</strong> <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">{activePoint.lotNumber}</span></span>
+            <span><strong>Profile:</strong> <span className="font-bold">{activePoint.profileName}</span></span>
+            <span><strong>Stage:</strong> {activePoint.stage || 'MASS'}</span>
+            <span><strong>Process:</strong> {activePoint.process || '-'}</span>
+            <span><strong>ผู้ตรวจ:</strong> {activePoint.inspector || '-'}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1 sm:mt-0 font-mono">
+            <span className="font-bold text-sm" style={{ color }}>{activePoint.value.toFixed(2)} {unit}</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+              activePoint.status === 'Pass' 
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+            }`}>
+              {activePoint.status === 'Pass' ? 'PASS' : 'FAIL'}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="h-2" />
+      )}
+
+      {/* SVG Chart Content */}
+      {validPoints.length === 0 ? (
+        <div className={`h-48 flex flex-col items-center justify-center rounded-xl border border-dashed text-xs ${
+          isLight ? 'bg-slate-50 border-slate-300 text-slate-400' : 'bg-slate-950/60 border-slate-800 text-slate-500'
+        }`}>
+          <Activity className="w-6 h-6 mb-2 opacity-50" />
+          <span>{isTh ? 'ไม่มีข้อมูลการตรวจวัดสำหรับพารามิเตอร์นี้' : 'No measurement trend data for this parameter'}</span>
+        </div>
+      ) : (
+        <div className="relative w-full overflow-hidden">
+          <svg
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+            className={`w-full h-56 sm:h-64 rounded-xl border overflow-visible ${
+              isLight ? 'bg-slate-50/70 border-slate-200' : 'bg-slate-950/90 border-slate-800'
+            }`}
+          >
+            <defs>
+              <linearGradient id={`grad-${paramKey}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor={color} stopOpacity="0.32" />
+                <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+              </linearGradient>
+            </defs>
+
+            {/* Y-axis Grid lines and labels */}
+            {yTicks.map((tick, i) => (
+              <g key={i}>
+                <line
+                  x1={padLeft}
+                  y1={tick.y}
+                  x2={padLeft + plotW}
+                  y2={tick.y}
+                  stroke={isLight ? '#e2e8f0' : '#1e293b'}
+                  strokeDasharray="3 3"
+                  strokeWidth="1"
+                />
+                <text
+                  x={padLeft - 8}
+                  y={tick.y + 3}
+                  textAnchor="end"
+                  fill={isLight ? '#64748b' : '#64748b'}
+                  fontSize="10"
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                >
+                  {tick.val.toFixed(1)}
+                </text>
+              </g>
+            ))}
+
+            {/* Average Line */}
+            {count > 1 && (
+              <g>
+                <line
+                  x1={padLeft}
+                  y1={getY(avg)}
+                  x2={padLeft + plotW}
+                  y2={getY(avg)}
+                  stroke={color}
+                  strokeDasharray="4 4"
+                  strokeWidth="1.5"
+                  opacity="0.8"
+                />
+                <text
+                  x={padLeft + plotW - 6}
+                  y={getY(avg) - 4}
+                  textAnchor="end"
+                  fill={color}
+                  fontSize="10"
+                  fontWeight="bold"
+                  fontFamily="monospace"
+                >
+                  Avg: {avg.toFixed(2)} {unit}
+                </text>
+              </g>
+            )}
+
+            {/* Spec Min Reference Line */}
+            {specMin !== null && specMin !== undefined && specMin > 0 && (
+              <g>
+                <line
+                  x1={padLeft}
+                  y1={getY(specMin)}
+                  x2={padLeft + plotW}
+                  y2={getY(specMin)}
+                  stroke="#ef4444"
+                  strokeDasharray="5 5"
+                  strokeWidth="2"
+                />
+                <text
+                  x={padLeft + plotW - 6}
+                  y={getY(specMin) - 4}
+                  textAnchor="end"
+                  fill="#ef4444"
+                  fontSize="10"
+                  fontWeight="bold"
+                  fontFamily="monospace"
+                >
+                  Spec Min: ≥ {specMin.toFixed(1)} {unit}
+                </text>
+              </g>
+            )}
+
+            {/* Spec Max Reference Line */}
+            {specMax !== null && specMax !== undefined && specMax > 0 && (
+              <g>
+                <line
+                  x1={padLeft}
+                  y1={getY(specMax)}
+                  x2={padLeft + plotW}
+                  y2={getY(specMax)}
+                  stroke="#ef4444"
+                  strokeDasharray="5 5"
+                  strokeWidth="2"
+                />
+                <text
+                  x={padLeft + plotW - 6}
+                  y={getY(specMax) - 4}
+                  textAnchor="end"
+                  fill="#ef4444"
+                  fontSize="10"
+                  fontWeight="bold"
+                  fontFamily="monospace"
+                >
+                  Spec Max: ≤ {specMax.toFixed(1)} {unit}
+                </text>
+              </g>
+            )}
+
+            {/* Area Fill */}
+            {areaPath && (
+              <path d={areaPath} fill={`url(#grad-${paramKey})`} />
+            )}
+
+            {/* Line Graph */}
+            {validPoints.length > 1 && (
+              <polyline
+                points={linePoints}
+                fill="none"
+                stroke={color}
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+
+            {/* Hover Vertical Guide Line */}
+            {hoveredIdx !== null && (
+              <line
+                x1={getX(hoveredIdx)}
+                y1={padTop}
+                x2={getX(hoveredIdx)}
+                y2={padTop + plotH}
+                stroke={color}
+                strokeDasharray="3 3"
+                strokeWidth="1.5"
+                opacity="0.8"
+              />
+            )}
+
+            {/* Data Points */}
+            {validPoints.map((p, i) => {
+              const cx = getX(i);
+              const cy = getY(p.value);
+              const isFail = 
+                (specMin !== null && specMin !== undefined && p.value < specMin) ||
+                (specMax !== null && specMax !== undefined && p.value > specMax) ||
+                p.status === 'Fail';
+              const isHovered = hoveredIdx === i;
+
+              return (
+                <g key={p.id || i}>
+                  {/* Invisible hit area */}
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r="12"
+                    fill="transparent"
+                    className="cursor-pointer"
+                    onMouseEnter={() => setHoveredIdx(i)}
+                    onMouseLeave={() => setHoveredIdx(null)}
+                    onClick={() => setHoveredIdx(i)}
+                  />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={isHovered ? 6.5 : (validPoints.length > 30 ? 3.5 : 4.5)}
+                    fill={isFail ? '#ef4444' : (isLight ? '#ffffff' : '#0f172a')}
+                    stroke={isFail ? '#ef4444' : color}
+                    strokeWidth={isHovered ? 3 : 2}
+                    className="transition-all pointer-events-none"
+                  />
+                </g>
+              );
+            })}
+
+            {/* X-axis Baseline */}
+            <line
+              x1={padLeft}
+              y1={padTop + plotH}
+              x2={padLeft + plotW}
+              y2={padTop + plotH}
+              stroke={isLight ? '#cbd5e1' : '#334155'}
+              strokeWidth="1.5"
+            />
+
+            {/* X-axis Tick Labels (Dates / Lots) */}
+            {validPoints.map((p, i) => {
+              if (i !== 0 && i !== validPoints.length - 1 && i % xStep !== 0) return null;
+              const cx = getX(i);
+              return (
+                <text
+                  key={i}
+                  x={cx}
+                  y={padTop + plotH + 16}
+                  textAnchor="middle"
+                  fill={isLight ? '#64748b' : '#64748b'}
+                  fontSize="9"
+                  fontFamily="monospace"
+                >
+                  {p.date ? p.date.slice(5) : `#${i + 1}`}
+                </text>
+              );
+            })}
+          </svg>
+        </div>
+      )}
     </div>
   );
 };
@@ -512,11 +901,11 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
     return { total, passCount, failCount, passRatio, profileSummaries };
   }, [inspections]);
 
-  // Filtered Trends
-  const filteredTrends = useMemo(() => {
+  // Filtered Chronological Inspection Data for unified X-Ray trend graphs
+  const filteredTrendData = useMemo<XRayTrendPointItem[]>(() => {
     if (inspections.length === 0) return [];
 
-    let filtered = inspections;
+    let filtered = [...inspections];
     if (trendFilterProfile !== 'All') {
       filtered = filtered.filter(i => (i.profileName || 'Unknown') === trendFilterProfile);
     }
@@ -524,42 +913,70 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
       filtered = filtered.filter(i => i.date && i.date.startsWith(trendFilterMonth));
     }
 
-    const groups: Record<string, { name: string; total: number; history: XRayInspectionRecord[] }> = {};
-    filtered.forEach(item => {
-      const pName = item.profileName || 'Unknown';
-      if (!groups[pName]) groups[pName] = { name: pName, total: 0, history: [] };
-      groups[pName].total++;
-      groups[pName].history.push(item);
+    // Sort chronologically (oldest to newest for left-to-right trend)
+    filtered.sort((a, b) => {
+      const dateA = `${a.date || ''} ${a.timestamp || ''}`;
+      const dateB = `${b.date || ''} ${b.timestamp || ''}`;
+      return dateA.localeCompare(dateB);
     });
 
-    return Object.values(groups).map(g => {
-      const sortedHistory = [...g.history].reverse(); 
-      const trends = {
-        zn: sortedHistory.map(item => {
-          let sum = 0, count = 0;
-          const upVals = toArray(item.raUp).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
-          const loVals = toArray(item.raLo).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
-          [...upVals, ...loVals].forEach(v => { sum += v; count++; });
-          return count > 0 ? sum / count : 0;
-        }),
-        flux: sortedHistory.map(item => {
-          let sum = 0, count = 0;
-          const upVals = toArray(item.rzUp).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
-          const loVals = toArray(item.rzLo).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
-          [...upVals, ...loVals].forEach(v => { sum += v; count++; });
-          return count > 0 ? sum / count : 0;
-        }),
-        coverage: sortedHistory.map(item => {
-          let sum = 0, count = 0;
-          const upVals = toArray(item.rtUp).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
-          const loVals = toArray(item.rtLo).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
-          [...upVals, ...loVals].forEach(v => { sum += v; count++; });
-          return count > 0 ? sum / count : 0;
-        })
+    return filtered.map((item, idx) => {
+      // Calculate Zn Weight
+      let znVal = 0;
+      if (item.znAvgTotal && !isNaN(parseFloat(item.znAvgTotal)) && parseFloat(item.znAvgTotal) > 0) {
+        znVal = parseFloat(item.znAvgTotal);
+      } else {
+        const upVals = toArray(item.raUp).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+        const loVals = toArray(item.raLo).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+        const all = [...upVals, ...loVals];
+        znVal = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : 0;
+      }
+
+      // Calculate Flux Weight
+      let fluxVal = 0;
+      if (item.fluxAvgTotal && !isNaN(parseFloat(item.fluxAvgTotal)) && parseFloat(item.fluxAvgTotal) > 0) {
+        fluxVal = parseFloat(item.fluxAvgTotal);
+      } else {
+        const upVals = toArray(item.rzUp).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+        const loVals = toArray(item.rzLo).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+        const all = [...upVals, ...loVals];
+        fluxVal = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : 0;
+      }
+
+      // Calculate Coverage %
+      let covVal = 0;
+      if (item.coverageAvgTotal && !isNaN(parseFloat(item.coverageAvgTotal)) && parseFloat(item.coverageAvgTotal) > 0) {
+        covVal = parseFloat(item.coverageAvgTotal);
+      } else {
+        const upVals = toArray(item.rtUp).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+        const loVals = toArray(item.rtLo).map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+        const all = [...upVals, ...loVals];
+        covVal = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : 0;
+      }
+
+      return {
+        index: idx + 1,
+        id: item.id || `xray-ins-${idx}`,
+        date: item.date || '-',
+        timestamp: item.timestamp || '',
+        lotNumber: item.lotNumber || '-',
+        profileName: item.profileName || 'Unknown',
+        stage: item.stage || 'MASS',
+        process: item.process || '-',
+        status: item.status || 'Pass',
+        inspector: item.inspectorName || '-',
+        zn: znVal,
+        flux: fluxVal,
+        coverage: covVal,
       };
-      return { ...g, trends };
     });
   }, [inspections, trendFilterProfile, trendFilterMonth]);
+
+  // Active spec when a specific profile is queried
+  const activeTrendSpec = useMemo(() => {
+    if (trendFilterProfile === 'All') return null;
+    return savedProfiles.find(p => p.name.toLowerCase() === trendFilterProfile.toLowerCase()) || null;
+  }, [trendFilterProfile, savedProfiles]);
 
   const formatSpecValue = (val: any) => {
     if (val === undefined || val === null || val === '' || isNaN(parseFloat(val))) return '0.0';
@@ -2608,60 +3025,97 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
             <>
               {/* Stat Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center gap-4">
-                  <div className="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20">
+                <div className={`p-5 rounded-2xl border flex items-center gap-4 transition-colors ${
+                  isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+                }`}>
+                  <div className="p-3 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
                     <ClipboardCheck className="w-6 h-6" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Total Inspected</p>
-                    <p className="text-2xl font-bold text-white">{dashboardStats.total} <span className="text-xs font-normal text-slate-500">Coils</span></p>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                      {isTh ? 'จำนวนการตรวจวัดทั้งหมด' : 'Total Inspected'}
+                    </p>
+                    <p className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                      {dashboardStats.total} <span className="text-xs font-normal text-slate-500">Coils</span>
+                    </p>
                   </div>
                 </div>
 
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center gap-4">
-                  <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
+                <div className={`p-5 rounded-2xl border flex items-center gap-4 transition-colors ${
+                  isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+                }`}>
+                  <div className="p-3 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 rounded-xl border border-emerald-500/20">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Passed</p>
-                    <p className="text-2xl font-bold text-emerald-400">{dashboardStats.passCount} <span className="text-xs font-normal text-slate-500">Coils</span></p>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                      {isTh ? 'ผ่านเกณฑ์มาตรฐาน' : 'Passed'}
+                    </p>
+                    <p className="text-2xl font-bold text-emerald-500 dark:text-emerald-400">
+                      {dashboardStats.passCount} <span className="text-xs font-normal text-slate-500">Coils</span>
+                    </p>
                   </div>
                 </div>
 
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center gap-4">
-                  <div className="p-3 bg-rose-500/10 text-rose-400 rounded-xl border border-rose-500/20">
+                <div className={`p-5 rounded-2xl border flex items-center gap-4 transition-colors ${
+                  isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+                }`}>
+                  <div className="p-3 bg-rose-500/10 text-rose-500 dark:text-rose-400 rounded-xl border border-rose-500/20">
                     <AlertCircle className="w-6 h-6" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Failed</p>
-                    <p className="text-2xl font-bold text-rose-400">{dashboardStats.failCount} <span className="text-xs font-normal text-slate-500">Coils</span></p>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                      {isTh ? 'ไม่ผ่านเกณฑ์' : 'Failed'}
+                    </p>
+                    <p className="text-2xl font-bold text-rose-500 dark:text-rose-400">
+                      {dashboardStats.failCount} <span className="text-xs font-normal text-slate-500">Coils</span>
+                    </p>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-indigo-900 to-purple-950 p-5 rounded-2xl border border-indigo-800 flex items-center gap-4 text-white">
+                <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-purple-950 p-5 rounded-2xl border border-indigo-800 flex items-center gap-4 text-white shadow-sm">
                   <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
                     <Target className="w-6 h-6 text-indigo-300" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-indigo-300 uppercase">Pass Rate</p>
+                    <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider">
+                      {isTh ? 'อัตราผ่านเกณฑ์' : 'Pass Rate'}
+                    </p>
                     <p className="text-2xl font-bold text-white">{dashboardStats.passRatio}%</p>
                   </div>
                 </div>
               </div>
 
               {/* Profile Summary Table */}
-              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-4">
-                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-indigo-400" />
-                  Summary Statistics by Profile
-                </h3>
+              <div className={`rounded-2xl border p-6 space-y-4 transition-colors ${
+                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${
+                    isLight ? 'text-slate-900' : 'text-slate-300'
+                  }`}>
+                    <TrendingUp className="w-4 h-4 text-indigo-500" />
+                    <span>{isTh ? 'สถิติภาพรวมแยกตาม Profile (คลิกเพื่อกรองดูกราฟ)' : 'Summary Statistics by Profile (Click to filter graph)'}</span>
+                  </h3>
+                  {trendFilterProfile !== 'All' && (
+                    <button
+                      onClick={() => setTrendFilterProfile('All')}
+                      className="text-[11px] text-indigo-500 hover:underline flex items-center gap-1 font-semibold self-start sm:self-auto"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>{isTh ? `กำลังกรอง: ${trendFilterProfile} (คลิกเพื่อดูทุก Profile)` : `Filtered: ${trendFilterProfile} (Reset)`}</span>
+                    </button>
+                  )}
+                </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800">
+                    <thead className={`uppercase text-[10px] font-bold border-b ${
+                      isLight ? 'bg-slate-50 text-slate-600 border-slate-200' : 'bg-slate-950 text-slate-400 border-slate-800'
+                    }`}>
                       <tr>
-                        <th className="px-4 py-3">Profile Name</th>
-                        <th className="px-4 py-3 text-center">Total Lots</th>
+                        <th className="px-4 py-3">{isTh ? 'ชื่อ Profile' : 'Profile Name'}</th>
+                        <th className="px-4 py-3 text-center">{isTh ? 'จำนวน Lot' : 'Total Lots'}</th>
                         <th className="px-4 py-3 text-center">Avg Zn (g/m²)</th>
                         <th className="px-4 py-3 text-center">Avg Flux (g/m²)</th>
                         <th className="px-4 py-3 text-center">Avg Coverage %</th>
@@ -2669,86 +3123,276 @@ export const XRayMeasurementApp: React.FC<XRayMeasurementAppProps> = ({
                         <th className="px-4 py-3 text-right">Pass Rate (%)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/80 font-mono">
-                      {dashboardStats.profileSummaries.map((p, idx) => (
-                        <tr key={idx} className="hover:bg-slate-950/40 transition">
-                          <td className="px-4 py-3 font-sans font-bold text-slate-200">{p.name}</td>
-                          <td className="px-4 py-3 text-center text-slate-300">{p.total}</td>
-                          <td className="px-4 py-3 text-center text-indigo-300 font-bold">{p.avgZn}</td>
-                          <td className="px-4 py-3 text-center text-emerald-300 font-bold">{p.avgFlux}</td>
-                          <td className="px-4 py-3 text-center text-amber-300 font-bold">{p.avgCov}</td>
-                          <td className="px-4 py-3 text-center font-sans">
-                            <span className="text-emerald-400 font-bold">{p.pass}</span>
-                            <span className="text-slate-600 mx-1">/</span>
-                            <span className="text-rose-400 font-bold">{p.fail}</span>
-                          </td>
-                          <td className="px-4 py-3 text-right font-sans font-bold">
-                            <span className={parseFloat(p.passRate) >= 95 ? 'text-emerald-400' : 'text-rose-400'}>
-                              {p.passRate}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                    <tbody className={`divide-y font-mono ${
+                      isLight ? 'divide-slate-200' : 'divide-slate-800/80'
+                    }`}>
+                      {dashboardStats.profileSummaries.map((p, idx) => {
+                        const isSelected = trendFilterProfile === p.name;
+                        return (
+                          <tr 
+                            key={idx} 
+                            onClick={() => setTrendFilterProfile(isSelected ? 'All' : p.name)}
+                            title={isTh ? `คลิกเพื่อกรองดูกราฟเฉพาะ Profile ${p.name}` : `Click to filter graph for ${p.name}`}
+                            className={`cursor-pointer transition-colors ${
+                              isSelected
+                                ? (isLight ? 'bg-indigo-50 font-semibold' : 'bg-indigo-950/40 font-semibold')
+                                : (isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-950/40')
+                            }`}
+                          >
+                            <td className={`px-4 py-3 font-sans font-bold flex items-center gap-2 ${
+                              isSelected ? 'text-indigo-600 dark:text-indigo-400' : (isLight ? 'text-slate-900' : 'text-slate-200')
+                            }`}>
+                              <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-indigo-500' : 'bg-transparent'}`} />
+                              {p.name}
+                            </td>
+                            <td className={`px-4 py-3 text-center ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{p.total}</td>
+                            <td className="px-4 py-3 text-center text-indigo-600 dark:text-indigo-400 font-bold">{p.avgZn}</td>
+                            <td className="px-4 py-3 text-center text-emerald-600 dark:text-emerald-400 font-bold">{p.avgFlux}</td>
+                            <td className="px-4 py-3 text-center text-amber-600 dark:text-amber-400 font-bold">{p.avgCov}%</td>
+                            <td className="px-4 py-3 text-center font-sans">
+                              <span className="text-emerald-500 font-bold">{p.pass}</span>
+                              <span className="text-slate-400 mx-1">/</span>
+                              <span className="text-rose-500 font-bold">{p.fail}</span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-sans font-bold">
+                              <span className={parseFloat(p.passRate) >= 95 ? 'text-emerald-500' : 'text-rose-500'}>
+                                {p.passRate}%
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* Sparkline Trends Section */}
-              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-indigo-400" />
-                    X-Ray Measurement Trend Analysis
-                  </h3>
+              {/* UNIFIED TREND ANALYSIS SECTION: Full-width rows for Zn, Flux, Coverage */}
+              <div className={`rounded-2xl border p-6 space-y-6 transition-colors ${
+                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+              }`}>
+                {/* Header & Query Filter Controls */}
+                <div className={`flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b pb-5 ${
+                  isLight ? 'border-slate-200' : 'border-slate-800'
+                }`}>
+                  <div>
+                    <h3 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
+                      isLight ? 'text-slate-900' : 'text-slate-200'
+                    }`}>
+                      <Activity className="w-4 h-4 text-indigo-500" />
+                      <span>{isTh ? 'การวิเคราะห์แนวโน้มค่าการเคลือบ X-Ray (X-Ray Coating Trend Analysis)' : 'X-Ray Coating Trend Analysis'}</span>
+                    </h3>
+                    <p className={`text-xs mt-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                      {trendFilterProfile === 'All' 
+                        ? (isTh ? '📊 กำลังแสดงภาพรวมทุก Profile รวมกัน (แยกตามแถวค่าทดสอบด้านล่าง)' : '📊 Showing unified overview of all profiles across dedicated parameter rows')
+                        : (isTh ? `🎯 กรองเฉพาะ Profile: ${trendFilterProfile} (พร้อมเส้นกำหนดมาตรฐาน Spec Min / Max)` : `🎯 Filtered by Profile: ${trendFilterProfile} (with Spec Min / Max limits)`)}
+                      {trendFilterMonth !== 'All' && ` • เดือน: ${trendFilterMonth}`}
+                      {` (${filteredTrendData.length} ${isTh ? 'ตัวอย่างที่นำมาพล็อตกราฟ' : 'samples plotted'})`}
+                    </p>
+                  </div>
 
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={trendFilterProfile}
-                      onChange={(e) => setTrendFilterProfile(e.target.value)}
-                      className="bg-slate-950 border border-slate-800 text-xs text-slate-300 font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="All">All Profiles</option>
-                      {availableProfiles.filter(p => p !== 'All').map(p => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
+                  {/* Query Toolbar */}
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Profile Query Dropdown */}
+                    <div className="flex items-center gap-1.5">
+                      <Filter className="w-3.5 h-3.5 text-slate-400" />
+                      <select
+                        value={trendFilterProfile}
+                        onChange={(e) => setTrendFilterProfile(e.target.value)}
+                        className={`text-xs font-semibold rounded-xl px-3 py-1.5 border transition focus:outline-none focus:border-indigo-500 ${
+                          isLight
+                            ? 'bg-slate-50 border-slate-300 text-slate-800'
+                            : 'bg-slate-950 border-slate-800 text-slate-300'
+                        }`}
+                      >
+                        <option value="All">{isTh ? 'ทุก Profile (ภาพรวม)' : 'All Profiles (Overview)'}</option>
+                        {availableProfiles.filter(p => p !== 'All').map(p => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                    <select
-                      value={trendFilterMonth}
-                      onChange={(e) => setTrendFilterMonth(e.target.value)}
-                      className="bg-slate-950 border border-slate-800 text-xs text-slate-300 font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="All">All Months</option>
-                      {availableMonths.filter(m => m !== 'All').map(m => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
+                    {/* Month Query Dropdown */}
+                    <div>
+                      <select
+                        value={trendFilterMonth}
+                        onChange={(e) => setTrendFilterMonth(e.target.value)}
+                        className={`text-xs font-semibold rounded-xl px-3 py-1.5 border transition focus:outline-none focus:border-indigo-500 ${
+                          isLight
+                            ? 'bg-slate-50 border-slate-300 text-slate-800'
+                            : 'bg-slate-950 border-slate-800 text-slate-300'
+                        }`}
+                      >
+                        <option value="All">{isTh ? 'ทุกเดือน (All Months)' : 'All Months'}</option>
+                        {availableMonths.filter(m => m !== 'All').map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Reset Button */}
+                    {(trendFilterProfile !== 'All' || trendFilterMonth !== 'All') && (
+                      <button
+                        onClick={() => {
+                          setTrendFilterProfile('All');
+                          setTrendFilterMonth('All');
+                        }}
+                        className={`text-xs px-3 py-1.5 rounded-xl border flex items-center gap-1.5 font-semibold transition ${
+                          isLight
+                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                        }`}
+                        title={isTh ? 'ล้างตัวกรองทั้งหมด' : 'Reset all filters'}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>{isTh ? 'รีเซ็ต' : 'Reset'}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                <div className="space-y-6">
-                  {filteredTrends.map((p, idx) => (
-                    <div key={idx} className="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-4">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="font-bold text-sm text-indigo-300">{p.name}</h4>
-                          <span className="text-[10px] text-slate-500 uppercase">Sample Count: {p.total}</span>
-                        </div>
-                      </div>
+                {/* Quick Profile Filter Pills */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                      isLight ? 'text-slate-600' : 'text-slate-400'
+                    }`}>
+                      <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>{isTh ? 'เลือก Profile ด่วน:' : 'Quick Profile Select:'}</span>
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {isTh ? 'เลือกเพื่อดู Spec Limit และแนวโน้มเฉพาะ Profile' : 'Select to inspect profile limits'}
+                    </span>
+                  </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <Sparkline data={p.trends.zn} color="#818cf8" label="Zn Weight Trend (g/m²)" />
-                        <Sparkline data={p.trends.flux} color="#34d399" label="Flux Weight Trend (g/m²)" />
-                        <Sparkline data={p.trends.coverage} color="#fbbf24" label="Coverage % Trend" />
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
+                    <button
+                      onClick={() => setTrendFilterProfile('All')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold border transition shrink-0 ${
+                        trendFilterProfile === 'All'
+                          ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
+                          : (isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-950 hover:bg-slate-800 text-slate-400 border-slate-800')
+                      }`}
+                    >
+                      {isTh ? '🌐 ภาพรวมทุก Profile' : '🌐 All Profiles Overview'}
+                    </button>
+
+                    {availableProfiles.filter(p => p !== 'All').map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setTrendFilterProfile(p)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition shrink-0 ${
+                          trendFilterProfile === p
+                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
+                            : (isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-950 hover:bg-slate-800 text-slate-400 border-slate-800')
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Active Profile Spec Banner when queried */}
+                {activeTrendSpec && (
+                  <div className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                    isLight 
+                      ? 'bg-indigo-50/70 border-indigo-200 text-indigo-950' 
+                      : 'bg-indigo-950/30 border-indigo-800/60 text-indigo-200'
+                  }`}>
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-indigo-500/20 text-indigo-500 rounded-lg">
+                        <Activity className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-indigo-600 dark:text-indigo-300">
+                          {activeTrendSpec.name} {isTh ? 'มาตรฐานที่กำหนด (Specification Limits)' : 'Specification Limits'}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {isTh ? 'เส้นประในแต่ละกราฟด้านล่างแสดงขอบเขตมาตรฐานควบคุมของ Profile นี้' : 'Dashed lines in the charts below mark the spec limits for this profile'}
+                        </p>
                       </div>
                     </div>
-                  ))}
+
+                    <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                      {/* Zn Spec */}
+                      <span className={`px-2.5 py-1 rounded-lg border font-bold ${
+                        isLight ? 'bg-white border-indigo-200 text-indigo-700' : 'bg-slate-900 border-indigo-800 text-indigo-300'
+                      }`}>
+                        Zn: {activeTrendSpec.raUp || activeTrendSpec.raLo || '-'} ~ {activeTrendSpec.rzUp || activeTrendSpec.rzLo || '-'} g/m²
+                      </span>
+                      {/* Flux Spec */}
+                      <span className={`px-2.5 py-1 rounded-lg border font-bold ${
+                        isLight ? 'bg-white border-emerald-200 text-emerald-700' : 'bg-slate-900 border-emerald-800 text-emerald-300'
+                      }`}>
+                        Flux: {activeTrendSpec.fluxMinUp || activeTrendSpec.fluxMinLo || '-'} ~ {activeTrendSpec.fluxMaxUp || activeTrendSpec.fluxMaxLo || '-'} g/m²
+                      </span>
+                      {/* Coverage Spec */}
+                      <span className={`px-2.5 py-1 rounded-lg border font-bold ${
+                        isLight ? 'bg-white border-amber-200 text-amber-700' : 'bg-slate-900 border-amber-800 text-amber-300'
+                      }`}>
+                        Cov: ≥ {activeTrendSpec.coverageLimitUp || activeTrendSpec.coverageLimitLo || '-'}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3 DEDICATED FULL-WIDTH PARAMETER ROWS */}
+                <div className="space-y-5">
+                  {/* Row 1: Zn Weight (g/m²) */}
+                  <XRayParameterRowCard
+                    paramKey="zn"
+                    title="Zn Weight"
+                    thaiTitle="ความหนาชั้นเคลือบสังกะสี (Zinc Coating Weight - Zn)"
+                    descriptionTh="น้ำหนักชั้นเคลือบสังกะสีเฉลี่ยทั้งด้านบน (Up) และด้านล่าง (Lo)"
+                    descriptionEn="Average zinc coating weight on upper and lower surfaces"
+                    color="#818cf8"
+                    data={filteredTrendData}
+                    unit="g/m²"
+                    specMin={activeTrendSpec ? (parseFloat(activeTrendSpec.raUp || activeTrendSpec.raLo || '0') || null) : null}
+                    specMax={activeTrendSpec ? (parseFloat(activeTrendSpec.rzUp || activeTrendSpec.rzLo || '0') || null) : null}
+                    isLight={isLight}
+                    isTh={isTh}
+                  />
+
+                  {/* Row 2: Flux Weight (g/m²) */}
+                  <XRayParameterRowCard
+                    paramKey="flux"
+                    title="Flux Weight"
+                    thaiTitle="ปริมาณสารเคลือบฟลักซ์ (Flux Coating Weight - Flux)"
+                    descriptionTh="น้ำหนักฟลักซ์เฉลี่ยทั้งด้านบนและด้านล่างในการเตรียมผิวเชื่อมประสาน"
+                    descriptionEn="Average flux coating weight on surfaces"
+                    color="#34d399"
+                    data={filteredTrendData}
+                    unit="g/m²"
+                    specMin={activeTrendSpec ? (parseFloat(activeTrendSpec.fluxMinUp || activeTrendSpec.fluxMinLo || '0') || null) : null}
+                    specMax={activeTrendSpec ? (parseFloat(activeTrendSpec.fluxMaxUp || activeTrendSpec.fluxMaxLo || '0') || null) : null}
+                    isLight={isLight}
+                    isTh={isTh}
+                  />
+
+                  {/* Row 3: Coverage % (%) */}
+                  <XRayParameterRowCard
+                    paramKey="coverage"
+                    title="Coverage %"
+                    thaiTitle="เปอร์เซ็นต์ความครอบคลุมผิว (Coating Coverage Percentage)"
+                    descriptionTh="สัดส่วนพื้นที่ผิวที่ผ่านการเคลือบอย่างสมบูรณ์เทียบกับพื้นที่ทั้งหมด (Surface Coverage)"
+                    descriptionEn="Percentage of surface area covered by coating"
+                    color="#fbbf24"
+                    data={filteredTrendData}
+                    unit="%"
+                    specMin={activeTrendSpec ? (parseFloat(activeTrendSpec.coverageLimitUp || activeTrendSpec.coverageLimitLo || '0') || null) : null}
+                    specMax={null}
+                    isLight={isLight}
+                    isTh={isTh}
+                  />
                 </div>
               </div>
             </>
           ) : (
-            <div className="py-20 text-center bg-slate-900 rounded-2xl border border-slate-800 text-slate-500 space-y-2">
+            <div className={`py-20 text-center rounded-2xl border space-y-2 ${
+              isLight ? 'bg-white border-slate-200 text-slate-500 shadow-sm' : 'bg-slate-900 border-slate-800 text-slate-500'
+            }`}>
               <PieChart className="w-12 h-12 mx-auto opacity-30" />
               <p className="text-xs font-semibold">{isTh ? 'ยังไม่มีข้อมูลการตรวจวัด' : 'No inspection records found'}</p>
             </div>

@@ -53,72 +53,420 @@ interface RoughnessMeasurementAppProps {
   onToggleTheme?: () => void;
 }
 
-// Sparkline SVG Component
-const Sparkline = ({ data, color, label }: { data: number[]; color: string; label: string }) => {
-  const validData = data.filter(v => v > 0);
-  
-  if (!validData || validData.length === 0) {
-    return (
-      <div className="flex flex-col w-full h-full justify-end">
-        <span className="text-[10px] font-bold text-slate-400 uppercase mb-1">{label}</span>
-        <div className="h-16 flex items-center justify-center text-[10px] text-slate-500 bg-slate-950/60 rounded-xl border border-dashed border-slate-800">
-          No trend data
-        </div>
-      </div>
-    );
-  }
-  
-  const width = 300; 
-  const height = 60;  
-  const padding = 8;
-  const innerWidth = width - padding * 2;
-  const innerHeight = height - padding * 2;
-  
-  const maxVal = Math.max(...validData, 0.1);
-  const minVal = Math.max(0, Math.min(...validData) * 0.8); 
-  const range = maxVal - minVal || 1;
+// Trend Data Point interface
+export interface RoughnessTrendPointItem {
+  index: number;
+  id: string;
+  date: string;
+  timestamp?: string;
+  lotNumber: string;
+  profileName: string;
+  process?: string;
+  status: string;
+  inspector?: string;
+  ra: number;
+  rz: number;
+  rt: number;
+  ry: number;
+}
 
-  const getX = (index: number) => {
-    if (validData.length === 1) return width / 2;
-    return padding + (index / (validData.length - 1)) * innerWidth;
+// Full-width parameter row chart component (RA, RZ, RT, RY)
+interface RoughnessParameterRowCardProps {
+  paramKey: 'ra' | 'rz' | 'rt' | 'ry';
+  title: string;
+  thaiTitle: string;
+  descriptionTh: string;
+  descriptionEn: string;
+  color: string;
+  data: RoughnessTrendPointItem[];
+  unit?: string;
+  specLimit?: number | null;
+  isLight: boolean;
+  isTh: boolean;
+}
+
+const RoughnessParameterRowCard: React.FC<RoughnessParameterRowCardProps> = ({
+  paramKey,
+  title,
+  thaiTitle,
+  descriptionTh,
+  descriptionEn,
+  color,
+  data,
+  unit = 'µm',
+  specLimit = null,
+  isLight,
+  isTh,
+}) => {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  // Extract non-zero / valid data points
+  const validPoints = useMemo(() => {
+    return data
+      .map(item => ({
+        ...item,
+        value: item[paramKey]
+      }))
+      .filter(item => !isNaN(item.value) && item.value > 0);
+  }, [data, paramKey]);
+
+  const count = validPoints.length;
+  const avg = count > 0 ? validPoints.reduce((acc, p) => acc + p.value, 0) / count : 0;
+  const min = count > 0 ? Math.min(...validPoints.map(p => p.value)) : 0;
+  const max = count > 0 ? Math.max(...validPoints.map(p => p.value)) : 0;
+  const last = count > 0 ? validPoints[validPoints.length - 1].value : 0;
+  const outOfSpecCount = specLimit ? validPoints.filter(p => p.value > specLimit).length : 0;
+
+  // Active hovered point
+  const activePoint = hoveredIdx !== null && hoveredIdx < validPoints.length ? validPoints[hoveredIdx] : null;
+
+  // SVG Chart Dimensions
+  const svgWidth = 1000;
+  const svgHeight = 220;
+  const padLeft = 65;
+  const padRight = 35;
+  const padTop = 25;
+  const padBottom = 35;
+  const plotW = svgWidth - padLeft - padRight;
+  const plotH = svgHeight - padTop - padBottom;
+
+  const minVal = 0;
+  const maxCandidate = Math.max(max, specLimit || 0, avg, 0.05);
+  const maxVal = maxCandidate * 1.25;
+  const valRange = maxVal - minVal || 1;
+
+  const getX = (idx: number) => {
+    if (validPoints.length <= 1) return padLeft + plotW / 2;
+    return padLeft + (idx / (validPoints.length - 1)) * plotW;
   };
 
   const getY = (val: number) => {
-    return padding + innerHeight - ((val - minVal) / range) * innerHeight;
+    return padTop + plotH - ((val - minVal) / valRange) * plotH;
   };
 
-  const points = validData.map((val, i) => `${getX(i)},${getY(val)}`).join(' ');
+  const linePoints = validPoints.map((p, i) => `${getX(i).toFixed(1)},${getY(p.value).toFixed(1)}`).join(' ');
+  const areaPath = validPoints.length > 0 
+    ? `M ${getX(0).toFixed(1)} ${padTop + plotH} ` + 
+      validPoints.map((p, i) => `L ${getX(i).toFixed(1)} ${getY(p.value).toFixed(1)}`).join(' ') + 
+      ` L ${getX(validPoints.length - 1).toFixed(1)} ${padTop + plotH} Z`
+    : '';
+
+  // Y-axis grid ticks (5 divisions)
+  const yTicks = [0, 0.25, 0.5, 0.75, 1.0].map(pct => {
+    const val = minVal + pct * valRange;
+    return { val, y: getY(val) };
+  });
+
+  // X-axis label step
+  const xStep = Math.max(1, Math.floor(validPoints.length / 8));
 
   return (
-    <div className="flex flex-col w-full">
-      <div className="flex justify-between items-center mb-1.5">
-         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
-         <span className="text-[10px] text-cyan-300 font-mono font-bold">Last: {validData[validData.length-1].toFixed(2)}</span>
+    <div className={`p-5 rounded-2xl border transition-all ${
+      isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+    }`}>
+      {/* Parameter Row Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span 
+              className="px-2.5 py-1 rounded-xl text-xs font-black uppercase font-mono tracking-wide border"
+              style={{
+                backgroundColor: isLight ? `${color}15` : `${color}25`,
+                color: color,
+                borderColor: `${color}40`
+              }}
+            >
+              {title}
+            </span>
+            <span className={`text-sm font-bold ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
+              {isTh ? thaiTitle : title}
+            </span>
+            {specLimit && (
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                Spec Max: ≤ {specLimit.toFixed(2)} {unit}
+              </span>
+            )}
+          </div>
+          <p className={`text-[11px] mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            {isTh ? descriptionTh : descriptionEn}
+          </p>
+        </div>
+
+        {/* Statistical Badges */}
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+          <div className={`px-2.5 py-1 rounded-lg border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950 border-slate-800 text-slate-300'
+          }`}>
+            <span className="text-[9px] block text-slate-400 font-sans uppercase font-bold">Samples (N)</span>
+            <strong className="text-xs">{count}</strong>
+          </div>
+
+          <div className={`px-2.5 py-1 rounded-lg border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+          }`}>
+            <span className="text-[9px] block text-slate-400 font-sans uppercase font-bold">Avg (เฉลี่ย)</span>
+            <strong style={{ color }}>{count > 0 ? avg.toFixed(3) : '-'} {unit}</strong>
+          </div>
+
+          <div className={`px-2.5 py-1 rounded-lg border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950 border-slate-800 text-slate-300'
+          }`}>
+            <span className="text-[9px] block text-slate-400 font-sans uppercase font-bold">Min (ต่ำสุด)</span>
+            <strong>{count > 0 ? min.toFixed(3) : '-'}</strong>
+          </div>
+
+          <div className={`px-2.5 py-1 rounded-lg border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950 border-slate-800 text-slate-300'
+          }`}>
+            <span className="text-[9px] block text-slate-400 font-sans uppercase font-bold">Max (สูงสุด)</span>
+            <strong>{count > 0 ? max.toFixed(3) : '-'}</strong>
+          </div>
+
+          <div className={`px-2.5 py-1 rounded-lg border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950 border-slate-800 text-slate-300'
+          }`}>
+            <span className="text-[9px] block text-slate-400 font-sans uppercase font-bold">Last (ล่าสุด)</span>
+            <strong style={{ color }}>{count > 0 ? last.toFixed(3) : '-'}</strong>
+          </div>
+
+          {specLimit && (
+            <div className={`px-2.5 py-1 rounded-lg border text-center ${
+              outOfSpecCount > 0 
+                ? 'bg-rose-500/10 border-rose-500/30 text-rose-500 font-bold' 
+                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 font-bold'
+            }`}>
+              <span className="text-[9px] block text-slate-400 font-sans uppercase font-bold">Out of Spec</span>
+              <strong>{outOfSpecCount} ({count > 0 ? ((outOfSpecCount / count) * 100).toFixed(1) : 0}%)</strong>
+            </div>
+          )}
+        </div>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-16 overflow-visible bg-slate-950/80 rounded-xl border border-slate-800">
-        {validData.length > 1 && (
-          <polyline 
-            points={points} 
-            fill="none" 
-            stroke={color} 
-            strokeWidth="2.5" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-          />
-        )}
-        {validData.map((val, i) => (
-           <circle 
-             key={i} 
-             cx={getX(i)} 
-             cy={getY(val)} 
-             r="3.5" 
-             fill="#0f172a" 
-             stroke={color} 
-             strokeWidth="2" 
-             className="hover:r-5 transition-all" 
-           />
-        ))}
-      </svg>
+
+      {/* Hover Inspection Detail Banner */}
+      {activePoint ? (
+        <div className={`my-2.5 p-2.5 rounded-xl border flex flex-wrap items-center justify-between text-xs animate-fade-in ${
+          isLight ? 'bg-blue-50/90 border-blue-200 text-slate-800' : 'bg-slate-950 border-cyan-900/50 text-slate-200'
+        }`}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-bold font-mono text-cyan-600 dark:text-cyan-400">#{activePoint.index}</span>
+            <span><strong>วันที่:</strong> {activePoint.date} {activePoint.timestamp}</span>
+            <span><strong>Coil / Lot:</strong> <span className="font-mono text-cyan-600 dark:text-cyan-400 font-bold">{activePoint.lotNumber}</span></span>
+            <span><strong>Profile:</strong> <span className="font-bold">{activePoint.profileName}</span></span>
+            <span><strong>Process:</strong> {activePoint.process}</span>
+            <span><strong>ผู้ตรวจ:</strong> {activePoint.inspector || '-'}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1 sm:mt-0 font-mono">
+            <span className="font-bold text-sm" style={{ color }}>{activePoint.value.toFixed(3)} {unit}</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+              activePoint.status === 'Pass' 
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+            }`}>
+              {activePoint.status === 'Pass' ? 'PASS' : 'FAIL'}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="h-2" />
+      )}
+
+      {/* SVG Chart Content */}
+      {validPoints.length === 0 ? (
+        <div className={`h-48 flex flex-col items-center justify-center rounded-xl border border-dashed text-xs ${
+          isLight ? 'bg-slate-50 border-slate-300 text-slate-400' : 'bg-slate-950/60 border-slate-800 text-slate-500'
+        }`}>
+          <Activity className="w-6 h-6 mb-2 opacity-50" />
+          <span>{isTh ? 'ไม่มีข้อมูลการตรวจวัดสำหรับพารามิเตอร์นี้' : 'No measurement trend data for this parameter'}</span>
+        </div>
+      ) : (
+        <div className="relative w-full overflow-hidden">
+          <svg
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+            className={`w-full h-56 sm:h-64 rounded-xl border overflow-visible ${
+              isLight ? 'bg-slate-50/70 border-slate-200' : 'bg-slate-950/90 border-slate-800'
+            }`}
+          >
+            <defs>
+              <linearGradient id={`grad-${paramKey}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor={color} stopOpacity="0.32" />
+                <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+              </linearGradient>
+            </defs>
+
+            {/* Y-axis Grid lines and labels */}
+            {yTicks.map((tick, i) => (
+              <g key={i}>
+                <line
+                  x1={padLeft}
+                  y1={tick.y}
+                  x2={padLeft + plotW}
+                  y2={tick.y}
+                  stroke={isLight ? '#e2e8f0' : '#1e293b'}
+                  strokeDasharray="3 3"
+                  strokeWidth="1"
+                />
+                <text
+                  x={padLeft - 8}
+                  y={tick.y + 3}
+                  textAnchor="end"
+                  fill={isLight ? '#64748b' : '#64748b'}
+                  fontSize="10"
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                >
+                  {tick.val.toFixed(2)}
+                </text>
+              </g>
+            ))}
+
+            {/* Average Line */}
+            {count > 1 && (
+              <g>
+                <line
+                  x1={padLeft}
+                  y1={getY(avg)}
+                  x2={padLeft + plotW}
+                  y2={getY(avg)}
+                  stroke={color}
+                  strokeDasharray="4 4"
+                  strokeWidth="1.5"
+                  opacity="0.8"
+                />
+                <text
+                  x={padLeft + plotW - 6}
+                  y={getY(avg) - 4}
+                  textAnchor="end"
+                  fill={color}
+                  fontSize="10"
+                  fontWeight="bold"
+                  fontFamily="monospace"
+                >
+                  Avg: {avg.toFixed(3)} {unit}
+                </text>
+              </g>
+            )}
+
+            {/* Spec Max Reference Line */}
+            {specLimit && (
+              <g>
+                <line
+                  x1={padLeft}
+                  y1={getY(specLimit)}
+                  x2={padLeft + plotW}
+                  y2={getY(specLimit)}
+                  stroke="#ef4444"
+                  strokeDasharray="5 5"
+                  strokeWidth="2"
+                />
+                <text
+                  x={padLeft + plotW - 6}
+                  y={getY(specLimit) - 4}
+                  textAnchor="end"
+                  fill="#ef4444"
+                  fontSize="10"
+                  fontWeight="bold"
+                  fontFamily="monospace"
+                >
+                  Spec Max: ≤ {specLimit.toFixed(2)} {unit}
+                </text>
+              </g>
+            )}
+
+            {/* Area Fill */}
+            {areaPath && (
+              <path d={areaPath} fill={`url(#grad-${paramKey})`} />
+            )}
+
+            {/* Line Graph */}
+            {validPoints.length > 1 && (
+              <polyline
+                points={linePoints}
+                fill="none"
+                stroke={color}
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+
+            {/* Hover Vertical Guide Line */}
+            {hoveredIdx !== null && (
+              <line
+                x1={getX(hoveredIdx)}
+                y1={padTop}
+                x2={getX(hoveredIdx)}
+                y2={padTop + plotH}
+                stroke={color}
+                strokeDasharray="3 3"
+                strokeWidth="1.5"
+                opacity="0.8"
+              />
+            )}
+
+            {/* Data Points */}
+            {validPoints.map((p, i) => {
+              const cx = getX(i);
+              const cy = getY(p.value);
+              const isFail = (specLimit && p.value > specLimit) || p.status === 'Fail';
+              const isHovered = hoveredIdx === i;
+
+              return (
+                <g key={p.id || i}>
+                  {/* Invisible hit area for easier mouse/touch target */}
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r="12"
+                    fill="transparent"
+                    className="cursor-pointer"
+                    onMouseEnter={() => setHoveredIdx(i)}
+                    onMouseLeave={() => setHoveredIdx(null)}
+                    onClick={() => setHoveredIdx(i)}
+                  />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={isHovered ? 6.5 : (validPoints.length > 30 ? 3.5 : 4.5)}
+                    fill={isFail ? '#ef4444' : (isLight ? '#ffffff' : '#0f172a')}
+                    stroke={isFail ? '#ef4444' : color}
+                    strokeWidth={isHovered ? 3 : 2}
+                    className="transition-all pointer-events-none"
+                  />
+                </g>
+              );
+            })}
+
+            {/* X-axis Baseline */}
+            <line
+              x1={padLeft}
+              y1={padTop + plotH}
+              x2={padLeft + plotW}
+              y2={padTop + plotH}
+              stroke={isLight ? '#cbd5e1' : '#334155'}
+              strokeWidth="1.5"
+            />
+
+            {/* X-axis Tick Labels (Dates / Lots) */}
+            {validPoints.map((p, i) => {
+              if (i !== 0 && i !== validPoints.length - 1 && i % xStep !== 0) return null;
+              const cx = getX(i);
+              return (
+                <text
+                  key={i}
+                  x={cx}
+                  y={padTop + plotH + 16}
+                  textAnchor="middle"
+                  fill={isLight ? '#64748b' : '#64748b'}
+                  fontSize="9"
+                  fontFamily="monospace"
+                >
+                  {p.date ? p.date.slice(5) : `#${i + 1}`}
+                </text>
+              );
+            })}
+          </svg>
+        </div>
+      )}
     </div>
   );
 };
@@ -567,11 +915,11 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     return { total, passCount, failCount, passRatio, profileSummaries };
   }, [inspections]);
 
-  // Filtered Trends calculation
-  const filteredTrends = useMemo(() => {
+  // Filtered Chronological Inspection Data for unified trend graphs
+  const filteredTrendData = useMemo<RoughnessTrendPointItem[]>(() => {
     if (inspections.length === 0) return [];
 
-    let filtered = inspections;
+    let filtered = [...inspections];
     if (trendFilterProfile !== 'All') {
       filtered = filtered.filter(i => (i.profileName || 'Unknown') === trendFilterProfile);
     }
@@ -579,24 +927,28 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
       filtered = filtered.filter(i => i.date && i.date.startsWith(trendFilterMonth));
     }
 
-    const groups: Record<string, { name: string; total: number; history: RoughnessInspectionRecord[] }> = {};
-    filtered.forEach(item => {
-      const pName = item.profileName || 'Unknown';
-      if (!groups[pName]) groups[pName] = { name: pName, total: 0, history: [] };
-      groups[pName].total++;
-      groups[pName].history.push(item);
+    // Sort chronologically (oldest to newest for left-to-right trend)
+    filtered.sort((a, b) => {
+      const dateA = `${a.date || ''} ${a.timestamp || ''}`;
+      const dateB = `${b.date || ''} ${b.timestamp || ''}`;
+      return dateA.localeCompare(dateB);
     });
 
-    return Object.values(groups).map(g => {
-      const sortedHistory = [...g.history].reverse(); 
-      const trends = {
-        ra: sortedHistory.map(item => parseFloat(item.raMax) || 0),
-        rz: sortedHistory.map(item => parseFloat(item.rzMax) || 0),
-        rt: sortedHistory.map(item => parseFloat(item.rtMax) || 0),
-        ry: sortedHistory.map(item => parseFloat(item.ryMax) || 0)
-      };
-      return { ...g, trends };
-    });
+    return filtered.map((item, idx) => ({
+      index: idx + 1,
+      id: item.id || `ins-${idx}`,
+      date: item.date || '-',
+      timestamp: item.timestamp || '',
+      lotNumber: item.lotNumber || '-',
+      profileName: item.profileName || 'Unknown',
+      process: item.process || '-',
+      status: item.status || 'Pass',
+      inspector: item.inspectorName || '-',
+      ra: parseFloat(item.raMax) || 0,
+      rz: parseFloat(item.rzMax) || 0,
+      rt: parseFloat(item.rtMax) || 0,
+      ry: parseFloat(item.ryMax) || 0,
+    }));
   }, [inspections, trendFilterProfile, trendFilterMonth]);
 
   const formatSpecValue = (val: any) => {
@@ -628,6 +980,12 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
     const nameMatch = savedProfiles.find(p => p.name.toLowerCase() === pNameLower);
     return nameMatch || null;
   };
+
+  // Active spec when a specific profile is queried
+  const activeTrendSpec = useMemo(() => {
+    if (trendFilterProfile === 'All') return null;
+    return getSpecForProfileAndProcess(trendFilterProfile);
+  }, [trendFilterProfile, savedProfiles]);
 
   // Helper: Calculate effective roughness limits for an inspection row based on its specific process
   const getRowEffectiveSpec = (item: typeof batchItems[0]) => {
@@ -2567,39 +2925,74 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
             <>
               {/* Metric Overview */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Total Inspected</span>
-                  <p className="text-2xl font-bold text-white font-mono">{dashboardStats.total}</p>
+                <div className={`p-5 rounded-2xl border space-y-1 transition ${
+                  isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+                }`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Total Inspected
+                  </span>
+                  <p className={`text-2xl font-bold font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                    {dashboardStats.total}
+                  </p>
                 </div>
 
-                <div className="bg-slate-900 p-5 rounded-2xl border border-emerald-900/50 space-y-1">
-                  <span className="text-[10px] font-bold text-emerald-400 uppercase">Passed</span>
-                  <p className="text-2xl font-bold text-emerald-300 font-mono">{dashboardStats.passCount}</p>
+                <div className={`p-5 rounded-2xl border space-y-1 transition ${
+                  isLight ? 'bg-emerald-50/70 border-emerald-300 shadow-sm' : 'bg-slate-900 border-emerald-900/50'
+                }`}>
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                    Passed
+                  </span>
+                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-300 font-mono">
+                    {dashboardStats.passCount}
+                  </p>
                 </div>
 
-                <div className="bg-slate-900 p-5 rounded-2xl border border-rose-900/50 space-y-1">
-                  <span className="text-[10px] font-bold text-rose-400 uppercase">Failed</span>
-                  <p className="text-2xl font-bold text-rose-300 font-mono">{dashboardStats.failCount}</p>
+                <div className={`p-5 rounded-2xl border space-y-1 transition ${
+                  isLight ? 'bg-rose-50/70 border-rose-300 shadow-sm' : 'bg-slate-900 border-rose-900/50'
+                }`}>
+                  <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
+                    Failed
+                  </span>
+                  <p className="text-2xl font-bold text-rose-600 dark:text-rose-300 font-mono">
+                    {dashboardStats.failCount}
+                  </p>
                 </div>
 
-                <div className="bg-slate-900 p-5 rounded-2xl border border-cyan-900/50 space-y-1">
-                  <span className="text-[10px] font-bold text-cyan-400 uppercase">Quality Ratio</span>
-                  <p className="text-2xl font-bold text-cyan-300 font-mono">{dashboardStats.passRatio}%</p>
+                <div className={`p-5 rounded-2xl border space-y-1 transition ${
+                  isLight ? 'bg-cyan-50/70 border-cyan-300 shadow-sm' : 'bg-slate-900 border-cyan-900/50'
+                }`}>
+                  <span className="text-[10px] font-bold text-cyan-700 dark:text-cyan-400 uppercase tracking-wider">
+                    Quality Ratio
+                  </span>
+                  <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-300 font-mono">
+                    {dashboardStats.passRatio}%
+                  </p>
                 </div>
               </div>
 
               {/* Profile Summary Table */}
-              <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
-                <div className="p-4 bg-slate-950 border-b border-slate-800">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-cyan-400" />
+              <div className={`rounded-2xl border overflow-hidden transition ${
+                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+              }`}>
+                <div className={`p-4 border-b flex items-center justify-between ${
+                  isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+                }`}>
+                  <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${
+                    isLight ? 'text-slate-800' : 'text-slate-300'
+                  }`}>
+                    <TrendingUp className="w-4 h-4 text-cyan-500" />
                     <span>Summary Statistics by Profile</span>
                   </h4>
+                  <span className={`text-[10px] font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {isTh ? '💡 คลิกแถว Profile เพื่อกรองกราฟด้านล่าง' : '💡 Click a profile to filter graphs below'}
+                  </span>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase font-bold text-[10px]">
+                    <thead className={`border-b uppercase font-bold text-[10px] ${
+                      isLight ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-slate-950 text-slate-400 border-slate-800'
+                    }`}>
                       <tr>
                         <th className="px-4 py-3">Profile Name</th>
                         <th className="px-4 py-3 text-center">Inspected</th>
@@ -2608,83 +3001,243 @@ export const RoughnessMeasurementApp: React.FC<RoughnessMeasurementAppProps> = (
                         <th className="px-4 py-3 text-center">Avg Rt Max</th>
                         <th className="px-4 py-3 text-center">Avg Ry Max</th>
                         <th className="px-4 py-3 text-center">Pass Rate</th>
+                        <th className="px-4 py-3 text-center">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/80">
-                      {dashboardStats.profileSummaries.map((p, idx) => (
-                        <tr key={`${p.name}-${idx}`} className="hover:bg-slate-950/40">
-                          <td className="px-4 py-3 font-bold text-slate-200">{p.name}</td>
-                          <td className="px-4 py-3 text-center font-mono">{p.total}</td>
-                          <td className="px-4 py-3 text-center font-mono text-cyan-300 font-bold">{p.avgRa} µm</td>
-                          <td className="px-4 py-3 text-center font-mono text-emerald-300 font-bold">{p.avgRz} µm</td>
-                          <td className="px-4 py-3 text-center font-mono text-amber-300 font-bold">{p.avgRt} µm</td>
-                          <td className="px-4 py-3 text-center font-mono text-indigo-300 font-bold">{p.avgRy} µm</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              parseFloat(p.passRate) >= 95 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
-                            }`}>
-                              {p.passRate}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                    <tbody className={`divide-y ${
+                      isLight ? 'divide-slate-200' : 'divide-slate-800/80'
+                    }`}>
+                      {dashboardStats.profileSummaries.map((p, idx) => {
+                        const isSelected = trendFilterProfile === p.name;
+                        return (
+                          <tr 
+                            key={`${p.name}-${idx}`} 
+                            onClick={() => setTrendFilterProfile(isSelected ? 'All' : p.name)}
+                            className={`cursor-pointer transition ${
+                              isSelected 
+                                ? (isLight ? 'bg-blue-100/70 text-blue-950 font-bold' : 'bg-cyan-950/60 text-cyan-200')
+                                : (isLight ? 'hover:bg-slate-100/80' : 'hover:bg-slate-950/50')
+                            }`}
+                          >
+                            <td className="px-4 py-3 font-bold flex items-center gap-2">
+                              {isSelected && <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />}
+                              <span>{p.name}</span>
+                            </td>
+                            <td className="px-4 py-3 text-center font-mono">{p.total}</td>
+                            <td className="px-4 py-3 text-center font-mono text-cyan-600 dark:text-cyan-300 font-bold">{p.avgRa} µm</td>
+                            <td className="px-4 py-3 text-center font-mono text-emerald-600 dark:text-emerald-300 font-bold">{p.avgRz} µm</td>
+                            <td className="px-4 py-3 text-center font-mono text-amber-600 dark:text-amber-300 font-bold">{p.avgRt} µm</td>
+                            <td className="px-4 py-3 text-center font-mono text-indigo-600 dark:text-indigo-300 font-bold">{p.avgRy} µm</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                parseFloat(p.passRate) >= 95 
+                                  ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300' 
+                                  : 'bg-rose-500/20 text-rose-600 dark:text-rose-300'
+                              }`}>
+                                {p.passRate}%
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTrendFilterProfile(isSelected ? 'All' : p.name);
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition ${
+                                  isSelected
+                                    ? 'bg-cyan-600 text-white border-cyan-700'
+                                    : (isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700')
+                                }`}
+                              >
+                                {isSelected ? (isTh ? '✓ กำลังดูกราฟ' : '✓ Active') : (isTh ? 'ดูกราฟ' : 'View Graph')}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* Sparkline Trends Section */}
-              <div className="space-y-4">
-                <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-cyan-400" />
-                    <span>Sparkline Parameter Trends</span>
-                  </h4>
+              {/* UNIFIED GRAPH TRENDS SECTION (SEPARATE ROWS FOR RA, RZ, RT, RY) */}
+              <div className="space-y-5">
+                {/* Graph Control & Query Toolbar */}
+                <div className={`p-4 rounded-2xl border space-y-3 transition ${
+                  isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
+                        isLight ? 'text-slate-900' : 'text-slate-200'
+                      }`}>
+                        <Activity className="w-4 h-4 text-cyan-500" />
+                        <span>{isTh ? 'กราฟแนวโน้มพารามิเตอร์ความเรียบผิว (Roughness Trend Analysis)' : 'Roughness Trend Analysis'}</span>
+                      </h4>
+                      <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                        {isTh 
+                          ? `แสดง: ${trendFilterProfile === 'All' ? 'ภาพรวมทุก Profile' : `Profile ${trendFilterProfile}`} • ${trendFilterMonth === 'All' ? 'ทุกช่วงเวลา' : `เดือน ${trendFilterMonth}`} • รวม ${filteredTrendData.length} ตัวอย่าง (แยกแถว RA, RZ, RT, RY เต็มหน้าจอ)`
+                          : `Showing: ${trendFilterProfile === 'All' ? 'All Profiles' : `Profile ${trendFilterProfile}`} • ${trendFilterMonth === 'All' ? 'All Months' : `Month ${trendFilterMonth}`} • ${filteredTrendData.length} samples (separate full rows for RA, RZ, RT, RY)`}
+                      </p>
+                    </div>
 
-                  <div className="flex items-center gap-3">
-                    <select
-                      value={trendFilterProfile}
-                      onChange={(e) => setTrendFilterProfile(e.target.value)}
-                      className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-                    >
-                      {availableProfiles.map((p, idx) => (
-                        <option key={`${p}-${idx}`} value={p}>{p === 'All' ? 'All Profiles' : p}</option>
-                      ))}
-                    </select>
+                    {/* Query Selectors */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={trendFilterProfile}
+                        onChange={(e) => setTrendFilterProfile(e.target.value)}
+                        className={`rounded-xl px-3 py-1.5 text-xs font-bold border focus:outline-none ${
+                          isLight
+                            ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-cyan-500'
+                            : 'bg-slate-950 border-slate-800 text-slate-200 focus:border-cyan-500'
+                        }`}
+                      >
+                        <option value="All">{isTh ? '🌐 ภาพรวมทุก Profile (Overview All)' : '🌐 All Profiles (Overview)'}</option>
+                        {availableProfiles.filter(p => p !== 'All').map((p, idx) => (
+                          <option key={`${p}-${idx}`} value={p}>Profile: {p}</option>
+                        ))}
+                      </select>
 
-                    <select
-                      value={trendFilterMonth}
-                      onChange={(e) => setTrendFilterMonth(e.target.value)}
-                      className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                      <select
+                        value={trendFilterMonth}
+                        onChange={(e) => setTrendFilterMonth(e.target.value)}
+                        className={`rounded-xl px-3 py-1.5 text-xs font-bold border focus:outline-none ${
+                          isLight
+                            ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-cyan-500'
+                            : 'bg-slate-950 border-slate-800 text-slate-200 focus:border-cyan-500'
+                        }`}
+                      >
+                        <option value="All">{isTh ? '📅 ทุกเดือน (All Months)' : '📅 All Months'}</option>
+                        {availableMonths.filter(m => m !== 'All').map((m, idx) => (
+                          <option key={`${m}-${idx}`} value={m}>{m}</option>
+                        ))}
+                      </select>
+
+                      {(trendFilterProfile !== 'All' || trendFilterMonth !== 'All') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTrendFilterProfile('All');
+                            setTrendFilterMonth('All');
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition ${
+                            isLight
+                              ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                          }`}
+                          title="Reset to Overview All"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>{isTh ? 'ดูภาพรวมทั้งหมด' : 'Reset All'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick Profile Filter Pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 text-xs">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider shrink-0 mr-1 ${
+                      isLight ? 'text-slate-500' : 'text-slate-400'
+                    }`}>
+                      {isTh ? 'เลือกเร็ว:' : 'Quick Select:'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setTrendFilterProfile('All')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition shrink-0 ${
+                        trendFilterProfile === 'All'
+                          ? 'bg-cyan-600 text-white border-cyan-700 shadow-sm'
+                          : (isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-950 hover:bg-slate-800 text-slate-400 border-slate-800')
+                      }`}
                     >
-                      {availableMonths.map((m, idx) => (
-                        <option key={`${m}-${idx}`} value={m}>{m === 'All' ? 'All Months' : m}</option>
-                      ))}
-                    </select>
+                      {isTh ? '🌐 ภาพรวมทุก Profile' : '🌐 All Profiles'}
+                    </button>
+                    {availableProfiles.filter(p => p !== 'All').slice(0, 10).map((p, idx) => (
+                      <button
+                        key={`${p}-${idx}`}
+                        type="button"
+                        onClick={() => setTrendFilterProfile(p)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition shrink-0 ${
+                          trendFilterProfile === p
+                            ? 'bg-cyan-600 text-white border-cyan-700 shadow-sm'
+                            : (isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-950 hover:bg-slate-800 text-slate-400 border-slate-800')
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  {filteredTrends.map((group, idx) => (
-                    <div key={`${group.name}-${idx}`} className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                        <strong className="text-sm font-bold text-cyan-300">{group.name}</strong>
-                        <span className="text-[10px] text-slate-400 font-mono">Sample Size: {group.total}</span>
-                      </div>
+                {/* 4 DEDICATED FULL-WIDTH PARAMETER ROWS */}
+                <div className="space-y-5">
+                  {/* Row 1: RA Max (Roughness Average) */}
+                  <RoughnessParameterRowCard
+                    paramKey="ra"
+                    title="Ra Max"
+                    thaiTitle="ความเรียบผิวเฉลี่ย (Roughness Average - Ra)"
+                    descriptionTh="ค่าเฉลี่ยทางคณิตศาสตร์ของความเบี่ยงเบนผิวสัมบูรณ์ตลอดระยะการวัด (Roughness Average)"
+                    descriptionEn="Arithmetical mean deviation of the assessed profile"
+                    color="#06b6d4"
+                    data={filteredTrendData}
+                    unit="µm"
+                    specLimit={activeTrendSpec ? (parseFloat(activeTrendSpec.raUp || activeTrendSpec.raLo || '0') || null) : null}
+                    isLight={isLight}
+                    isTh={isTh}
+                  />
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <Sparkline data={group.trends.ra} color="#06b6d4" label="Ra Max Trend" />
-                        <Sparkline data={group.trends.rz} color="#10b981" label="Rz Max Trend" />
-                        <Sparkline data={group.trends.rt} color="#f59e0b" label="Rt Max Trend" />
-                        <Sparkline data={group.trends.ry} color="#6366f1" label="Ry Max Trend" />
-                      </div>
-                    </div>
-                  ))}
+                  {/* Row 2: RZ Max (Mean Roughness Depth) */}
+                  <RoughnessParameterRowCard
+                    paramKey="rz"
+                    title="Rz Max"
+                    thaiTitle="ความลึกความเรียบผิวเฉลี่ย 5 จุด (Mean Roughness Depth - Rz)"
+                    descriptionTh="ค่าเฉลี่ยของระยะห่างระหว่าง 5 ยอดเขาสูงสุดและ 5 หุบเขาลึกสุด (Mean Roughness Depth)"
+                    descriptionEn="Mean roughness depth from five highest peaks and five lowest valleys"
+                    color="#10b981"
+                    data={filteredTrendData}
+                    unit="µm"
+                    specLimit={activeTrendSpec ? (parseFloat(activeTrendSpec.rzUp || activeTrendSpec.rzLo || '0') || null) : null}
+                    isLight={isLight}
+                    isTh={isTh}
+                  />
+
+                  {/* Row 3: RT Max (Total Roughness) */}
+                  <RoughnessParameterRowCard
+                    paramKey="rt"
+                    title="Rt Max"
+                    thaiTitle="ความสูงความเรียบผิวรวมสูงสุด (Total Roughness - Rt)"
+                    descriptionTh="ระยะห่างทางดิ่งระหว่างยอดเขาสูงสุดและหุบเขาลึกสุดตลอดระยะความยาวประเมิน (Total Height)"
+                    descriptionEn="Total height of the profile between the highest peak and lowest valley"
+                    color="#f59e0b"
+                    data={filteredTrendData}
+                    unit="µm"
+                    specLimit={activeTrendSpec ? (parseFloat(activeTrendSpec.rtUp || activeTrendSpec.rtLo || '0') || null) : null}
+                    isLight={isLight}
+                    isTh={isTh}
+                  />
+
+                  {/* Row 4: RY Max (Maximum Peak to Valley) */}
+                  <RoughnessParameterRowCard
+                    paramKey="ry"
+                    title="Ry Max"
+                    thaiTitle="ความสูงสูงสุดระหว่างยอดและหุบเขา (Maximum Peak to Valley - Ry)"
+                    descriptionTh="ระยะห่างสูงสุดระหว่างยอดสูงสุดและหุบเขาลึกสุดในแต่ละช่วง sampling (Maximum Roughness Depth)"
+                    descriptionEn="Maximum height of the profile within a sampling length"
+                    color="#6366f1"
+                    data={filteredTrendData}
+                    unit="µm"
+                    specLimit={activeTrendSpec ? (parseFloat(activeTrendSpec.ryUp || activeTrendSpec.ryLo || '0') || null) : null}
+                    isLight={isLight}
+                    isTh={isTh}
+                  />
                 </div>
               </div>
             </>
           ) : (
-            <div className="bg-slate-900 p-12 rounded-2xl border border-slate-800 text-center text-slate-500">
+            <div className={`p-12 rounded-2xl border text-center ${
+              isLight ? 'bg-white border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-500'
+            }`}>
               {isTh ? 'ยังไม่มีข้อมูลการตรวจวัดความเรียบผิว' : 'No inspection records for dashboard summary'}
             </div>
           )}

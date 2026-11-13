@@ -790,6 +790,10 @@ export interface ThicknessWallRecordValues {
   t2: WallMeasurementValRange;
   t3: number | string;
   t4: number | string;
+  t1_list?: string[];
+  t2_list?: string[];
+  t3_list?: string[];
+  t4_list?: string[];
   t5_list: string[];
   or: WallMeasurementValRange;
   ir: WallMeasurementValRange;

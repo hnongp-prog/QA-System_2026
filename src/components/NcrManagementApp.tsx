@@ -89,6 +89,73 @@ const PROCESS_OPTIONS = [
   'Anodizing & Surface Treatment'
 ];
 
+const THAI_MONTH_NAMES = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+];
+
+const EN_MONTH_NAMES = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+];
+
+function extractNcrDateParts(item: NcrRecord): {
+  year: string;
+  month: string;
+  day: string;
+  sortMs: number;
+} {
+  const candidates = [item.inspectionDate, item.createdAt].filter(Boolean) as string[];
+  for (const raw of candidates) {
+    const s = String(raw).trim();
+    // Match YYYY-MM-DD or YYYY/MM/DD (with optional time)
+    const ymd = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2}))?/);
+    if (ymd) {
+      let yr = parseInt(ymd[1], 10);
+      if (yr > 2400) yr -= 543;
+      const mo = String(parseInt(ymd[2], 10)).padStart(2, '0');
+      const dy = String(parseInt(ymd[3], 10)).padStart(2, '0');
+      const hh = ymd[4] ? String(parseInt(ymd[4], 10)).padStart(2, '0') : '00';
+      const mm = ymd[5] ? String(parseInt(ymd[5], 10)).padStart(2, '0') : '00';
+      const ms = Date.parse(`${yr}-${mo}-${dy}T${hh}:${mm}:00`);
+      return {
+        year: String(yr),
+        month: mo,
+        day: dy,
+        sortMs: Number.isNaN(ms) ? 0 : ms,
+      };
+    }
+    // Match DD/MM/YYYY or DD-MM-YYYY
+    const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:[T\s](\d{1,2}):(\d{1,2}))?/);
+    if (dmy) {
+      let yr = parseInt(dmy[3], 10);
+      if (yr > 2400) yr -= 543;
+      const mo = String(parseInt(dmy[2], 10)).padStart(2, '0');
+      const dy = String(parseInt(dmy[1], 10)).padStart(2, '0');
+      const hh = dmy[4] ? String(parseInt(dmy[4], 10)).padStart(2, '0') : '00';
+      const mm = dmy[5] ? String(parseInt(dmy[5], 10)).padStart(2, '0') : '00';
+      const ms = Date.parse(`${yr}-${mo}-${dy}T${hh}:${mm}:00`);
+      return {
+        year: String(yr),
+        month: mo,
+        day: dy,
+        sortMs: Number.isNaN(ms) ? 0 : ms,
+      };
+    }
+    const parsed = Date.parse(s);
+    if (!Number.isNaN(parsed)) {
+      const d = new Date(parsed);
+      return {
+        year: String(d.getFullYear()),
+        month: String(d.getMonth() + 1).padStart(2, '0'),
+        day: String(d.getDate()).padStart(2, '0'),
+        sortMs: parsed,
+      };
+    }
+  }
+  return { year: '', month: '', day: '', sortMs: 0 };
+}
+
 export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
   onBackToPortal,
   onLogNewActivity,
@@ -117,6 +184,9 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
   const [filterProcess, setFilterProcess] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterSeverity, setFilterSeverity] = useState<string>('ALL');
+  const [filterDay, setFilterDay] = useState<string>('ALL');
+  const [filterMonth, setFilterMonth] = useState<string>('ALL');
+  const [filterYear, setFilterYear] = useState<string>('ALL');
 
   // Modals & Selected NCR for 8D Review
   const [selectedNcr, setSelectedNcr] = useState<NcrRecord | null>(null);
@@ -175,12 +245,29 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Filtered List
+  // Available Years from NCR records
+  const availableYears = useMemo(() => {
+    const yrs = new Set<string>();
+    ncrList.forEach((item) => {
+      const { year } = extractNcrDateParts(item);
+      if (year) yrs.add(year);
+    });
+    return Array.from(yrs).sort((a, b) => b.localeCompare(a));
+  }, [ncrList]);
+
+  // Filtered List (sorted newest first)
   const filteredList = useMemo(() => {
-    return ncrList.filter((item) => {
+    const matched = ncrList.filter((item) => {
       if (filterProcess !== 'ALL' && !item.process.includes(filterProcess)) return false;
       if (filterStatus !== 'ALL' && item.status !== filterStatus) return false;
       if (filterSeverity !== 'ALL' && item.severity !== filterSeverity) return false;
+
+      if (filterDay !== 'ALL' || filterMonth !== 'ALL' || filterYear !== 'ALL') {
+        const { day, month, year } = extractNcrDateParts(item);
+        if (filterYear !== 'ALL' && year !== filterYear) return false;
+        if (filterMonth !== 'ALL' && month !== filterMonth) return false;
+        if (filterDay !== 'ALL' && day !== filterDay) return false;
+      }
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -196,7 +283,16 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
       }
       return true;
     });
-  }, [ncrList, filterProcess, filterStatus, filterSeverity, searchQuery]);
+
+    return [...matched].sort((a, b) => {
+      const msA = extractNcrDateParts(a).sortMs || Date.parse(a.createdAt || '') || 0;
+      const msB = extractNcrDateParts(b).sortMs || Date.parse(b.createdAt || '') || 0;
+      return msB - msA;
+    });
+  }, [ncrList, filterProcess, filterStatus, filterSeverity, filterDay, filterMonth, filterYear, searchQuery]);
+
+  // Strictly display only the latest 20 matching records in the NCR Breakdown Table
+  const latest20List = useMemo(() => filteredList.slice(0, 20), [filteredList]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -614,102 +710,227 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
         <div className="space-y-4">
           
           {/* Filters Bar */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={isTh ? 'ค้นหา Coil no., Profile, Inspector, Process, หรือรายละเอียด Out of Spec...' : 'Search Coil no., Profile, Inspector, Process or Defect description...'}
-                className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none transition"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+          <div className={`border rounded-3xl p-4 space-y-3 transition-colors ${
+            isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+          }`}>
+            <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+              <div className="relative flex-1">
+                <Search className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${isLight ? 'text-slate-400' : 'text-slate-400'}`} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={isTh ? 'ค้นหา Coil no., Profile, Inspector, Process, หรือรายละเอียด Out of Spec...' : 'Search Coil no., Profile, Inspector, Process or Defect description...'}
+                  className={`w-full border focus:border-rose-500 rounded-2xl pl-10 pr-8 py-2.5 text-xs focus:outline-none transition ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
+                      : 'bg-slate-950 border-slate-800 text-slate-200 placeholder-slate-500'
+                  }`}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 ${isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-slate-300'}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Process Filter */}
+                <div className={`flex items-center gap-1.5 border rounded-2xl px-3 py-1.5 ${
+                  isLight ? 'bg-slate-50 border-slate-300' : 'bg-slate-950 border-slate-800'
+                }`}>
+                  <span className={`text-[11px] whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{isTh ? 'กระบวนการ:' : 'Process:'}</span>
+                  <select
+                    value={filterProcess}
+                    onChange={(e) => setFilterProcess(e.target.value)}
+                    className={`bg-transparent text-xs font-semibold focus:outline-none cursor-pointer ${
+                      isLight ? 'text-rose-700' : 'text-rose-300'
+                    }`}
+                  >
+                    <option value="ALL" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{isTh ? 'ทั้งหมด (All Processes)' : 'All Processes'}</option>
+                    <option value="IPQA-07" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>IPQA-07 Thickness Wall</option>
+                    <option value="IPQA-01" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>IPQA-01 Tensile Test</option>
+                    <option value="IPQA-02" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>IPQA-02 Roughness</option>
+                    <option value="IPQA-03" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>IPQA-03 X-Ray</option>
+                    <option value="IPQA-04" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>IPQA-04 Coating</option>
+                    <option value="IPQA-05" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>IPQA-05 Cutting</option>
+                    <option value="IPQA-06" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>IPQA-06 Mixing</option>
+                    <option value="IQA-01" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>IQA-01 Billet Incoming</option>
+                    <option value="IQA-02" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>IQA-02 Chemical Incoming</option>
+                    <option value="IQA-03" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>IQA-03 Zn Wire Incoming</option>
+                    <option value="OQA-01" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>OQA-01 FG Shipment</option>
+                    <option value="EQP-01" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>EQP-01 Metrology</option>
+                  </select>
+                </div>
+
+                {/* Status Filter */}
+                <div className={`flex items-center gap-1.5 border rounded-2xl px-3 py-1.5 ${
+                  isLight ? 'bg-slate-50 border-slate-300' : 'bg-slate-950 border-slate-800'
+                }`}>
+                  <span className={`text-[11px] whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{isTh ? 'สถานะ:' : 'Status:'}</span>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className={`bg-transparent text-xs font-semibold focus:outline-none cursor-pointer ${
+                      isLight ? 'text-amber-700' : 'text-amber-300'
+                    }`}
+                  >
+                    <option value="ALL" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{isTh ? 'ทุกสถานะ' : 'All Status'}</option>
+                    <option value="QUARANTINE" className={isLight ? 'bg-white text-rose-700' : 'bg-slate-900 text-rose-400'}>QUARANTINE</option>
+                    <option value="UNDER_INVESTIGATION" className={isLight ? 'bg-white text-amber-700' : 'bg-slate-900 text-amber-300'}>INVESTIGATING</option>
+                    <option value="CAPA_IN_PROGRESS" className={isLight ? 'bg-white text-indigo-700' : 'bg-slate-900 text-indigo-300'}>CAPA ACTION</option>
+                    <option value="REWORK" className={isLight ? 'bg-white text-orange-700' : 'bg-slate-900 text-orange-300'}>REWORK</option>
+                    <option value="SCRAP" className={isLight ? 'bg-white text-red-700' : 'bg-slate-900 text-red-400'}>SCRAP</option>
+                    <option value="CONCESSION" className={isLight ? 'bg-white text-purple-700' : 'bg-slate-900 text-purple-300'}>CONCESSION</option>
+                    <option value="CLOSED" className={isLight ? 'bg-white text-emerald-700' : 'bg-slate-900 text-emerald-400'}>CLOSED</option>
+                  </select>
+                </div>
+
+                {/* Severity Filter */}
+                <div className={`flex items-center gap-1.5 border rounded-2xl px-3 py-1.5 ${
+                  isLight ? 'bg-slate-50 border-slate-300' : 'bg-slate-950 border-slate-800'
+                }`}>
+                  <span className={`text-[11px] whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{isTh ? 'ระดับ:' : 'Severity:'}</span>
+                  <select
+                    value={filterSeverity}
+                    onChange={(e) => setFilterSeverity(e.target.value)}
+                    className={`bg-transparent text-xs font-semibold focus:outline-none cursor-pointer ${
+                      isLight ? 'text-cyan-700' : 'text-cyan-300'
+                    }`}
+                  >
+                    <option value="ALL" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{isTh ? 'ทุกระดับ' : 'All Severity'}</option>
+                    <option value="CRITICAL" className={isLight ? 'bg-white text-rose-700' : 'bg-slate-900 text-rose-400'}>CRITICAL</option>
+                    <option value="MAJOR" className={isLight ? 'bg-white text-amber-700' : 'bg-slate-900 text-amber-300'}>MAJOR</option>
+                    <option value="MINOR" className={isLight ? 'bg-white text-slate-700' : 'bg-slate-900 text-slate-300'}>MINOR</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Day / Month / Year Query Bar */}
+            <div className={`pt-3 border-t flex flex-wrap items-center gap-2.5 ${
+              isLight ? 'border-slate-200' : 'border-slate-800/80'
+            }`}>
+              <div className="flex items-center gap-1.5 mr-1">
+                <Calendar className="w-3.5 h-3.5 text-cyan-500" />
+                <span className={`text-[11px] font-bold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                  {isTh ? 'Query วัน / เดือน / ปี:' : 'Date Query (D/M/Y):'}
+                </span>
+              </div>
+
+              {/* Day Filter */}
+              <div className={`flex items-center gap-1.5 border rounded-xl px-2.5 py-1.5 ${
+                isLight ? 'bg-slate-50 border-slate-300' : 'bg-slate-950 border-slate-800'
+              }`}>
+                <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{isTh ? 'วัน:' : 'Day:'}</span>
+                <select
+                  value={filterDay}
+                  onChange={(e) => setFilterDay(e.target.value)}
+                  className={`bg-transparent text-xs font-semibold focus:outline-none cursor-pointer ${
+                    isLight ? 'text-slate-800' : 'text-cyan-300'
+                  }`}
                 >
-                  <X className="w-4 h-4" />
+                  <option value="ALL" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{isTh ? 'ทุกวัน' : 'All Days'}</option>
+                  {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => (
+                    <option key={d} value={d} className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Month Filter */}
+              <div className={`flex items-center gap-1.5 border rounded-xl px-2.5 py-1.5 ${
+                isLight ? 'bg-slate-50 border-slate-300' : 'bg-slate-950 border-slate-800'
+              }`}>
+                <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{isTh ? 'เดือน:' : 'Month:'}</span>
+                <select
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className={`bg-transparent text-xs font-semibold focus:outline-none cursor-pointer ${
+                    isLight ? 'text-slate-800' : 'text-cyan-300'
+                  }`}
+                >
+                  <option value="ALL" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{isTh ? 'ทุกเดือน' : 'All Months'}</option>
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const val = String(i + 1).padStart(2, '0');
+                    const label = isTh ? `${THAI_MONTH_NAMES[i]} (${val})` : `${EN_MONTH_NAMES[i]} (${val})`;
+                    return (
+                      <option key={val} value={val} className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Year Filter */}
+              <div className={`flex items-center gap-1.5 border rounded-xl px-2.5 py-1.5 ${
+                isLight ? 'bg-slate-50 border-slate-300' : 'bg-slate-950 border-slate-800'
+              }`}>
+                <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{isTh ? 'ปี:' : 'Year:'}</span>
+                <select
+                  value={filterYear}
+                  onChange={(e) => setFilterYear(e.target.value)}
+                  className={`bg-transparent text-xs font-semibold focus:outline-none cursor-pointer ${
+                    isLight ? 'text-slate-800' : 'text-cyan-300'
+                  }`}
+                >
+                  <option value="ALL" className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{isTh ? 'ทุกปี' : 'All Years'}</option>
+                  {availableYears.map((yr) => (
+                    <option key={yr} value={yr} className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>
+                      {yr}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {(filterDay !== 'ALL' || filterMonth !== 'ALL' || filterYear !== 'ALL') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterDay('ALL');
+                    setFilterMonth('ALL');
+                    setFilterYear('ALL');
+                  }}
+                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold border flex items-center gap-1 transition ${
+                    isLight
+                      ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
+                      : 'bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border-rose-800/60'
+                  }`}
+                >
+                  <X className="w-3 h-3" />
+                  <span>{isTh ? 'ล้างวัน/เดือน/ปี' : 'Clear Date'}</span>
                 </button>
               )}
             </div>
-
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              {/* Process Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-2xl px-3 py-1.5">
-                <span className="text-[11px] text-slate-400 whitespace-nowrap">{isTh ? 'กระบวนการ:' : 'Process:'}</span>
-                <select
-                  value={filterProcess}
-                  onChange={(e) => setFilterProcess(e.target.value)}
-                  className="bg-transparent text-xs text-rose-300 font-semibold focus:outline-none cursor-pointer"
-                >
-                  <option value="ALL" className="bg-slate-900 text-white">{isTh ? 'ทั้งหมด (All Processes)' : 'All Processes'}</option>
-                  <option value="IPQA-07" className="bg-slate-900 text-white">IPQA-07 Thickness Wall</option>
-                  <option value="IPQA-01" className="bg-slate-900 text-white">IPQA-01 Tensile Test</option>
-                  <option value="IPQA-02" className="bg-slate-900 text-white">IPQA-02 Roughness</option>
-                  <option value="IPQA-03" className="bg-slate-900 text-white">IPQA-03 X-Ray</option>
-                  <option value="IPQA-04" className="bg-slate-900 text-white">IPQA-04 Coating</option>
-                  <option value="IPQA-05" className="bg-slate-900 text-white">IPQA-05 Cutting</option>
-                  <option value="IPQA-06" className="bg-slate-900 text-white">IPQA-06 Mixing</option>
-                  <option value="IQA-01" className="bg-slate-900 text-white">IQA-01 Billet Incoming</option>
-                  <option value="IQA-02" className="bg-slate-900 text-white">IQA-02 Chemical Incoming</option>
-                  <option value="IQA-03" className="bg-slate-900 text-white">IQA-03 Zn Wire Incoming</option>
-                  <option value="OQA-01" className="bg-slate-900 text-white">OQA-01 FG Shipment</option>
-                  <option value="EQP-01" className="bg-slate-900 text-white">EQP-01 Metrology</option>
-                </select>
-              </div>
-
-              {/* Status Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-2xl px-3 py-1.5">
-                <span className="text-[11px] text-slate-400 whitespace-nowrap">{isTh ? 'สถานะ:' : 'Status:'}</span>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="bg-transparent text-xs text-amber-300 font-semibold focus:outline-none cursor-pointer"
-                >
-                  <option value="ALL" className="bg-slate-900 text-white">{isTh ? 'ทุกสถานะ' : 'All Status'}</option>
-                  <option value="QUARANTINE" className="bg-slate-900 text-rose-400">QUARANTINE</option>
-                  <option value="UNDER_INVESTIGATION" className="bg-slate-900 text-amber-300">INVESTIGATING</option>
-                  <option value="CAPA_IN_PROGRESS" className="bg-slate-900 text-indigo-300">CAPA ACTION</option>
-                  <option value="REWORK" className="bg-slate-900 text-orange-300">REWORK</option>
-                  <option value="SCRAP" className="bg-slate-900 text-red-400">SCRAP</option>
-                  <option value="CONCESSION" className="bg-slate-900 text-purple-300">CONCESSION</option>
-                  <option value="CLOSED" className="bg-slate-900 text-emerald-400">CLOSED</option>
-                </select>
-              </div>
-
-              {/* Severity Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-2xl px-3 py-1.5">
-                <span className="text-[11px] text-slate-400 whitespace-nowrap">{isTh ? 'ระดับ:' : 'Severity:'}</span>
-                <select
-                  value={filterSeverity}
-                  onChange={(e) => setFilterSeverity(e.target.value)}
-                  className="bg-transparent text-xs text-cyan-300 font-semibold focus:outline-none cursor-pointer"
-                >
-                  <option value="ALL" className="bg-slate-900 text-white">{isTh ? 'ทุกระดับ' : 'All Severity'}</option>
-                  <option value="CRITICAL" className="bg-slate-900 text-rose-400">CRITICAL</option>
-                  <option value="MAJOR" className="bg-slate-900 text-amber-300">MAJOR</option>
-                  <option value="MINOR" className="bg-slate-900 text-slate-300">MINOR</option>
-                </select>
-              </div>
-            </div>
           </div>
 
-          {/* Main NCR Table with Separated Dimensions */}
+          {/* Main NCR Table with Separated Dimensions (Latest 20 Records) */}
           <div className={`border rounded-3xl overflow-hidden transition-colors ${
             isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800 shadow-xl'
           }`}>
-            <div className={`px-5 py-4 border-b flex items-center justify-between ${
+            <div className={`px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
               isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
             }`}>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <ShieldAlert className="w-5 h-5 text-rose-500" />
                 <span className={`text-sm font-bold tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isTh ? 'ตารางแยกรายละเอียดของเสียตามมิติที่กำหนด (NCR Breakdown Table)' : 'Non-Conformance Detail Log by Dimension'}
                 </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                  isLight ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-rose-950/50 text-rose-300 border-rose-800/60'
+                }`}>
+                  {isTh ? 'จำกัด 20 รายการล่าสุด' : 'Latest 20 Items'}
+                </span>
               </div>
               <span className={`text-xs font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {isTh ? `แสดงผล ${filteredList.length} จาก ${ncrList.length} รายการ` : `Showing ${filteredList.length} of ${ncrList.length} items`}
+                {isTh
+                  ? `แสดง ${latest20List.length} รายการล่าสุด (พบตามเงื่อนไข ${filteredList.length} จากทั้งหมด ${ncrList.length} รายการ)`
+                  : `Showing latest ${latest20List.length} (Matched ${filteredList.length} of ${ncrList.length} items)`}
               </span>
             </div>
 
@@ -731,7 +952,7 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                   </tr>
                 </thead>
                 <tbody className={`divide-y font-sans ${isLight ? 'divide-slate-200' : 'divide-slate-800/60'}`}>
-                  {filteredList.length === 0 ? (
+                  {latest20List.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="py-12 text-center text-slate-500">
                         <div className="flex flex-col items-center justify-center gap-2">
@@ -746,7 +967,7 @@ export const NcrManagementApp: React.FC<NcrManagementAppProps> = ({
                       </td>
                     </tr>
                   ) : (
-                    filteredList.map((item) => (
+                    latest20List.map((item) => (
                       <tr
                         key={item.id}
                         className={`transition-colors group cursor-pointer ${

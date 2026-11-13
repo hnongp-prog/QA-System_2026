@@ -1,18 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileText,
   Sparkles,
   CheckCircle2,
   AlertTriangle,
   Building2,
-  Calendar,
   Layers,
-  ArrowRight,
   RefreshCw,
-  Sliders,
-  Check,
   Link,
-  Info
+  KeyRound,
+  Database,
+  Ruler
 } from 'lucide-react';
 import {
   CoiCustomerTemplate,
@@ -22,9 +20,16 @@ import {
 } from '../../types';
 import {
   generateNextCoiNumber,
-  generateDetailedMeasuredDataForCustomer,
   saveCoiRecord
 } from '../../utils/coiStorage';
+import {
+  AllCloudInspectionDatasets,
+  CoiLiveLinkResult,
+  extractLinkSuggestions,
+  fetchFreshCloudInspectionDatasets,
+  getCachedCloudInspectionDatasets,
+  linkLiveCoiData
+} from '../../utils/coiLiveDataLinker';
 
 interface CoiIssueFormProps {
   templates: CoiCustomerTemplate[];
@@ -46,10 +51,23 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
   const isTh = language === 'th';
   const currentTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0];
 
-  // Form Inputs
+  // Cached & Live Cloud Datasets (IQA-01..03, IPQA-01..08, OQA-01)
+  const [datasets, setDatasets] = useState<AllCloudInspectionDatasets>(() => getCachedCloudInspectionDatasets());
+
+  const suggestions = useMemo(() => extractLinkSuggestions(datasets), [datasets]);
+
+  // Form Inputs (Primary Link Keys: Heat No. (Billet), Coil No., Length)
   const [workNo, setWorkNo] = useState<string>('W-2026-8831');
-  const [coilNo, setCoilNo] = useState<string>('COIL-2026-A109');
-  const [heatNo, setHeatNo] = useState<string>(currentTemplate.heatNoMaterialCode || 'HEAT-CA105-09');
+  const [coilNo, setCoilNo] = useState<string>(() => {
+    const cached = getCachedCloudInspectionDatasets();
+    const s = extractLinkSuggestions(cached);
+    return s.coilNumbers[0] || 'COIL-2026-A109';
+  });
+  const [heatNo, setHeatNo] = useState<string>(() => {
+    const cached = getCachedCloudInspectionDatasets();
+    const s = extractLinkSuggestions(cached);
+    return s.heatNumbers[0] || currentTemplate.heatNoMaterialCode || 'HEAT-2026-9011';
+  });
   const [lengthMm, setLengthMm] = useState<string>(currentTemplate.defaultLength || '650.0 mm');
   const [poNo, setPoNo] = useState<string>('PO-2026-DENSO-7789');
   const [invoiceNo, setInvoiceNo] = useState<string>('INV-2026-08-0442');
@@ -63,44 +81,133 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
     `Material conforms to ${currentTemplate.standardRef} in all chemical, mechanical, coating and dimensional inspection.`
   );
 
-  // Live Measured Data State
-  const [measuredData, setMeasuredData] = useState<DetailedCoiMeasuredData>(() =>
-    generateDetailedMeasuredDataForCustomer(currentTemplate, {
+  // Live Linked Data State
+  const [linkResult, setLinkResult] = useState<CoiLiveLinkResult>(() =>
+    linkLiveCoiData({
+      template: currentTemplate,
+      heatNo: heatNo,
+      coilNo: coilNo,
+      lengthMm: currentTemplate.defaultLength || '650.0 mm',
       workNo: 'W-2026-8831',
-      coilNo: 'COIL-2026-A109',
-      lengthMm: '650.0 mm',
-      heatNo: 'HEAT-CA105-09',
-      invoiceNo: 'INV-2026-08-0442'
+      invoiceNo: 'INV-2026-08-0442',
+      datasets: getCachedCloudInspectionDatasets()
     })
   );
+
+  const measuredData: DetailedCoiMeasuredData = linkResult.measuredData;
 
   const [isPullingData, setIsPullingData] = useState<boolean>(false);
   const [pullSuccess, setPullSuccess] = useState<boolean>(false);
 
-  // Auto update defaults when template changes
+  // Run initial live Firestore fetch on mount
   useEffect(() => {
-    setHeatNo(currentTemplate.heatNoMaterialCode || 'HEAT-CA105-09');
-    setLengthMm(currentTemplate.defaultLength || '650.0 mm');
-    setRemarks(`Material conforms to ${currentTemplate.standardRef} in all chemical, mechanical, coating and dimensional inspection.`);
-    handlePullLiveInspectionData();
-  }, [currentTemplate.id]);
-
-  const handlePullLiveInspectionData = () => {
-    setIsPullingData(true);
-    setTimeout(() => {
-      const freshData = generateDetailedMeasuredDataForCustomer(currentTemplate, {
-        workNo,
+    let active = true;
+    fetchFreshCloudInspectionDatasets().then(freshDatasets => {
+      if (!active) return;
+      setDatasets(freshDatasets);
+      const res = linkLiveCoiData({
+        template: currentTemplate,
+        heatNo,
         coilNo,
         lengthMm,
-        heatNo,
-        invoiceNo
+        workNo,
+        invoiceNo,
+        datasets: freshDatasets
       });
-      setMeasuredData(freshData);
-      setIsPullingData(false);
+      setLinkResult(res);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Re-link automatically whenever Heat No., Coil No., Length, or Template changes
+  useEffect(() => {
+    const res = linkLiveCoiData({
+      template: currentTemplate,
+      heatNo,
+      coilNo,
+      lengthMm,
+      workNo,
+      invoiceNo,
+      datasets
+    });
+    setLinkResult(res);
+  }, [currentTemplate, heatNo, coilNo, lengthMm, workNo, invoiceNo, datasets]);
+
+  // Update remarks & default length when template changes
+  useEffect(() => {
+    setLengthMm(currentTemplate.defaultLength || '650.0 mm');
+    setRemarks(`Material conforms to ${currentTemplate.standardRef} in all chemical, mechanical, coating and dimensional inspection.`);
+  }, [currentTemplate.id]);
+
+  // Pull Live IQA & IPQA Data from Firestore (force refresh)
+  const handlePullLiveInspectionData = async () => {
+    setIsPullingData(true);
+    try {
+      const freshDatasets = await fetchFreshCloudInspectionDatasets();
+      setDatasets(freshDatasets);
+
+      const res = linkLiveCoiData({
+        template: currentTemplate,
+        heatNo,
+        coilNo,
+        lengthMm,
+        workNo,
+        invoiceNo,
+        datasets: freshDatasets
+      });
+      setLinkResult(res);
+
+      // Auto-fill detected Length or Work No. if matched from IPQA-05 / IPQA-01 / OQA-01
+      if (res.detectedLengthMm) {
+        setLengthMm(res.detectedLengthMm);
+      }
+      if (res.detectedWorkNo) {
+        setWorkNo(res.detectedWorkNo);
+      }
+
       setPullSuccess(true);
       setTimeout(() => setPullSuccess(false), 3000);
-    }, 450);
+    } finally {
+      setIsPullingData(false);
+    }
   };
+
+  // Helper to check numeric range against template spec
+  const checkWithinSpec = (val: number, min?: number, max?: number): boolean => {
+    if (min !== undefined && val < min) return false;
+    if (max !== undefined && val > max) return false;
+    return true;
+  };
+
+  const siPass = checkWithinSpec(measuredData.chemActual.si, undefined, currentTemplate.chemicalSpecs.si.max);
+  const cuPass = checkWithinSpec(measuredData.chemActual.cu, currentTemplate.chemicalSpecs.cu.min, currentTemplate.chemicalSpecs.cu.max);
+  const tensilePass = checkWithinSpec(measuredData.mechActual.tensileStrength, currentTemplate.mechanicalSpecs.tensileMin);
+  const rzTopPass = checkWithinSpec(measuredData.mechActual.roughnessRzTop, undefined, currentTemplate.mechanicalSpecs.roughnessRzTopMax);
+  const znPass = checkWithinSpec(
+    measuredData.coatingActual.head.znAdhesionWeightTop,
+    currentTemplate.coatingSpecs.znAdhesionWeightMin,
+    currentTemplate.coatingSpecs.znAdhesionWeightMax
+  );
+  const t1Pass = checkWithinSpec(
+    measuredData.webActual.head.t1,
+    currentTemplate.webThicknessSpecs.outerWebT1Min,
+    currentTemplate.webThicknessSpecs.outerWebT1Max
+  );
+  const widthPass = checkWithinSpec(
+    measuredData.geometryActual.head.widthLeft,
+    currentTemplate.geometrySpecs.widthMin,
+    currentTemplate.geometrySpecs.widthMax
+  );
+
+  const allKeyCheckpointsPass =
+    siPass && cuPass && tensilePass && rzTopPass && znPass && t1Pass && widthPass && !linkResult.hasAnyFail;
+
+  // Quick-pick helpers when user selects a Coil No.
+  const normalizedCoil = coilNo.trim().toUpperCase().replace(/\s+/g, '');
+  const suggestedHeatForCoil = suggestions.coilToHeat[normalizedCoil];
+  const suggestedLengthsForCoil = suggestions.coilToLengths[normalizedCoil] || [];
 
   const handleGenerateCertificate = () => {
     const newCoiNo = generateNextCoiNumber();
@@ -125,9 +232,9 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
       totalWeightKg,
       inspectorName,
       approverName,
-      overallResult: 'PASS',
+      overallResult: allKeyCheckpointsPass ? 'PASS' : 'REJECT',
       remarks,
-      qrVerificationCode: `VERIFY-${newCoiNo}-${coilNo}-UACJ-PASSED`,
+      qrVerificationCode: `VERIFY-${newCoiNo}-${coilNo}-${heatNo}-UACJ-${allKeyCheckpointsPass ? 'PASSED' : 'CHECK'}`,
       createdAt: new Date().toISOString(),
       customerTemplateId: currentTemplate.id,
       partNumber: currentTemplate.partNumber,
@@ -141,13 +248,13 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
       docControlNo: currentTemplate.documentControlNo,
       detailedData: measuredData,
       items: [
-        { id: 'i1', category: 'CHEMICAL', parameterKey: 'Si', nameTh: 'ซิลิคอน (Si)', nameEn: 'Silicon (Si)', unit: '%', specText: `Max ${currentTemplate.chemicalSpecs.si.max}`, actualValue: measuredData.chemActual.si, testMethod: 'OES', isPass: true, linkSource: 'IQA-01' },
-        { id: 'i2', category: 'CHEMICAL', parameterKey: 'Cu', nameTh: 'ทองแดง (Cu)', nameEn: 'Copper (Cu)', unit: '%', specText: `${currentTemplate.chemicalSpecs.cu.min} - ${currentTemplate.chemicalSpecs.cu.max}`, actualValue: measuredData.chemActual.cu, testMethod: 'OES', isPass: true, linkSource: 'IQA-01' },
-        { id: 'i3', category: 'MECHANICAL', parameterKey: 'Tensile_Strength', nameTh: 'แรงดึง (Tensile)', nameEn: 'Tensile strength', unit: 'N/mm²', specText: `Min ${currentTemplate.mechanicalSpecs.tensileMin}`, actualValue: measuredData.mechActual.tensileStrength, testMethod: 'JIS Z2241', isPass: true, linkSource: 'IPQA-01' },
-        { id: 'i4', category: 'SURFACE_COATING', parameterKey: 'Roughness_Rz_Top', nameTh: 'ความหยาบผิว Rz บน', nameEn: 'Surface Roughness Rz (Top)', unit: 'µm', specText: `≤ ${currentTemplate.mechanicalSpecs.roughnessRzTopMax} µm`, actualValue: measuredData.mechActual.roughnessRzTop, testMethod: 'ISO 4287', isPass: true, linkSource: 'IPQA-02' },
-        { id: 'i5', category: 'SURFACE_COATING', parameterKey: 'Zn_Adhesion_Weight', nameTh: 'น้ำหนักชั้นเคลือบ Zn', nameEn: 'Zn adhesion weight', unit: 'g/m²', specText: currentTemplate.coatingSpecs.znAdhesionWeightSpec, actualValue: measuredData.coatingActual.head.znAdhesionWeightTop, testMethod: 'XRF', isPass: true, linkSource: 'IPQA-03' },
-        { id: 'i6', category: 'DIMENSION', parameterKey: 'Outer_Web_T1', nameTh: 'ความหนาผนังนอก T1', nameEn: 'Outer web T1', unit: 'mm', specText: currentTemplate.webThicknessSpecs.outerWebT1Spec, actualValue: measuredData.webActual.head.t1, testMethod: 'Micrometer', isPass: true, linkSource: 'IPQA-07' },
-        { id: 'i7', category: 'DIMENSION', parameterKey: 'Width_At_5mm', nameTh: 'ความกว้าง (5mm cut end)', nameEn: 'Width at 5mm', unit: 'mm', specText: currentTemplate.geometrySpecs.widthAt5mmSpec, actualValue: measuredData.geometryActual.head.widthLeft, testMethod: 'Caliper', isPass: true, linkSource: 'IPQA-05' }
+        { id: 'i1', category: 'CHEMICAL', parameterKey: 'Si', nameTh: 'ซิลิคอน (Si)', nameEn: 'Silicon (Si)', unit: '%', specText: `Max ${currentTemplate.chemicalSpecs.si.max}`, actualValue: measuredData.chemActual.si, testMethod: 'OES', isPass: siPass, linkSource: 'IQA-01' },
+        { id: 'i2', category: 'CHEMICAL', parameterKey: 'Cu', nameTh: 'ทองแดง (Cu)', nameEn: 'Copper (Cu)', unit: '%', specText: `${currentTemplate.chemicalSpecs.cu.min} - ${currentTemplate.chemicalSpecs.cu.max}`, actualValue: measuredData.chemActual.cu, testMethod: 'OES', isPass: cuPass, linkSource: 'IQA-01' },
+        { id: 'i3', category: 'MECHANICAL', parameterKey: 'Tensile_Strength', nameTh: 'แรงดึง (Tensile)', nameEn: 'Tensile strength', unit: 'N/mm²', specText: `Min ${currentTemplate.mechanicalSpecs.tensileMin}`, actualValue: measuredData.mechActual.tensileStrength, testMethod: 'JIS Z2241', isPass: tensilePass, linkSource: 'IPQA-01' },
+        { id: 'i4', category: 'SURFACE_COATING', parameterKey: 'Roughness_Rz_Top', nameTh: 'ความหยาบผิว Rz บน', nameEn: 'Surface Roughness Rz (Top)', unit: 'µm', specText: `≤ ${currentTemplate.mechanicalSpecs.roughnessRzTopMax} µm`, actualValue: measuredData.mechActual.roughnessRzTop, testMethod: 'ISO 4287', isPass: rzTopPass, linkSource: 'IPQA-02' },
+        { id: 'i5', category: 'SURFACE_COATING', parameterKey: 'Zn_Adhesion_Weight', nameTh: 'น้ำหนักชั้นเคลือบ Zn', nameEn: 'Zn adhesion weight', unit: 'g/m²', specText: currentTemplate.coatingSpecs.znAdhesionWeightSpec, actualValue: measuredData.coatingActual.head.znAdhesionWeightTop, testMethod: 'XRF', isPass: znPass, linkSource: 'IPQA-03' },
+        { id: 'i6', category: 'DIMENSION', parameterKey: 'Outer_Web_T1', nameTh: 'ความหนาผนังนอก T1', nameEn: 'Outer web T1', unit: 'mm', specText: currentTemplate.webThicknessSpecs.outerWebT1Spec, actualValue: measuredData.webActual.head.t1, testMethod: 'Micrometer', isPass: t1Pass, linkSource: 'IPQA-07' },
+        { id: 'i7', category: 'DIMENSION', parameterKey: 'Width_At_5mm', nameTh: 'ความกว้าง (5mm cut end)', nameEn: 'Width at 5mm', unit: 'mm', specText: currentTemplate.geometrySpecs.widthAt5mmSpec, actualValue: measuredData.geometryActual.head.widthLeft, testMethod: 'Caliper', isPass: widthPass, linkSource: 'IPQA-05' }
       ]
     };
 
@@ -159,9 +266,9 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
         moduleCode: 'COI-01',
         moduleNameTh: 'ออกใบรับรองผลการตรวจคุณภาพ (COI)',
         moduleNameEn: 'Certificate of Inspection Issuance',
-        status: 'PASS',
-        sampleIdentifier: `${newCoiNo} (${coilNo})`,
-        summaryNotes: `Issued official COI for ${currentTemplate.customerName} - Part ${currentTemplate.partNumber}, Length ${lengthMm}`
+        status: allKeyCheckpointsPass ? 'PASS' : 'FAIL',
+        sampleIdentifier: `${newCoiNo} (${coilNo} / ${heatNo})`,
+        summaryNotes: `Issued official COI for ${currentTemplate.customerName} - Heat ${heatNo}, Coil ${coilNo}, Length ${lengthMm} (${linkResult.matchedModulesCount}/${linkResult.totalCheckedModules} linked)`
       });
     }
 
@@ -170,6 +277,23 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Datalists for Auto-Suggest from Real IQA & IPQA Records */}
+      <datalist id="coi-heat-no-list">
+        {suggestions.heatNumbers.map(h => (
+          <option key={h} value={h} />
+        ))}
+      </datalist>
+      <datalist id="coi-coil-no-list">
+        {suggestions.coilNumbers.map(c => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
+      <datalist id="coi-length-list">
+        {(suggestedLengthsForCoil.length > 0 ? suggestedLengthsForCoil : suggestions.lengths).map(l => (
+          <option key={l} value={l} />
+        ))}
+      </datalist>
+
       {/* Header Bar */}
       <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -182,14 +306,15 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
           </h2>
           <p className="text-slate-400 text-xs mt-0.5">
             {isTh
-              ? 'เลือกลูกค้า ระบุ Coil No., Length แล้วกดดึงผลตรวจจริงจาก IQA / IPQA เพื่อสร้างใบรับรองทันที'
-              : 'Select Customer, specify Coil No. & Length, pull live inspection results, and generate the Certificate.'}
+              ? 'ระบุ Heat No. (Billet), Coil No. และ Length ของ Coil No. เพื่อเชื่อมโยงและดึงผลตรวจจริงจาก IQA (เคมีบิลเล็ต) และ IPQA (01–08) อัตโนมัติ'
+              : 'Specify Heat No. (Billet), Coil No., and Length to auto-link and pull live IQA & IPQA inspection records.'}
           </p>
         </div>
 
         {/* Pull live inspection data button */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
+            type="button"
             onClick={handlePullLiveInspectionData}
             disabled={isPullingData}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition shadow-lg ${
@@ -200,13 +325,14 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
           >
             <RefreshCw className={`w-4 h-4 ${isPullingData ? 'animate-spin' : ''}`} />
             {isPullingData
-              ? (isTh ? 'กำลังดึงข้อมูล IQA/IPQA...' : 'Pulling IQA/IPQA data...')
+              ? (isTh ? 'กำลังดึงข้อมูลจาก Cloud IQA/IPQA...' : 'Syncing Cloud IQA/IPQA...')
               : pullSuccess
-              ? (isTh ? 'ดึงข้อมูลสำเร็จ 100%' : 'Data Linked Successfully!')
+              ? (isTh ? `เชื่อมข้อมูลแล้ว (${linkResult.matchedModulesCount}/${linkResult.totalCheckedModules} โมดูล)` : `Linked (${linkResult.matchedModulesCount}/${linkResult.totalCheckedModules})`)
               : (isTh ? '⚡ ดึงข้อมูลผลการตรวจจาก IQA / IPQA' : '⚡ Pull Live IQA / IPQA Data')}
           </button>
 
           <button
+            type="button"
             onClick={handleGenerateCertificate}
             className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 px-5 py-2.5 rounded-lg text-xs font-black transition shadow-lg"
           >
@@ -218,11 +344,17 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
 
       {/* Input Form Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Card 1: Customer & Production Identifiers */}
-        <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-xl space-y-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-slate-800 pb-2">
-            <Building2 className="w-4 h-4" />
-            {isTh ? '1. เลือกลูกค้าและคำสั่งผลิต' : '1. Customer & Work Order'}
+        {/* Card 1: Customer & Primary Link Keys (Heat No., Coil No., Length) */}
+        <div className="bg-slate-900/90 border border-cyan-500/30 p-4 rounded-xl space-y-3 shadow-lg">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 uppercase tracking-wider">
+              <Building2 className="w-4 h-4" />
+              {isTh ? '1. ลูกค้า & Key เชื่อมข้อมูล IQA/IPQA' : '1. Customer & Data Link Keys'}
+            </div>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-950 text-cyan-300 border border-cyan-800/70">
+              <KeyRound className="w-3 h-3" />
+              Heat + Coil
+            </span>
           </div>
 
           <div>
@@ -240,6 +372,80 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
             </select>
           </div>
 
+          {/* Primary Link Key #1: Heat No. (Billet) & Primary Link Key #2: Coil No. */}
+          <div className="p-2.5 rounded-lg bg-slate-950/90 border border-cyan-900/60 space-y-2.5">
+            <div className="flex items-center justify-between text-[10px] text-cyan-300 font-bold">
+              <span className="flex items-center gap-1">
+                <Link className="w-3 h-3" />
+                {isTh ? 'Key หลักสำหรับ Link ข้อมูล IQA & IPQA' : 'Primary Traceability Link Keys'}
+              </span>
+              <span className="text-slate-400 font-normal">
+                {suggestions.heatNumbers.length} Heat • {suggestions.coilNumbers.length} Coil
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-amber-300 text-[11px] mb-1 font-bold">
+                  {isTh ? '🔑 Heat No. (Billet) [IQA-01/08]' : '🔑 Heat No. (Billet)'}
+                </label>
+                <input
+                  type="text"
+                  list="coi-heat-no-list"
+                  value={heatNo}
+                  onChange={e => setHeatNo(e.target.value)}
+                  placeholder="e.g. HEAT-2026-9011"
+                  className="w-full bg-slate-900 border border-amber-500/70 rounded-lg px-2.5 py-1.5 text-xs text-amber-300 font-mono font-bold focus:border-amber-400 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-cyan-300 text-[11px] mb-1 font-bold">
+                  {isTh ? '🔑 Coil No. (IPQA-01..07)' : '🔑 Coil No.'}
+                </label>
+                <input
+                  type="text"
+                  list="coi-coil-no-list"
+                  value={coilNo}
+                  onChange={e => setCoilNo(e.target.value)}
+                  placeholder="e.g. COIL-2026-A109"
+                  className="w-full bg-slate-900 border border-cyan-500/80 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono font-bold focus:border-cyan-400 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Auto-suggest Heat or Length detected from Coil No. */}
+            {(suggestedHeatForCoil && suggestedHeatForCoil.toUpperCase() !== heatNo.trim().toUpperCase()) ||
+            suggestedLengthsForCoil.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[10px]">
+                {suggestedHeatForCoil && suggestedHeatForCoil.toUpperCase() !== heatNo.trim().toUpperCase() && (
+                  <button
+                    type="button"
+                    onClick={() => setHeatNo(suggestedHeatForCoil)}
+                    className="px-2 py-0.5 rounded bg-amber-950/80 hover:bg-amber-900 text-amber-300 border border-amber-700/70 font-mono transition"
+                    title={isTh ? 'คลิกเพื่อใช้ Heat No. ที่ผูกกับ Coil นี้จาก IPQA-01' : 'Use Heat No. linked to this Coil'}
+                  >
+                    + ใช้ Heat: {suggestedHeatForCoil}
+                  </button>
+                )}
+                {suggestedLengthsForCoil.map(len => (
+                  <button
+                    key={len}
+                    type="button"
+                    onClick={() => setLengthMm(len)}
+                    className={`px-2 py-0.5 rounded border font-mono transition ${
+                      lengthMm.trim() === len
+                        ? 'bg-cyan-600 text-slate-950 border-cyan-400 font-bold'
+                        : 'bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border-cyan-800/70'
+                    }`}
+                  >
+                    L: {len}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-slate-400 text-[11px] mb-1 font-semibold">{isTh ? 'Work No.' : 'Work No.'}</label>
@@ -251,32 +457,16 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
               />
             </div>
             <div>
-              <label className="block text-cyan-400 text-[11px] mb-1 font-semibold">{isTh ? 'Coil No. (ม้วนที่ตรวจ)' : 'Coil No.'}</label>
+              <label className="block text-cyan-400 text-[11px] mb-1 font-semibold flex items-center gap-1">
+                <Ruler className="w-3 h-3" />
+                <span>{isTh ? 'Length ของ Coil No.' : 'Coil Length (mm)'}</span>
+              </label>
               <input
                 type="text"
-                value={coilNo}
-                onChange={e => setCoilNo(e.target.value)}
-                className="w-full bg-slate-950 border border-cyan-500/80 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono font-bold focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-slate-400 text-[11px] mb-1 font-semibold">{isTh ? 'Heat No. (เบอร์ฮีท)' : 'Heat No.'}</label>
-              <input
-                type="text"
-                value={heatNo}
-                onChange={e => setHeatNo(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-amber-300 font-mono focus:border-cyan-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-cyan-400 text-[11px] mb-1 font-semibold">{isTh ? 'Length (ความยาวตัด)' : 'Length (mm)'}</label>
-              <input
-                type="text"
+                list="coi-length-list"
                 value={lengthMm}
                 onChange={e => setLengthMm(e.target.value)}
+                placeholder="e.g. 650.0 mm"
                 className="w-full bg-slate-950 border border-cyan-500/80 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono font-bold focus:outline-none"
               />
             </div>
@@ -394,51 +584,192 @@ export const CoiIssueForm: React.FC<CoiIssueFormProps> = ({
         </div>
       </div>
 
+      {/* Live IQA & IPQA Traceability Link Status Grid */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-cyan-400" />
+            <h3 className="text-sm font-bold text-white">
+              {isTh
+                ? 'สถานะการเชื่อมโยงข้อมูล IQA & IPQA (เชื่อมด้วย Key: Heat No. & Coil No.)'
+                : 'Live IQA & IPQA Traceability Link Status (Key: Heat No. & Coil No.)'}
+            </h3>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="px-2.5 py-1 rounded-full font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+              {isTh
+                ? `เชื่อมข้อมูลจริงแล้ว ${linkResult.matchedModulesCount} / ${linkResult.totalCheckedModules} โมดูล`
+                : `Linked ${linkResult.matchedModulesCount} / ${linkResult.totalCheckedModules} Modules`}
+            </span>
+            <span className="text-[11px] text-slate-400 font-mono">
+              Sync: {linkResult.lastSyncedAt}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {linkResult.moduleStatuses.map((mod) => {
+            const keyBadge =
+              mod.linkKeyType === 'HEAT_NO'
+                ? 'Key: Heat No.'
+                : mod.linkKeyType === 'HEAT_AND_COIL'
+                  ? 'Key: Heat / Coil'
+                  : mod.linkKeyType === 'COIL_AND_LENGTH'
+                    ? 'Key: Coil + Length'
+                    : 'Key: Coil No.';
+
+            return (
+              <div
+                key={mod.moduleCode}
+                className={`p-3 rounded-xl border text-xs transition ${
+                  mod.matched
+                    ? mod.status === 'FAIL'
+                      ? 'bg-rose-950/30 border-rose-700/70'
+                      : 'bg-emerald-950/25 border-emerald-700/60'
+                    : 'bg-slate-950/80 border-slate-800/90 opacity-85'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono font-extrabold text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 border border-slate-700">
+                      {mod.moduleCode}
+                    </span>
+                    <span className="text-[10px] font-semibold text-slate-400">{keyBadge}</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      mod.status === 'PASS'
+                        ? 'bg-emerald-950 text-emerald-300 border-emerald-700'
+                        : mod.status === 'FAIL'
+                          ? 'bg-rose-950 text-rose-300 border-rose-700'
+                          : 'bg-slate-900 text-slate-400 border-slate-700'
+                    }`}
+                  >
+                    {mod.matched ? `${mod.status} (${mod.recordCount})` : isTh ? 'ไม่พบข้อมูล' : 'Not Found'}
+                  </span>
+                </div>
+
+                <div className="font-bold text-slate-200 text-[11px] truncate">
+                  {isTh ? mod.moduleNameTh : mod.moduleNameEn}
+                </div>
+                <div className="text-[10px] font-mono text-amber-300/90 mt-0.5 truncate">
+                  {mod.matched ? `✓ ${mod.matchedKeyDisplay}` : `Query: ${mod.matchedKeyDisplay}`}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                  {mod.summary}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Live Inspection Checkpoints Preview Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className={`w-2.5 h-2.5 rounded-full ${allKeyCheckpointsPass ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500 animate-pulse'}`}></span>
             <h3 className="text-sm font-bold text-white">
               {isTh ? 'ผลการตรวจสอบจริงที่ดึงจาก IQA / IPQA (Live Measured Inspection Values)' : 'Linked Inspection Results'}
             </h3>
           </div>
-          <span className="text-xs text-emerald-400 font-bold bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-800">
-            ✓ ALL 40+ CHECKPOINTS PASS
+          <span className={`text-xs font-bold px-3 py-1 rounded-full border flex items-center gap-1.5 w-fit ${
+            allKeyCheckpointsPass
+              ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800'
+              : 'text-rose-300 bg-rose-950/60 border-rose-800'
+          }`}>
+            {allKeyCheckpointsPass ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>✓ ALL CHECKPOINTS PASS</span>
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>⚠ OUT OF SPEC / FAIL DETECTED</span>
+              </>
+            )}
           </span>
         </div>
 
-        {/* Quick summary grid of key parameters */}
+        {/* Summary grid of key parameters from IQA & IPQA */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
-          <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-            <div className="text-[10px] text-slate-400 font-semibold">Si Content</div>
-            <div className="text-sm font-mono font-bold text-emerald-400">{measuredData.chemActual.si}%</div>
-            <div className="text-[9px] text-slate-500">Spec: &lt; {currentTemplate.chemicalSpecs.si.max}%</div>
+          <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
+              <span>Si / Fe (OES)</span>
+              <span className="text-amber-400 font-mono">IQA-01</span>
+            </div>
+            <div className={`text-sm font-mono font-bold mt-0.5 ${siPass ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {measuredData.chemActual.si}% / {measuredData.chemActual.fe}%
+            </div>
+            <div className="text-[9px] text-slate-500">
+              Spec: Si ≤ {currentTemplate.chemicalSpecs.si.max}%, Fe ≤ {currentTemplate.chemicalSpecs.fe.max}%
+            </div>
           </div>
-          <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-            <div className="text-[10px] text-slate-400 font-semibold">Cu Content</div>
-            <div className="text-sm font-mono font-bold text-emerald-400">{measuredData.chemActual.cu}%</div>
-            <div className="text-[9px] text-slate-500">Spec: {currentTemplate.chemicalSpecs.cu.min}-{currentTemplate.chemicalSpecs.cu.max}%</div>
+
+          <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
+              <span>Cu / Mn (OES)</span>
+              <span className="text-amber-400 font-mono">IQA-01</span>
+            </div>
+            <div className={`text-sm font-mono font-bold mt-0.5 ${cuPass ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {measuredData.chemActual.cu}% / {measuredData.chemActual.mn}%
+            </div>
+            <div className="text-[9px] text-slate-500">
+              Spec Cu: {currentTemplate.chemicalSpecs.cu.min}-{currentTemplate.chemicalSpecs.cu.max}%
+            </div>
           </div>
-          <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-            <div className="text-[10px] text-slate-400 font-semibold">Tensile Strength</div>
-            <div className="text-sm font-mono font-bold text-emerald-400">{measuredData.mechActual.tensileStrength} N/mm²</div>
-            <div className="text-[9px] text-slate-500">Spec: &gt; {currentTemplate.mechanicalSpecs.tensileMin}</div>
+
+          <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
+              <span>Tensile / Elong</span>
+              <span className="text-cyan-400 font-mono">IPQA-01</span>
+            </div>
+            <div className={`text-sm font-mono font-bold mt-0.5 ${tensilePass ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {measuredData.mechActual.tensileStrength} / {measuredData.mechActual.elongation}%
+            </div>
+            <div className="text-[9px] text-slate-500">
+              Spec: ≥ {currentTemplate.mechanicalSpecs.tensileMin} MPa
+            </div>
           </div>
-          <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-            <div className="text-[10px] text-slate-400 font-semibold">Zn Coating Weight</div>
-            <div className="text-sm font-mono font-bold text-emerald-400">{measuredData.coatingActual.head.znAdhesionWeightTop} g/m²</div>
-            <div className="text-[9px] text-slate-500">Spec: 9.5 - 13.5</div>
+
+          <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
+              <span>Rz Top / Bot</span>
+              <span className="text-cyan-400 font-mono">IPQA-02</span>
+            </div>
+            <div className={`text-sm font-mono font-bold mt-0.5 ${rzTopPass ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {measuredData.mechActual.roughnessRzTop} / {measuredData.mechActual.roughnessRzBottom} µm
+            </div>
+            <div className="text-[9px] text-slate-500">
+              Spec: ≤ {currentTemplate.mechanicalSpecs.roughnessRzTopMax} µm
+            </div>
           </div>
-          <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-            <div className="text-[10px] text-slate-400 font-semibold">Wall Outer T1</div>
-            <div className="text-sm font-mono font-bold text-emerald-400">{measuredData.webActual.head.t1} mm</div>
-            <div className="text-[9px] text-slate-500">Spec: 0.175 - 0.275</div>
+
+          <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
+              <span>Zn / Flux Wt</span>
+              <span className="text-cyan-400 font-mono">IPQA-03/04</span>
+            </div>
+            <div className={`text-sm font-mono font-bold mt-0.5 ${znPass ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {measuredData.coatingActual.head.znAdhesionWeightTop} / {measuredData.coatingActual.head.fluxAdhesionWeightTop} g/m²
+            </div>
+            <div className="text-[9px] text-slate-500">
+              Spec Zn: {currentTemplate.coatingSpecs.znAdhesionWeightMin}-{currentTemplate.coatingSpecs.znAdhesionWeightMax}
+            </div>
           </div>
-          <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-            <div className="text-[10px] text-slate-400 font-semibold">Width @ 5mm</div>
-            <div className="text-sm font-mono font-bold text-emerald-400">{measuredData.geometryActual.head.widthLeft} mm</div>
-            <div className="text-[9px] text-slate-500">Spec: 14.75 - 14.85</div>
+
+          <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
+              <span>Wall T1 / Width</span>
+              <span className="text-cyan-400 font-mono">IPQA-07/05</span>
+            </div>
+            <div className={`text-sm font-mono font-bold mt-0.5 ${t1Pass && widthPass ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {measuredData.webActual.head.t1} / {measuredData.geometryActual.head.widthLeft} mm
+            </div>
+            <div className="text-[9px] text-slate-500">
+              L={measuredData.geometryActual.head.lengthMm} mm
+            </div>
           </div>
         </div>
       </div>

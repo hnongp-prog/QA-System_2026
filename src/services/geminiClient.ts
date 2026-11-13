@@ -667,7 +667,7 @@ Analyze the uploaded document image or PDF carefully and extract ALL real inform
   },
   "table": [
     {
-      "description": "string (Exact dimension label/point name as written in document, e.g. OR-1, OR-2, T1-1, T1-2, T2-1, T3, T4, T5-1, IR-1, IHR-1, OHW-1, IHW-1, RA-1, IOR-1, etc.)",
+      "description": "string (Exact dimension label/point name as written in document, e.g. OR-1, OR-2, T1-1, T1-2, T1-3, T2-1, T2-2, T2-3, T3-1, T3-2, T3-3, T4-1, T4-2, T4-3, T5-1, T5-2, T5-3, ... T5-n, IR-1, IHR-1, OHW-1, IHW-1, RA-1, IOR-1, etc.)",
       "total": "string or number (The exact measured value or total dimension reading for this item)"
     }
   ]

@@ -23,7 +23,11 @@ import {
   HelpCircle,
   Calculator,
   Moon,
-  Sun
+  Sun,
+  TrendingUp,
+  Target,
+  Filter,
+  PieChart
 } from 'lucide-react';
 
 import { 
@@ -46,72 +50,473 @@ interface CoatingMeasurementAppProps {
   onToggleTheme?: () => void;
 }
 
-// Sparkline SVG Component
-const Sparkline = ({ data, color, label }: { data: number[]; color: string; label: string }) => {
-  const validData = data.filter(v => v > 0);
-  
-  if (!validData || validData.length === 0) {
-    return (
-      <div className="flex flex-col w-full h-full justify-end">
-        <span className="text-[10px] font-bold text-slate-400 uppercase mb-1">{label}</span>
-        <div className="h-16 flex items-center justify-center text-[10px] text-slate-500 bg-slate-950/60 rounded-xl border border-dashed border-slate-800">
-          No trend data
-        </div>
-      </div>
-    );
-  }
-  
-  const width = 300; 
-  const height = 60;  
-  const padding = 8;
-  const innerWidth = width - padding * 2;
-  const innerHeight = height - padding * 2;
-  
-  const maxVal = Math.max(...validData, 0.1);
-  const minVal = Math.max(0, Math.min(...validData) * 0.8); 
-  const range = maxVal - minVal || 1;
+// Trend Data Point interface for Coating
+export interface CoatingTrendPointItem {
+  index: number;
+  id: string;
+  date: string;
+  timestamp?: string;
+  lotNumber: string; // Coil No.
+  profileName: string;
+  process?: string;
+  status: string;
+  inspector?: string;
+  coatingWt: number;
+  coatingUp: number;
+  coatingLo: number;
+  binderPercent: number;
+  amountOfBinder?: number;
+}
+
+// Full-width parameter row chart component (Coating WT, Binder %)
+interface CoatingParameterRowCardProps {
+  paramKey: 'coatingWt' | 'binderPercent';
+  title: string;
+  thaiTitle: string;
+  descriptionTh: string;
+  descriptionEn: string;
+  color: string;
+  data: CoatingTrendPointItem[];
+  unit: string;
+  specMin?: number | null;
+  specMax?: number | null;
+  isLight: boolean;
+  isTh: boolean;
+}
+
+const CoatingParameterRowCard: React.FC<CoatingParameterRowCardProps> = ({
+  paramKey,
+  title,
+  thaiTitle,
+  descriptionTh,
+  descriptionEn,
+  color,
+  data,
+  unit,
+  specMin = null,
+  specMax = null,
+  isLight,
+  isTh,
+}) => {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  // Extract non-zero / valid data points
+  const validPoints = useMemo(() => {
+    return data
+      .map(item => ({
+        ...item,
+        value: item[paramKey]
+      }))
+      .filter(item => !isNaN(item.value) && item.value > 0);
+  }, [data, paramKey]);
+
+  const count = validPoints.length;
+  const avg = count > 0 ? validPoints.reduce((acc, p) => acc + p.value, 0) / count : 0;
+  const min = count > 0 ? Math.min(...validPoints.map(p => p.value)) : 0;
+  const max = count > 0 ? Math.max(...validPoints.map(p => p.value)) : 0;
+  const last = count > 0 ? validPoints[validPoints.length - 1].value : 0;
+
+  const outOfSpecCount = useMemo(() => {
+    if (specMin === null && specMax === null) return 0;
+    return validPoints.filter(p => {
+      if (specMin !== null && specMin !== undefined && p.value < specMin) return true;
+      if (specMax !== null && specMax !== undefined && p.value > specMax) return true;
+      return false;
+    }).length;
+  }, [validPoints, specMin, specMax]);
+
+  // Chart Dimensions
+  const width = 1000;
+  const height = 240;
+  const padding = { top: 25, right: 35, bottom: 45, left: 60 };
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+
+  // Calculate dynamic Y domain including spec limits with margin
+  const values = validPoints.map(p => p.value);
+  if (specMin !== null && specMin !== undefined) values.push(specMin);
+  if (specMax !== null && specMax !== undefined) values.push(specMax);
+
+  const rawMin = values.length > 0 ? Math.min(...values) : 0;
+  const rawMax = values.length > 0 ? Math.max(...values) : 10;
+  const margin = Math.max((rawMax - rawMin) * 0.15, rawMax * 0.05, 0.5);
+
+  const domainMin = Math.max(0, parseFloat((rawMin - margin).toFixed(2)));
+  const domainMax = parseFloat((rawMax + margin).toFixed(2));
+  const domainRange = domainMax - domainMin || 1;
 
   const getX = (index: number) => {
-    if (validData.length === 1) return width / 2;
-    return padding + (index / (validData.length - 1)) * innerWidth;
+    if (count <= 1) return padding.left + innerWidth / 2;
+    return padding.left + (index / (count - 1)) * innerWidth;
   };
 
   const getY = (val: number) => {
-    return padding + innerHeight - ((val - minVal) / range) * innerHeight;
+    return padding.top + innerHeight - ((val - domainMin) / domainRange) * innerHeight;
   };
 
-  const points = validData.map((val, i) => `${getX(i)},${getY(val)}`).join(' ');
+  const pointsString = validPoints.map((p, i) => `${getX(i)},${getY(p.value)}`).join(' ');
+  const areaPolygonString = count > 1 
+    ? `${getX(0)},${padding.top + innerHeight} ${pointsString} ${getX(count - 1)},${padding.top + innerHeight}`
+    : '';
+
+  // 5 grid lines
+  const gridSteps = 4;
+  const gridLines = Array.from({ length: gridSteps + 1 }, (_, i) => {
+    const val = domainMin + (domainRange / gridSteps) * i;
+    const y = getY(val);
+    return { val, y };
+  });
+
+  const hoveredPoint = hoveredIdx !== null && validPoints[hoveredIdx] ? validPoints[hoveredIdx] : null;
 
   return (
-    <div className="flex flex-col w-full">
-      <div className="flex justify-between items-center mb-1.5">
-         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
-         <span className="text-[10px] text-indigo-300 font-mono font-bold">Last: {validData[validData.length-1].toFixed(2)}</span>
+    <div className={`p-5 rounded-2xl border transition-all ${
+      isLight 
+        ? 'bg-white border-slate-200 shadow-sm hover:border-slate-300' 
+        : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+    }`}>
+      {/* Header Info & Stats Toolbar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <span 
+              className="w-3.5 h-3.5 rounded-md shadow-sm"
+              style={{ backgroundColor: color }}
+            />
+            <h4 className={`font-bold text-base tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
+              {title}
+            </h4>
+            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
+              isLight ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-slate-800 text-slate-300 border-slate-700'
+            }`}>
+              {thaiTitle}
+            </span>
+            <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400">
+              ({unit})
+            </span>
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+            {isTh ? descriptionTh : descriptionEn}
+            {(specMin !== null || specMax !== null) && (
+              <span className="ml-2 font-mono text-[11px] font-bold text-indigo-700 dark:text-indigo-400">
+                [Spec: {specMin !== null ? `Min ${specMin}` : ''} {specMax !== null ? `Max ${specMax}` : ''} {unit}]
+              </span>
+            )}
+          </p>
+        </div>
+
+        {/* Statistical Summary Badges */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Sample count N */}
+          <div className={`px-3 py-1.5 rounded-xl border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+          }`}>
+            <span className={`text-[9px] uppercase tracking-wider block font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Sample N</span>
+            <span className={`text-xs font-mono font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>{count}</span>
+          </div>
+
+          {/* Average */}
+          <div className={`px-3 py-1.5 rounded-xl border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+          }`}>
+            <span className={`text-[9px] uppercase tracking-wider block font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Avg (X̄)</span>
+            <span className="text-xs font-mono font-bold" style={{ color }}>
+              {count > 0 ? avg.toFixed(2) : '-'}
+            </span>
+          </div>
+
+          {/* Min / Max */}
+          <div className={`px-3 py-1.5 rounded-xl border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+          }`}>
+            <span className={`text-[9px] uppercase tracking-wider block font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Min / Max</span>
+            <span className={`text-xs font-mono font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>
+              {count > 0 ? `${min.toFixed(2)} / ${max.toFixed(2)}` : '-'}
+            </span>
+          </div>
+
+          {/* Last */}
+          <div className={`px-3 py-1.5 rounded-xl border text-center ${
+            isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+          }`}>
+            <span className={`text-[9px] uppercase tracking-wider block font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Last</span>
+            <span className={`text-xs font-mono font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+              {count > 0 ? last.toFixed(2) : '-'}
+            </span>
+          </div>
+
+          {/* Out of Spec Badge */}
+          {(specMin !== null || specMax !== null) && (
+            <div className={`px-3 py-1.5 rounded-xl border text-center ${
+              outOfSpecCount === 0
+                ? (isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-emerald-950/40 border-emerald-800 text-emerald-400')
+                : (isLight ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-rose-950/40 border-rose-800 text-rose-400')
+            }`}>
+              <span className="text-[9px] uppercase tracking-wider block font-bold">Out of Spec</span>
+              <span className="text-xs font-mono font-black">
+                {outOfSpecCount} {count > 0 ? `(${((outOfSpecCount / count) * 100).toFixed(1)}%)` : ''}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-16 overflow-visible bg-slate-950/80 rounded-xl border border-slate-800">
-        {validData.length > 1 && (
-          <polyline 
-            points={points} 
-            fill="none" 
-            stroke={color} 
-            strokeWidth="2.5" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-          />
+
+      {/* SVG Chart Area */}
+      <div className="relative mt-4">
+        {count === 0 ? (
+          <div className={`h-48 flex flex-col items-center justify-center text-xs border border-dashed rounded-xl ${
+            isLight ? 'bg-slate-50 border-slate-300 text-slate-600' : 'bg-slate-950/50 border-slate-800 text-slate-400'
+          }`}>
+            <BarChart3 className="w-8 h-8 opacity-30 mb-2" />
+            <span>{isTh ? 'ไม่มีข้อมูลการตรวจวัดสำหรับพารามิเตอร์นี้ในช่วงที่เลือก' : 'No inspection data available for this parameter'}</span>
+          </div>
+        ) : (
+          <div className="w-full overflow-x-auto">
+            <svg
+              viewBox={`0 0 ${width} ${height}`}
+              className={`w-full h-56 sm:h-64 transition-colors select-none rounded-xl border ${
+                isLight ? 'bg-slate-50/70 border-slate-200' : 'bg-slate-950/70 border-slate-800/80'
+              }`}
+              onMouseLeave={() => setHoveredIdx(null)}
+            >
+              <defs>
+                <linearGradient id={`coat-grad-${paramKey}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity={0.28} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+
+              {/* Horizontal Gridlines & Y-axis labels */}
+              {gridLines.map((gl, i) => (
+                <g key={i}>
+                  <line
+                    x1={padding.left}
+                    y1={gl.y}
+                    x2={width - padding.right}
+                    y2={gl.y}
+                    stroke={isLight ? '#e2e8f0' : '#1e293b'}
+                    strokeDasharray="4 4"
+                    strokeWidth="1"
+                  />
+                  <text
+                    x={padding.left - 8}
+                    y={gl.y + 3.5}
+                    textAnchor="end"
+                    fontSize="10"
+                    fontFamily="monospace"
+                    fill={isLight ? '#64748b' : '#64748b'}
+                  >
+                    {gl.val.toFixed(2)}
+                  </text>
+                </g>
+              ))}
+
+              {/* SPEC MIN LIMIT LINE (Dashed Red/Orange) */}
+              {specMin !== null && specMin !== undefined && (
+                <g>
+                  <line
+                    x1={padding.left}
+                    y1={getY(specMin)}
+                    x2={width - padding.right}
+                    y2={getY(specMin)}
+                    stroke="#ef4444"
+                    strokeWidth="1.8"
+                    strokeDasharray="6 4"
+                  />
+                  <text
+                    x={width - padding.right}
+                    y={getY(specMin) + 12}
+                    textAnchor="end"
+                    fontSize="10"
+                    fontWeight="bold"
+                    fontFamily="monospace"
+                    fill="#ef4444"
+                  >
+                    SPEC MIN: {specMin} {unit}
+                  </text>
+                </g>
+              )}
+
+              {/* SPEC MAX LIMIT LINE (Dashed Red/Orange) */}
+              {specMax !== null && specMax !== undefined && (
+                <g>
+                  <line
+                    x1={padding.left}
+                    y1={getY(specMax)}
+                    x2={width - padding.right}
+                    y2={getY(specMax)}
+                    stroke="#f97316"
+                    strokeWidth="1.8"
+                    strokeDasharray="6 4"
+                  />
+                  <text
+                    x={width - padding.right}
+                    y={getY(specMax) - 5}
+                    textAnchor="end"
+                    fontSize="10"
+                    fontWeight="bold"
+                    fontFamily="monospace"
+                    fill="#f97316"
+                  >
+                    SPEC MAX: {specMax} {unit}
+                  </text>
+                </g>
+              )}
+
+              {/* Area Fill Gradient under the line */}
+              {count > 1 && (
+                <polygon
+                  points={areaPolygonString}
+                  fill={`url(#coat-grad-${paramKey})`}
+                />
+              )}
+
+              {/* Main Trend Polyline */}
+              {count > 1 && (
+                <polyline
+                  points={pointsString}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+
+              {/* Hover highlight guide vertical line */}
+              {hoveredIdx !== null && validPoints[hoveredIdx] && (
+                <line
+                  x1={getX(hoveredIdx)}
+                  y1={padding.top}
+                  x2={getX(hoveredIdx)}
+                  y2={padding.top + innerHeight}
+                  stroke={isLight ? '#94a3b8' : '#475569'}
+                  strokeDasharray="2 2"
+                  strokeWidth="1.2"
+                />
+              )}
+
+              {/* Data Point Circles */}
+              {validPoints.map((p, i) => {
+                const cx = getX(i);
+                const cy = getY(p.value);
+                const isHovered = hoveredIdx === i;
+                const isOut = (specMin !== null && p.value < specMin) || (specMax !== null && p.value > specMax);
+
+                return (
+                  <g key={p.id || i} className="cursor-pointer">
+                    {/* Invisible larger hover hitbox */}
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r="14"
+                      fill="transparent"
+                      onMouseEnter={() => setHoveredIdx(i)}
+                    />
+                    {/* Visual Point */}
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={isHovered ? 6 : 3.8}
+                      fill={isOut ? '#ef4444' : (isLight ? '#ffffff' : '#0f172a')}
+                      stroke={isOut ? '#ef4444' : color}
+                      strokeWidth={isHovered ? 3 : 2}
+                      className="transition-all duration-150"
+                    />
+                  </g>
+                );
+              })}
+
+              {/* Bottom timeline milestone labels on X-axis */}
+              {count > 0 && (
+                <g fontSize="10" fontFamily="monospace" fill={isLight ? '#64748b' : '#64748b'}>
+                  <text x={getX(0)} y={height - 12} textAnchor="start">
+                    #1 ({validPoints[0].lotNumber})
+                  </text>
+                  {count > 3 && (
+                    <text x={getX(Math.floor(count / 2))} y={height - 12} textAnchor="middle">
+                      #{Math.floor(count / 2) + 1} ({validPoints[Math.floor(count / 2)].date || ''})
+                    </text>
+                  )}
+                  {count > 1 && (
+                    <text x={getX(count - 1)} y={height - 12} textAnchor="end">
+                      #{count} ({validPoints[count - 1].lotNumber})
+                    </text>
+                  )}
+                </g>
+              )}
+            </svg>
+
+            {/* Interactive Floating Tooltip */}
+            {hoveredPoint && (
+              <div
+                className={`absolute z-30 pointer-events-none p-3 rounded-xl shadow-xl border text-xs font-sans transition-all transform -translate-y-full -translate-x-1/2 ${
+                  isLight 
+                    ? 'bg-slate-900/95 text-white border-slate-700 shadow-slate-900/30' 
+                    : 'bg-slate-950/95 text-slate-100 border-slate-700 shadow-black/60'
+                }`}
+                style={{
+                  left: `${(getX(hoveredIdx!) / width) * 100}%`,
+                  top: `${Math.max(15, (getY(hoveredPoint.value) / height) * 100 - 8)}%`,
+                  minWidth: '220px'
+                }}
+              >
+                <div className="flex items-center justify-between border-b border-slate-700 pb-1.5 mb-1.5">
+                  <span className="font-bold text-indigo-400">
+                    Sample #{hoveredPoint.index}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    hoveredPoint.status === 'Pass' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                  }`}>
+                    {hoveredPoint.status}
+                  </span>
+                </div>
+
+                <div className="space-y-1 font-mono text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Coil No:</span>
+                    <span className="font-bold text-white">{hoveredPoint.lotNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Profile:</span>
+                    <span className="text-indigo-300 font-semibold">{hoveredPoint.profileName}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-800 pt-1">
+                    <span className="text-slate-300 font-sans font-bold">{title}:</span>
+                    <span className="font-bold text-sm" style={{ color }}>
+                      {hoveredPoint.value.toFixed(2)} {unit}
+                    </span>
+                  </div>
+                  {paramKey === 'coatingWt' && (hoveredPoint.coatingUp > 0 || hoveredPoint.coatingLo > 0) && (
+                    <div className="text-[10px] text-slate-400 flex justify-between">
+                      <span>Side Up / Lo:</span>
+                      <span className="text-slate-200">{hoveredPoint.coatingUp || '-'} / {hoveredPoint.coatingLo || '-'} g/m²</span>
+                    </div>
+                  )}
+                  {(specMin !== null || specMax !== null) && (
+                    <div className="text-[10px] text-slate-400 flex justify-between border-t border-slate-800 pt-1">
+                      <span>Spec Evaluation:</span>
+                      <span className={
+                        (specMin !== null && hoveredPoint.value < specMin) || (specMax !== null && hoveredPoint.value > specMax)
+                          ? 'text-rose-400 font-bold'
+                          : 'text-emerald-400 font-bold'
+                      }>
+                        {(specMin !== null && hoveredPoint.value < specMin) || (specMax !== null && hoveredPoint.value > specMax)
+                          ? 'Out of Spec'
+                          : 'In Spec'}
+                      </span>
+                    </div>
+                  )}
+                  <div className="text-[10px] text-slate-400 pt-1 flex justify-between">
+                    <span>Date: {hoveredPoint.date || hoveredPoint.timestamp}</span>
+                    <span>Insp: {hoveredPoint.inspector}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
-        {validData.map((val, i) => (
-           <circle 
-             key={i} 
-             cx={getX(i)} 
-             cy={getY(val)} 
-             r="3.5" 
-             fill="#0f172a" 
-             stroke={color} 
-             strokeWidth="2" 
-             className="hover:r-5 transition-all" 
-           />
-        ))}
-      </svg>
+      </div>
     </div>
   );
 };
@@ -613,11 +1018,11 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
     return { total, passCount, failCount, passRatio, profileSummaries };
   }, [inspections]);
 
-  // Filtered Trends
-  const filteredTrends = useMemo(() => {
+  // Filtered Trend Data for Unified Overview & Query
+  const filteredTrendData = useMemo<CoatingTrendPointItem[]>(() => {
     if (inspections.length === 0) return [];
 
-    let filtered = inspections;
+    let filtered = [...inspections];
     if (trendFilterProfile !== 'All') {
       filtered = filtered.filter(i => (i.profileName || 'Unknown') === trendFilterProfile);
     }
@@ -625,25 +1030,48 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       filtered = filtered.filter(i => i.date && i.date.startsWith(trendFilterMonth));
     }
 
-    const groups: Record<string, { name: string; total: number; history: CoatingInspectionRecord[] }> = {};
-    filtered.forEach(item => {
-      const pName = item.profileName || 'Unknown';
-      if (!groups[pName]) groups[pName] = { name: pName, total: 0, history: [] };
-      groups[pName].total++;
-      groups[pName].history.push(item);
+    // Sort chronologically (oldest to newest)
+    const sorted = [...filtered].sort((a, b) => {
+      const timeA = new Date(a.date ? `${a.date}T${a.timestamp || '00:00:00'}` : (a.timestamp || 0)).getTime();
+      const timeB = new Date(b.date ? `${b.date}T${b.timestamp || '00:00:00'}` : (b.timestamp || 0)).getTime();
+      return (timeA || 0) - (timeB || 0);
     });
 
-    return Object.values(groups).map(g => {
-      const sortedHistory = [...g.history].reverse(); 
-      const trends = {
-        coatingUp: sortedHistory.map(item => parseFloat(item.raUp || '0')),
-        coatingLo: sortedHistory.map(item => parseFloat(item.raLo || '0')),
-        binderPercent: sortedHistory.map(item => parseFloat(item.binderPercent || '0')),
-        amountOfBinder: sortedHistory.map(item => parseFloat(item.amountOfBinder || '0'))
+    return sorted.map((item, idx) => {
+      const up = parseFloat(item.raUp || '0');
+      const lo = parseFloat(item.raLo || '0');
+      let coatWt = 0;
+      if (!isNaN(up) && up > 0 && !isNaN(lo) && lo > 0) coatWt = (up + lo) / 2;
+      else if (!isNaN(up) && up > 0) coatWt = up;
+      else if (!isNaN(lo) && lo > 0) coatWt = lo;
+
+      const binderPct = parseFloat(item.binderPercent || '0');
+      const amtBinder = parseFloat(item.amountOfBinder || '0');
+
+      return {
+        index: idx + 1,
+        id: item.id || `pt-${idx}`,
+        date: item.date || item.timestamp?.split(' ')[0] || '',
+        timestamp: item.timestamp || '',
+        lotNumber: item.lotNumber || '-',
+        profileName: item.profileName || 'Unknown',
+        process: item.partId || '',
+        status: item.status || 'Pass',
+        inspector: item.inspectorName || '-',
+        coatingWt: parseFloat(coatWt.toFixed(2)),
+        coatingUp: !isNaN(up) && up > 0 ? parseFloat(up.toFixed(2)) : 0,
+        coatingLo: !isNaN(lo) && lo > 0 ? parseFloat(lo.toFixed(2)) : 0,
+        binderPercent: !isNaN(binderPct) ? parseFloat(binderPct.toFixed(2)) : 0,
+        amountOfBinder: !isNaN(amtBinder) ? parseFloat(amtBinder.toFixed(2)) : 0
       };
-      return { ...g, trends };
     });
   }, [inspections, trendFilterProfile, trendFilterMonth]);
+
+  // Active Profile Spec for Spec Limit Lines in Trend Charts
+  const activeTrendSpec = useMemo(() => {
+    if (trendFilterProfile === 'All') return null;
+    return effectiveProfiles.find(p => p.name.toLowerCase() === trendFilterProfile.toLowerCase()) || null;
+  }, [trendFilterProfile, effectiveProfiles]);
 
   const formatSpecValue = (val: any) => {
     if (val === undefined || val === null || val === '') return '';
@@ -2263,100 +2691,367 @@ export const CoatingMeasurementApp: React.FC<CoatingMeasurementAppProps> = ({
       {activeTab === 'dashboard' && (
         <div className="space-y-6">
           {dashboardStats ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex justify-between items-center">
-                <div>
-                  <div className="text-xs text-slate-400 font-bold uppercase">{isTh ? 'จำนวนการตรวจทั้งหมด' : 'Total Inspected'}</div>
-                  <div className="text-2xl font-black text-white mt-1">{dashboardStats.total}</div>
+            <>
+              {/* Stat Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className={`p-5 rounded-2xl border flex items-center justify-between transition-colors ${
+                  isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+                }`}>
+                  <div>
+                    <div className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                      {isTh ? 'จำนวนการตรวจทั้งหมด' : 'Total Inspected'}
+                    </div>
+                    <div className={`text-2xl font-black mt-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                      {dashboardStats.total} <span className="text-xs font-normal text-slate-500">Coils</span>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
+                    <ClipboardCheck className="w-6 h-6" />
+                  </div>
                 </div>
-                <div className="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20">
-                  <ClipboardCheck className="w-6 h-6" />
+
+                <div className={`p-5 rounded-2xl border flex items-center justify-between transition-colors ${
+                  isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+                }`}>
+                  <div>
+                    <div className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                      {isTh ? 'ผ่านเกณฑ์ (Pass)' : 'Passed'}
+                    </div>
+                    <div className="text-2xl font-black text-emerald-500 dark:text-emerald-400 mt-1">
+                      {dashboardStats.passCount} <span className="text-xs font-normal text-slate-500">Coils</span>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 rounded-xl border border-emerald-500/20">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <div className={`p-5 rounded-2xl border flex items-center justify-between transition-colors ${
+                  isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+                }`}>
+                  <div>
+                    <div className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                      {isTh ? 'ไม่ผ่านเกณฑ์ (Fail)' : 'Failed'}
+                    </div>
+                    <div className="text-2xl font-black text-rose-500 dark:text-rose-400 mt-1">
+                      {dashboardStats.failCount} <span className="text-xs font-normal text-slate-500">Coils</span>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-rose-500/10 text-rose-500 dark:text-rose-400 rounded-xl border border-rose-500/20">
+                    <AlertCircle className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-purple-950 p-5 rounded-2xl border border-indigo-800 flex items-center justify-between text-white shadow-sm">
+                  <div>
+                    <div className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider">
+                      {isTh ? 'อัตราผ่านเกณฑ์ (Pass Rate)' : 'Pass Rate'}
+                    </div>
+                    <div className="text-2xl font-black text-white mt-1">{dashboardStats.passRatio}%</div>
+                  </div>
+                  <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+                    <Target className="w-6 h-6 text-indigo-300" />
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex justify-between items-center">
-                <div>
-                  <div className="text-xs text-slate-400 font-bold uppercase">{isTh ? 'ผ่านเกณฑ์ (Pass)' : 'Passed'}</div>
-                  <div className="text-2xl font-black text-emerald-400 mt-1">{dashboardStats.passCount}</div>
+              {/* Profile Summary Table */}
+              <div className={`rounded-2xl border p-6 space-y-4 transition-colors ${
+                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${
+                    isLight ? 'text-slate-900' : 'text-slate-300'
+                  }`}>
+                    <TrendingUp className="w-4 h-4 text-indigo-500" />
+                    <span>{isTh ? 'สถิติภาพรวมแยกตาม Profile (คลิกแถวเพื่อกรองดูกราฟ)' : 'Summary Statistics by Profile (Click row to filter graph)'}</span>
+                  </h3>
+                  {trendFilterProfile !== 'All' && (
+                    <button
+                      onClick={() => setTrendFilterProfile('All')}
+                      className="text-[11px] text-indigo-500 hover:underline flex items-center gap-1 font-semibold self-start sm:self-auto"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>{isTh ? `กำลังกรอง: ${trendFilterProfile} (คลิกเพื่อดูทุก Profile)` : `Filtered: ${trendFilterProfile} (Reset)`}</span>
+                    </button>
+                  )}
                 </div>
-                <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
-                  <CheckCircle2 className="w-6 h-6" />
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className={`uppercase text-[10px] font-bold border-b ${
+                      isLight ? 'bg-slate-50 text-slate-600 border-slate-200' : 'bg-slate-950 text-slate-400 border-slate-800'
+                    }`}>
+                      <tr>
+                        <th className="px-4 py-3">{isTh ? 'ชื่อ Profile' : 'Profile Name'}</th>
+                        <th className="px-4 py-3 text-center">{isTh ? 'จำนวน Lot' : 'Total Lots'}</th>
+                        <th className="px-4 py-3 text-center">Avg Coating Up (g/m²)</th>
+                        <th className="px-4 py-3 text-center">Avg Binder % (%)</th>
+                        <th className="px-4 py-3 text-center">Avg Amt Binder</th>
+                        <th className="px-4 py-3 text-center">Pass / Fail</th>
+                        <th className="px-4 py-3 text-right">Pass Rate (%)</th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y font-mono ${
+                      isLight ? 'divide-slate-200' : 'divide-slate-800/80'
+                    }`}>
+                      {dashboardStats.profileSummaries.map((p, idx) => {
+                        const isSelected = trendFilterProfile === p.name;
+                        return (
+                          <tr 
+                            key={idx}
+                            onClick={() => setTrendFilterProfile(isSelected ? 'All' : p.name)}
+                            title={isTh ? `คลิกเพื่อกรองดูกราฟเฉพาะ Profile ${p.name}` : `Click to filter graph for ${p.name}`}
+                            className={`cursor-pointer transition-colors ${
+                              isSelected
+                                ? (isLight ? 'bg-indigo-50 font-semibold' : 'bg-indigo-950/40 font-semibold')
+                                : (isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-950/40')
+                            }`}
+                          >
+                            <td className={`px-4 py-3 font-sans font-bold flex items-center gap-2 ${
+                              isSelected ? 'text-indigo-600 dark:text-indigo-400' : (isLight ? 'text-slate-900' : 'text-slate-200')
+                            }`}>
+                              <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-indigo-500' : 'bg-transparent'}`} />
+                              {p.name}
+                            </td>
+                            <td className={`px-4 py-3 text-center ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{p.total}</td>
+                            <td className="px-4 py-3 text-center text-emerald-600 dark:text-emerald-400 font-bold">{p.avgCoatingUp}</td>
+                            <td className="px-4 py-3 text-center text-amber-600 dark:text-amber-400 font-bold">{p.avgBinderPct}%</td>
+                            <td className="px-4 py-3 text-center text-purple-600 dark:text-purple-400 font-bold">{p.avgAmtBinder}</td>
+                            <td className="px-4 py-3 text-center font-sans">
+                              <span className="text-emerald-500 font-bold">{p.pass}</span>
+                              <span className="text-slate-400 mx-1">/</span>
+                              <span className="text-rose-500 font-bold">{p.fail}</span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-sans font-bold">
+                              <span className={parseFloat(p.passRate) >= 95 ? 'text-emerald-500' : 'text-rose-500'}>
+                                {p.passRate}%
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex justify-between items-center">
-                <div>
-                  <div className="text-xs text-slate-400 font-bold uppercase">{isTh ? 'ไม่ผ่านเกณฑ์ (Fail)' : 'Failed'}</div>
-                  <div className="text-2xl font-black text-rose-400 mt-1">{dashboardStats.failCount}</div>
-                </div>
-                <div className="p-3 bg-rose-500/10 text-rose-400 rounded-xl border border-rose-500/20">
-                  <AlertCircle className="w-6 h-6" />
-                </div>
-              </div>
+              {/* UNIFIED TREND ANALYSIS SECTION: Full-width rows for Coating WT, Binder % */}
+              <div className={`rounded-2xl border p-6 space-y-6 transition-colors ${
+                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'
+              }`}>
+                {/* Header & Query Filter Controls */}
+                <div className={`flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b pb-5 ${
+                  isLight ? 'border-slate-200' : 'border-slate-800'
+                }`}>
+                  <div>
+                    <h3 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
+                      isLight ? 'text-slate-900' : 'text-slate-200'
+                    }`}>
+                      <Activity className="w-4 h-4 text-indigo-500" />
+                      <span>{isTh ? 'การวิเคราะห์แนวโน้มการเคลือบผิว (Coating Measurement Trend Analysis)' : 'Coating Measurement Trend Analysis'}</span>
+                    </h3>
+                    <p className={`text-xs mt-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                      {trendFilterProfile === 'All'
+                        ? (isTh ? '📊 กำลังแสดงภาพรวมทุก Profile รวมกัน (แยกตามแถว Coating WT และ Binder % ด้านล่าง)' : '📊 Showing unified overview of all profiles across dedicated parameter rows')
+                        : (isTh ? `🎯 กรองเฉพาะ Profile: ${trendFilterProfile} (พร้อมเส้นกำหนดมาตรฐาน Spec Min / Max)` : `🎯 Filtered by Profile: ${trendFilterProfile} (with Spec Min / Max limits)`)}
+                      {trendFilterMonth !== 'All' && ` • เดือน: ${trendFilterMonth}`}
+                      {` (${filteredTrendData.length} ${isTh ? 'ตัวอย่างที่นำมาพล็อตกราฟ' : 'samples plotted'})`}
+                    </p>
+                  </div>
 
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex justify-between items-center">
-                <div>
-                  <div className="text-xs text-slate-400 font-bold uppercase">{isTh ? 'อัตราผ่านเกณฑ์ (Pass Rate)' : 'Pass Rate'}</div>
-                  <div className="text-2xl font-black text-indigo-300 mt-1">{dashboardStats.passRatio}%</div>
+                  {/* Query Toolbar */}
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Profile Query Dropdown */}
+                    <div className="flex items-center gap-1.5">
+                      <Filter className="w-3.5 h-3.5 text-slate-400" />
+                      <select
+                        value={trendFilterProfile}
+                        onChange={(e) => setTrendFilterProfile(e.target.value)}
+                        className={`text-xs font-semibold rounded-xl px-3 py-1.5 border transition focus:outline-none focus:border-indigo-500 ${
+                          isLight
+                            ? 'bg-slate-50 border-slate-300 text-slate-800'
+                            : 'bg-slate-950 border-slate-800 text-slate-300'
+                        }`}
+                      >
+                        <option value="All">{isTh ? 'ทุก Profile (ภาพรวม)' : 'All Profiles (Overview)'}</option>
+                        {availableProfiles.filter(p => p !== 'All').map(p => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Month Query Dropdown */}
+                    <div>
+                      <select
+                        value={trendFilterMonth}
+                        onChange={(e) => setTrendFilterMonth(e.target.value)}
+                        className={`text-xs font-semibold rounded-xl px-3 py-1.5 border transition focus:outline-none focus:border-indigo-500 ${
+                          isLight
+                            ? 'bg-slate-50 border-slate-300 text-slate-800'
+                            : 'bg-slate-950 border-slate-800 text-slate-300'
+                        }`}
+                      >
+                        <option value="All">{isTh ? 'ทุกเดือน (All Months)' : 'All Months'}</option>
+                        {availableMonths.filter(m => m !== 'All').map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Reset Button */}
+                    {(trendFilterProfile !== 'All' || trendFilterMonth !== 'All') && (
+                      <button
+                        onClick={() => {
+                          setTrendFilterProfile('All');
+                          setTrendFilterMonth('All');
+                        }}
+                        className={`text-xs px-3 py-1.5 rounded-xl border flex items-center gap-1.5 font-semibold transition ${
+                          isLight
+                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                        }`}
+                        title={isTh ? 'ล้างตัวกรองทั้งหมด' : 'Reset all filters'}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>{isTh ? 'รีเซ็ต' : 'Reset'}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="p-3 bg-indigo-500/10 text-indigo-300 rounded-xl border border-indigo-500/20">
-                  <BarChart3 className="w-6 h-6" />
+
+                {/* Quick Profile Filter Pills */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                      isLight ? 'text-slate-600' : 'text-slate-400'
+                    }`}>
+                      <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>{isTh ? 'เลือก Profile ด่วน:' : 'Quick Profile Select:'}</span>
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {isTh ? 'เลือกเพื่อดู Spec Limit และแนวโน้มเฉพาะ Profile' : 'Select to inspect profile limits'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
+                    <button
+                      onClick={() => setTrendFilterProfile('All')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold border transition shrink-0 ${
+                        trendFilterProfile === 'All'
+                          ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
+                          : (isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-950 hover:bg-slate-800 text-slate-400 border-slate-800')
+                      }`}
+                    >
+                      {isTh ? '🌐 ภาพรวมทุก Profile' : '🌐 All Profiles Overview'}
+                    </button>
+
+                    {availableProfiles.filter(p => p !== 'All').map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setTrendFilterProfile(p)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition shrink-0 ${
+                          trendFilterProfile === p
+                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
+                            : (isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-950 hover:bg-slate-800 text-slate-400 border-slate-800')
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Active Profile Spec Banner when queried */}
+                {activeTrendSpec && (
+                  <div className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                    isLight 
+                      ? 'bg-indigo-50/70 border-indigo-200 text-indigo-950' 
+                      : 'bg-indigo-950/30 border-indigo-800/60 text-indigo-200'
+                  }`}>
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-indigo-500/20 text-indigo-500 rounded-lg">
+                        <Activity className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-indigo-600 dark:text-indigo-300">
+                          {activeTrendSpec.name} {isTh ? 'มาตรฐานที่กำหนด (Specification Limits)' : 'Specification Limits'}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {isTh ? 'เส้นประในแต่ละกราฟด้านล่างแสดงขอบเขตมาตรฐานควบคุมของ Profile นี้' : 'Dashed lines in the charts below mark the spec limits for this profile'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                      {/* Coating WT Spec */}
+                      <span className={`px-2.5 py-1 rounded-lg border font-bold ${
+                        isLight ? 'bg-white border-emerald-200 text-emerald-700' : 'bg-slate-900 border-emerald-800 text-emerald-300'
+                      }`}>
+                        Coating WT: {activeTrendSpec.coatingWtMinUp || activeTrendSpec.coatingWtMinLo || '-'} ~ {activeTrendSpec.coatingWtMaxUp || activeTrendSpec.coatingWtMaxLo || '-'} g/m²
+                      </span>
+                      {/* Binder % Spec */}
+                      <span className={`px-2.5 py-1 rounded-lg border font-bold ${
+                        isLight ? 'bg-white border-amber-200 text-amber-700' : 'bg-slate-900 border-amber-800 text-amber-300'
+                      }`}>
+                        Binder %: {activeTrendSpec.binderMin || '-'}% ~ {activeTrendSpec.binderMax || '-'}%
+                      </span>
+                      {/* Amt Binder Spec */}
+                      {(activeTrendSpec.amtBinderMin || activeTrendSpec.amtBinderMax) && (
+                        <span className={`px-2.5 py-1 rounded-lg border font-bold ${
+                          isLight ? 'bg-white border-purple-200 text-purple-700' : 'bg-slate-900 border-purple-800 text-purple-300'
+                        }`}>
+                          Amt Binder: {activeTrendSpec.amtBinderMin || '-'} ~ {activeTrendSpec.amtBinderMax || '-'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2 DEDICATED FULL-WIDTH PARAMETER ROWS */}
+                <div className="space-y-5">
+                  {/* Row 1: Coating WT Trend (g/m²) */}
+                  <CoatingParameterRowCard
+                    paramKey="coatingWt"
+                    title="Coating WT"
+                    thaiTitle="น้ำหนักการเคลือบผิว (Coating Weight - Up/Lo Avg)"
+                    descriptionTh="น้ำหนักการเคลือบผิวเฉลี่ยทั้งด้านบนและด้านล่าง (Coating Weight Average)"
+                    descriptionEn="Average coating weight on upper and lower surfaces"
+                    color="#10b981"
+                    data={filteredTrendData}
+                    unit="g/m²"
+                    specMin={activeTrendSpec ? (parseFloat(activeTrendSpec.coatingWtMinUp || activeTrendSpec.coatingWtMinLo || '0') || null) : null}
+                    specMax={activeTrendSpec ? (parseFloat(activeTrendSpec.coatingWtMaxUp || activeTrendSpec.coatingWtMaxLo || '0') || null) : null}
+                    isLight={isLight}
+                    isTh={isTh}
+                  />
+
+                  {/* Row 2: Binder % Trend (%) */}
+                  <CoatingParameterRowCard
+                    paramKey="binderPercent"
+                    title="Binder %"
+                    thaiTitle="เปอร์เซ็นต์ไบน์เดอร์ (Binder Percentage)"
+                    descriptionTh="สัดส่วนเปอร์เซ็นต์สารยึดเกาะไบน์เดอร์ต่อน้ำหนักการเคลือบทั้งหมด"
+                    descriptionEn="Binder percentage relative to total coating film weight"
+                    color="#f59e0b"
+                    data={filteredTrendData}
+                    unit="%"
+                    specMin={activeTrendSpec ? (parseFloat(activeTrendSpec.binderMin || '0') || null) : null}
+                    specMax={activeTrendSpec ? (parseFloat(activeTrendSpec.binderMax || '0') || null) : null}
+                    isLight={isLight}
+                    isTh={isTh}
+                  />
                 </div>
               </div>
-            </div>
+            </>
           ) : (
-            <div className="text-center py-12 bg-slate-900 rounded-2xl border border-slate-800 text-slate-400">
-              {isTh ? 'ยังไม่มีข้อมูลการตรวจวัด' : 'No inspection records yet'}
+            <div className={`py-20 text-center rounded-2xl border space-y-2 ${
+              isLight ? 'bg-white border-slate-200 text-slate-500 shadow-sm' : 'bg-slate-900 border-slate-800 text-slate-500'
+            }`}>
+              <PieChart className="w-12 h-12 mx-auto opacity-30" />
+              <p className="text-xs font-semibold">{isTh ? 'ยังไม่มีข้อมูลการตรวจวัด' : 'No inspection records yet'}</p>
             </div>
           )}
-
-          {/* Sparkline Trends Section */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-indigo-400" />
-                <span>{isTh ? 'แนวโน้มการตรวจวัด (Sparkline Trends)' : 'Measurement Trends'}</span>
-              </h3>
-
-              <div className="flex gap-3">
-                <select
-                  value={trendFilterProfile}
-                  onChange={(e) => setTrendFilterProfile(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-1.5 focus:outline-none"
-                >
-                  {availableProfiles.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-
-                <select
-                  value={trendFilterMonth}
-                  onChange={(e) => setTrendFilterMonth(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-1.5 focus:outline-none"
-                >
-                  {availableMonths.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredTrends.map(group => (
-                <div key={group.name} className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-indigo-300">{group.name}</span>
-                    <span className="text-[10px] text-slate-400">{group.total} tests</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Sparkline data={group.trends.coatingUp} color="#10b981" label="Coating Wt Up (g/m²)" />
-                    <Sparkline data={group.trends.binderPercent} color="#f59e0b" label="Binder % (%)" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
 
