@@ -1267,6 +1267,8 @@ export interface BilletCuttingSpec {
   surfaceDefectMaxWidth?: string; // Max width (e.g. "50.0")
   surfaceDefectMaxLength?: string; // Max length (e.g. "100.0")
   remarks?: string;
+  isManual?: boolean;
+  updatedAt?: string;
 }
 
 export interface BilletCuttingMeasurementItem {

@@ -24,6 +24,8 @@ interface BilletCuttingSpecModalProps {
   onClose: () => void;
   specs: Record<string, BilletCuttingSpec>;
   onSaveSpecs: (newSpecs: Record<string, BilletCuttingSpec>) => void;
+  onSpecSaved?: (savedKey: string, previousKey: string | null, savedSpec: BilletCuttingSpec) => void;
+  onSpecDeleted?: (deletedKey: string) => void;
   iqaSuppliers?: string[];
   iqaGrades?: string[];
   iqaHistory?: any[];
@@ -37,6 +39,8 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
   onClose,
   specs,
   onSaveSpecs,
+  onSpecSaved,
+  onSpecDeleted,
   iqaSuppliers = [],
   iqaGrades = [],
   iqaHistory = [],
@@ -155,7 +159,7 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
     } else if (initialSup && IQA_SUPPLIER_GRADE_MAP[initialSup]) {
       setBilletGrade(IQA_SUPPLIER_GRADE_MAP[initialSup]);
     } else {
-      setBilletGrade('6063');
+      setBilletGrade(effectiveIqaGrades[0] || '6063');
     }
     setLengthNominal('500');
     setLengthMin('498.0');
@@ -165,21 +169,52 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
     setDiameterMax('128.5');
     setCuttingSurfaceMax('2.0');
     setSurfaceDefectSpecText('≤ 2x50x100 mm');
-    setRemarks(initialSup ? `Auto-linked from IQA-01 Billet Incoming (${initialSup})` : '');
+    setRemarks(initialSup ? `Billet Spec (${initialSup})` : '');
   };
 
   const handleSaveSpec = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanKey = name.trim().toUpperCase();
-    if (!cleanKey) {
+    const cleanSupplier = name.trim();
+    const cleanGrade = billetGrade.trim();
+    if (!cleanSupplier) {
       setFormError(isTh ? 'กรุณากรอกชื่อผู้ขาย / ผู้ผลิต (Supplier Name)' : 'Please enter Supplier Name');
       return;
     }
+    if (!cleanGrade) {
+      setFormError(isTh ? 'กรุณากรอก Billet Grade' : 'Please enter Billet Grade');
+      return;
+    }
+
+    const existingSpec = editingKey ? specs[editingKey] : undefined;
+
+    let targetKey: string;
+    if (editingKey && existingSpec) {
+      const sameIdentity =
+        (existingSpec.name || '').trim().toLowerCase() === cleanSupplier.toLowerCase() &&
+        (existingSpec.billetGrade || '').trim().toLowerCase() === cleanGrade.toLowerCase();
+      targetKey = sameIdentity ? editingKey : `${cleanSupplier} (${cleanGrade})`;
+    } else {
+      const existingMatchingPair = (Object.entries(specs) as [string, BilletCuttingSpec][]).find(
+        ([, s]) =>
+          (s?.name || '').trim().toLowerCase() === cleanSupplier.toLowerCase() &&
+          (s?.billetGrade || '').trim().toLowerCase() === cleanGrade.toLowerCase()
+      );
+      targetKey = existingMatchingPair ? existingMatchingPair[0] : `${cleanSupplier} (${cleanGrade})`;
+    }
+
+    const cleanedRemarks =
+      remarks.trim().startsWith('Auto-synced from IQA-01')
+        ? `Billet Spec • Supplier: ${cleanSupplier} • Grade: ${cleanGrade}`
+        : remarks.trim();
 
     const newSpec: BilletCuttingSpec = {
-      id: `spec-${Date.now()}`,
-      name: cleanKey,
-      billetGrade: billetGrade.trim(),
+      ...(existingSpec || {}),
+      id:
+        existingSpec?.id && !existingSpec.id.startsWith('spec-iqa-')
+          ? existingSpec.id
+          : `spec-manual-${Date.now()}`,
+      name: cleanSupplier,
+      billetGrade: cleanGrade,
       lengthNominal,
       lengthMin,
       lengthMax,
@@ -189,19 +224,24 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
       bendingMax: computedBendingMax,
       cuttingSurfaceMax,
       surfaceDefectSpecText,
-      remarks
+      remarks: cleanedRemarks,
+      isManual: true,
+      updatedAt: new Date().toISOString()
     };
 
     const updated = { ...specs };
-    if (editingKey && editingKey !== cleanKey) {
+    const prevKey = editingKey;
+    if (editingKey && editingKey !== targetKey) {
       delete updated[editingKey];
     }
-    updated[cleanKey] = newSpec;
+    updated[targetKey] = newSpec;
     onSaveSpecs(updated);
+    onSpecSaved?.(targetKey, prevKey, newSpec);
+
     setIsAddingNew(false);
     setEditingKey(null);
     setFormError(null);
-    setToastMessage(isTh ? `บันทึก Supplier Spec "${cleanKey}" เรียบร้อยแล้ว` : `Supplier Spec "${cleanKey}" saved`);
+    setToastMessage(isTh ? `บันทึก Supplier Spec "${targetKey}" เรียบร้อยแล้ว` : `Supplier Spec "${targetKey}" saved`);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
@@ -209,6 +249,7 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
     const updated = { ...specs };
     delete updated[key];
     onSaveSpecs(updated);
+    onSpecDeleted?.(key);
     if (editingKey === key) {
       setEditingKey(null);
     }
@@ -749,7 +790,16 @@ export const BilletCuttingSpecModal: React.FC<BilletCuttingSpecModalProps> = ({
                         }`}>
                           Grade: {spec.billetGrade}
                         </span>
-                        {(spec.remarks?.includes('IQA-01') || spec.id?.includes('iqa')) && (
+                        {spec.isManual ? (
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-black border flex items-center gap-1 ${
+                            isLight
+                              ? 'bg-emerald-100 text-emerald-900 border-emerald-400'
+                              : 'bg-emerald-950 text-emerald-300 border-emerald-700'
+                          }`}>
+                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                            <span>{isTh ? 'Billet Spec ล่าสุด' : 'Saved Spec'}</span>
+                          </span>
+                        ) : (spec.remarks?.includes('IQA-01') || spec.id?.includes('iqa')) && (
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-black border flex items-center gap-1 ${
                             isLight
                               ? 'bg-cyan-100 text-cyan-900 border-cyan-400'

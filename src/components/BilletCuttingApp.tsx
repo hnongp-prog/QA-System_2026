@@ -78,10 +78,17 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
   // Specs & Records State synced to Firebase Cloud Firestore
   const [specs, setSpecs, isSpecsReady] = useCloudState<Record<string, BilletCuttingSpec>>('ipqa08_billet_specs', INITIAL_BILLET_SPECS);
   const [records, setRecords] = useCloudState<BilletCuttingRecord[]>('ipqa08_billet_records', INITIAL_BILLET_RECORDS);
+  const [deletedSpecKeys, setDeletedSpecKeys, isDeletedKeysReady] = useCloudState<string[]>('ipqa08_deleted_spec_keys', []);
 
   // Sync with IQA-01 (Billet Incoming Inspection) Cloud State
   const [iqaHistory, , isIqaHistoryReady] = useCloudState<any[]>('billet_qc_history', []);
   const [iqaGradeSpecs, , isIqaGradeSpecsReady] = useCloudState<Record<string, any>>('billet_qc_grade_specs', {});
+
+  // Helper to identify specs created or edited directly in Billet Spec
+  const isUserManagedSpec = React.useCallback((spec?: BilletCuttingSpec | null): boolean => {
+    if (!spec) return false;
+    return Boolean(spec.isManual || /^spec-(manual-)?\d+$/.test(spec.id || ''));
+  }, []);
 
   // Active Grade list derived strictly from IQA-01 Grade Spec (`billet_qc_grade_specs`)
   const activeIqaGrades = React.useMemo(() => {
@@ -141,18 +148,28 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
     };
   }, [iqaHistory, activeIqaGrades, activeIqaGradeSet]);
 
-  // Reconcile IPQA-08 Billet Specs with live IQA-01 Grade Spec (add new, remove deleted grades/stale IQA specs)
-  const reconcileSpecsWithIqa = React.useCallback((prev: Record<string, BilletCuttingSpec>): { next: Record<string, BilletCuttingSpec>; changed: boolean } => {
+  // Reconcile IPQA-08 Billet Specs with live IQA-01 Grade Spec WITHOUT ever overwriting/removing edited or added Billet Specs
+  const reconcileSpecsWithIqa = React.useCallback((
+    prev: Record<string, BilletCuttingSpec>,
+    ignoredDeletedKeys: string[] = deletedSpecKeys
+  ): { next: Record<string, BilletCuttingSpec>; changed: boolean } => {
     const iqaSpecs = buildIqaCuttingSpecs(iqaHistory, iqaGradeSpecs);
     const hasActiveGrades = activeIqaGradeSet.size > 0;
+    const deletedSet = new Set(ignoredDeletedKeys || []);
     const next: Record<string, BilletCuttingSpec> = {};
     let changed = false;
 
     Object.entries(prev || {}).forEach(([k, spec]) => {
+      // Always preserve specs edited or added manually in Billet Spec
+      if (isUserManagedSpec(spec)) {
+        next[k] = spec;
+        return;
+      }
+
       const specGradeLower = (spec?.billetGrade || '').trim().toLowerCase();
       const isAutoSyncedIqa = Boolean(spec?.id?.startsWith('spec-iqa-') || spec?.remarks?.includes('Auto-synced from IQA-01'));
 
-      // Remove specs whose Billet Grade was deleted from IQA-01 Grade Spec
+      // Remove non-manual specs whose Billet Grade was deleted from IQA-01 Grade Spec
       if (hasActiveGrades && (!specGradeLower || !activeIqaGradeSet.has(specGradeLower))) {
         changed = true;
         return;
@@ -167,48 +184,60 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
       next[k] = spec;
     });
 
-    // Add missing active IQA-01 specs
+    // Collect existing (supplier, grade) pairs in `next` so IQA defaults NEVER duplicate or override saved Billet Specs
+    const existingPairs = new Set(
+      (Object.values(next) as BilletCuttingSpec[]).map(
+        s => `${(s?.name || '').trim().toLowerCase()}__${(s?.billetGrade || '').trim().toLowerCase()}`
+      )
+    );
+
+    // Add missing active IQA-01 specs only if not already represented and not explicitly deleted by user
     Object.entries(iqaSpecs).forEach(([k, spec]) => {
-      if (!next[k]) {
+      const pairKey = `${(spec.name || '').trim().toLowerCase()}__${(spec.billetGrade || '').trim().toLowerCase()}`;
+      if (!next[k] && !existingPairs.has(pairKey) && !deletedSet.has(k)) {
         next[k] = spec;
+        existingPairs.add(pairKey);
         changed = true;
       }
     });
 
     return { next, changed };
-  }, [iqaHistory, iqaGradeSpecs, activeIqaGradeSet]);
+  }, [iqaHistory, iqaGradeSpecs, activeIqaGradeSet, deletedSpecKeys, isUserManagedSpec]);
 
-  // Sync specs from IQA-01 into IPQA-08 Cutting Specs manually
+  // Sync specs from IQA-01 into IPQA-08 Cutting Specs manually (preserves all edited/added Billet Specs)
   const handleSyncFromIqa = React.useCallback(() => {
-    setSpecs(prev => reconcileSpecsWithIqa(prev).next);
+    setDeletedSpecKeys([]);
+    setSpecs(prev => reconcileSpecsWithIqa(prev, []).next);
     setToastMessage(
       isTh
-        ? 'ซิงค์และปรับปรุงข้อมูล Supplier / Billet Grade ตาม IQA-01 (Grade Spec) ล่าสุดเรียบร้อยแล้ว'
-        : 'Synced Supplier & Grade strictly with latest IQA-01 Grade Spec'
+        ? 'ซิงค์ข้อมูลจาก IQA-01 โดยคงเกณฑ์ Billet Spec ที่แก้ไข/เพิ่มไว้ทั้งหมดเรียบร้อยแล้ว'
+        : 'Synced from IQA-01 while preserving all saved Billet Specs'
     );
     setTimeout(() => setToastMessage(null), 3000);
-  }, [reconcileSpecsWithIqa, isTh, setSpecs]);
+  }, [reconcileSpecsWithIqa, isTh, setSpecs, setDeletedSpecKeys]);
 
-  // Auto-sync & prune stale specs whenever cloud IQA-01 Grade Spec or History updates
+  // Auto-sync & prune stale non-manual specs whenever cloud IQA-01 Grade Spec or History updates
   useEffect(() => {
-    if (!isSpecsReady || !isIqaGradeSpecsReady || !isIqaHistoryReady) return;
+    if (!isSpecsReady || !isIqaGradeSpecsReady || !isIqaHistoryReady || !isDeletedKeysReady) return;
     setSpecs(prev => {
-      const { next, changed } = reconcileSpecsWithIqa(prev);
+      const { next, changed } = reconcileSpecsWithIqa(prev, deletedSpecKeys);
       return changed ? next : prev;
     });
-  }, [isSpecsReady, isIqaGradeSpecsReady, isIqaHistoryReady, reconcileSpecsWithIqa, setSpecs]);
+  }, [isSpecsReady, isIqaGradeSpecsReady, isIqaHistoryReady, isDeletedKeysReady, reconcileSpecsWithIqa, deletedSpecKeys, setSpecs]);
 
   // Selected Profile Spec (Empty by default for fresh key-in)
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
 
-  // Derived Billet Grades & Suppliers linked from Billet Spec (`specs`) AND filtered by active IQA-01 Grade Spec
+  // Derived Billet Grades & Suppliers linked from Billet Spec (`specs`):
+  // - All specs added/edited in Billet Spec (`isUserManagedSpec`) ALWAYS appear and are used as-is
+  // - Auto-synced IQA-01 specs are filtered by active IQA-01 Grade Spec
   const specEntries = React.useMemo(() => {
     const all = Object.entries(specs || {}) as [string, BilletCuttingSpec][];
     if (activeIqaGradeSet.size === 0) return all;
     return all.filter(([, s]) =>
-      activeIqaGradeSet.has((s?.billetGrade || '').trim().toLowerCase())
+      isUserManagedSpec(s) || activeIqaGradeSet.has((s?.billetGrade || '').trim().toLowerCase())
     );
-  }, [specs, activeIqaGradeSet]);
+  }, [specs, activeIqaGradeSet, isUserManagedSpec]);
 
   const activeSpec = React.useMemo(() => {
     if (!selectedProfileId) return null;
@@ -233,10 +262,8 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
     specEntries.forEach(([, s]) => {
       if (s?.billetGrade?.trim()) set.add(s.billetGrade.trim());
     });
-    // Ensure all active IQA-01 Grade Spec grades are always represented
-    activeIqaGrades.forEach(g => set.add(g));
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [specEntries, activeIqaGrades]);
+  }, [specEntries]);
 
   const specSuppliers = React.useMemo(() => {
     const set = new Set<string>();
@@ -413,6 +440,70 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
       setHeader(prev => ({ ...prev, supplier: cleanSupplier }));
     }
   };
+
+  // Handle when user edits or adds a Billet Spec in BilletCuttingSpecModal
+  const handleSpecSaved = React.useCallback((savedKey: string, previousKey: string | null, savedSpec: BilletCuttingSpec) => {
+    // Unmark from deleted keys if previously deleted
+    setDeletedSpecKeys(prev => prev.filter(k => k !== savedKey && k !== previousKey));
+
+    // Apply immediately if editing the currently selected spec OR adding a new Billet Spec
+    const isEditingActive = Boolean(previousKey && selectedProfileId === previousKey);
+    const isAddingNewSpec = previousKey === null;
+
+    if (isEditingActive || isAddingNewSpec) {
+      setSelectedProfileId(savedKey);
+      const newLen = savedSpec.lengthNominal || header.cuttingLength;
+      setHeader(prev => ({
+        ...prev,
+        specProfileId: savedKey,
+        billetGrade: savedSpec.billetGrade || '',
+        supplier: savedSpec.name || '',
+        cuttingLength: newLen
+      }));
+
+      // Recompute items with newly saved spec criteria & limits
+      const lMin = parseFloat(savedSpec.lengthMin);
+      const lMax = parseFloat(savedSpec.lengthMax);
+      const dMin = parseFloat(savedSpec.diameterMin);
+      const dMax = parseFloat(savedSpec.diameterMax);
+      const surfMax = parseFloat(savedSpec.cuttingSurfaceMax || '2.0');
+
+      setItems(prev => prev.map(item => {
+        const lVal = parseFloat(item.length);
+        const dVal = parseFloat(item.diameter);
+        const bVal = parseFloat(item.bending);
+        const sVal = parseFloat(item.cuttingSurface);
+        const targetLen = !isNaN(lVal) ? lVal : (parseFloat(newLen) || 0);
+        const newLimit = targetLen > 0 ? (targetLen * 0.0015).toFixed(2) : '0.00';
+
+        const isLengthOk = item.length === '' || isNaN(lVal) || (!isNaN(lMin) && !isNaN(lMax) ? (lVal >= lMin && lVal <= lMax) : true);
+        const isDiameterOk = item.diameter === '' || isNaN(dVal) || (!isNaN(dMin) && !isNaN(dMax) ? (dVal >= dMin && dVal <= dMax) : true);
+        const calcBendingLim = targetLen * 0.0015;
+        const isBendingOk = item.bending === '' || isNaN(bVal) || (calcBendingLim > 0 ? bVal <= calcBendingLim : true);
+        const isSurfaceOk = item.cuttingSurface === '' || isNaN(sVal) || (!isNaN(surfMax) ? sVal <= surfMax : true);
+
+        const isPass =
+          isLengthOk &&
+          isDiameterOk &&
+          isBendingOk &&
+          isSurfaceOk &&
+          item.heatIdentify !== 'NG' &&
+          item.appearance !== 'NG';
+
+        return {
+          ...item,
+          billetGrade: savedSpec.billetGrade || item.billetGrade,
+          supplier: savedSpec.name || item.supplier,
+          bendingLimit: newLimit,
+          judgement: isPass ? 'PASS' : 'FAIL'
+        };
+      }));
+    }
+  }, [selectedProfileId, header.cuttingLength, setDeletedSpecKeys]);
+
+  const handleSpecDeleted = React.useCallback((deletedKey: string) => {
+    setDeletedSpecKeys(prev => (prev.includes(deletedKey) ? prev : [...prev, deletedKey]));
+  }, [setDeletedSpecKeys]);
 
   // Item Validation Helper
   const validateItem = (item: BilletCuttingMeasurementItem): {
@@ -1584,6 +1675,8 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
         onClose={() => setIsSpecModalOpen(false)}
         specs={specs}
         onSaveSpecs={setSpecs}
+        onSpecSaved={handleSpecSaved}
+        onSpecDeleted={handleSpecDeleted}
         iqaSuppliers={iqaSuppliers}
         iqaGrades={iqaGrades}
         iqaHistory={iqaHistory}
