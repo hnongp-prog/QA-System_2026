@@ -1942,19 +1942,20 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
 
       {/* Top Navigation Header */}
       <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b ${
-        isLight ? 'border-slate-300' : 'border-slate-800'
+        isLight ? 'border-slate-200' : 'border-slate-800'
       }`}>
         <div className="flex items-center gap-3">
           {onBackToPortal && (
             <button
               onClick={onBackToPortal}
-              className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-xs font-bold ${
+              className={`p-2.5 rounded-xl transition flex items-center gap-1.5 text-xs font-semibold border ${
                 isLight 
-                  ? 'bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-sm' 
+                  ? 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-xs' 
                   : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800'
               }`}
+              title="Return to QA Main Portal"
             >
-              <ArrowLeft className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+              <ArrowLeft className={`w-4 h-4 ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
               <span>{isTh ? 'กลับสู่เมนูหลัก QA' : 'Back to Portal'}</span>
             </button>
           )}
@@ -1965,99 +1966,135 @@ export const ThicknessWallApp: React.FC<ThicknessWallAppProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded border ${
-                  isLight ? 'bg-indigo-100 text-indigo-900 border-indigo-300' : 'bg-indigo-950 text-indigo-300 border-indigo-800'
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                  isLight ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-blue-950 text-blue-300 border-blue-800'
                 }`}>
                   IPQA-07
                 </span>
-                <h1 className={`text-xl font-extrabold tracking-tight ${
+                <h1 className={`text-xl font-bold tracking-tight ${
                   isLight ? 'text-slate-900' : 'text-white'
                 }`}>
                   {isTh ? 'ระบบวัดความหนาผนังชิ้นงาน (Thickness Wall Measurement)' : 'Thickness Wall Measure System'}
                 </h1>
               </div>
-              <p className={`text-xs mt-0.5 font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+              <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {isTh ? 'สกัดข้อมูลด้วย Gemini AI 3.8 • Server-Side Cloud Synced' : 'AI-powered wall thickness extraction & quality specification audit'}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Tab Buttons */}
-        <div className={`flex items-center gap-1.5 overflow-x-auto p-1.5 rounded-2xl border ${
-          isLight ? 'bg-white border-slate-300 shadow-sm' : 'bg-slate-900 border-slate-800'
-        }`}>
-          <button
-            onClick={() => handleSwitchTab('extraction')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'extraction' 
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
-                : isLight ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>{isTh ? 'Data Extraction' : 'Data Extraction'}</span>
-          </button>
-
-          <button
-            onClick={() => handleSwitchTab('history')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'history' 
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
-                : isLight ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <History className="w-3.5 h-3.5" />
-            <span>{isTh ? 'ประวัติการบันทึกข้อมูล' : 'History Hub'}</span>
-            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono ${
-              activeTab === 'history'
-                ? 'bg-white/20 text-white'
-                : isLight ? 'bg-slate-200 text-slate-700' : 'bg-slate-800 text-slate-300'
+        {/* Status Badge & Theme Toggle (Matching IQA-01) */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {status && (
+            <div className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border shadow-xs transition ${
+              status.type === 'success' 
+                ? isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-emerald-950/80 border-emerald-800 text-emerald-300' 
+                : status.type === 'error' 
+                  ? isLight ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-rose-950/80 border-rose-800 text-rose-300' 
+                  : isLight ? 'bg-white border-slate-200 text-slate-700' : 'bg-slate-900 border-slate-800 text-cyan-300'
             }`}>
-              {savedRecords.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => handleSwitchTab('dashboard')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'dashboard' 
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
-                : isLight ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>{isTh ? 'Dashboard' : 'Dashboard'}</span>
-          </button>
-
-          <button
-            onClick={() => handleSwitchTab('settings')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'settings' 
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
-                : isLight ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span>{isTh ? 'Profile Spec Setting' : 'Spec Setting'}</span>
-          </button>
+              <Sparkles className={`w-4 h-4 shrink-0 ${isLight ? 'text-blue-600' : 'text-cyan-400'}`} />
+              <span className="max-w-[260px] truncate">{status.message}</span>
+            </div>
+          )}
 
           {onToggleTheme && (
             <button
               onClick={onToggleTheme}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition ml-1 ${
-                isLight
-                  ? 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200 shadow-xs'
-                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-xs font-bold ${
+                isLight 
+                  ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-xs' 
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
               }`}
-              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Clean'}
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
             >
-              {isLight ? <Moon className="w-3.5 h-3.5 text-indigo-600" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
-              <span>{isLight ? (isTh ? 'สว่าง' : 'Light') : (isTh ? 'มืด' : 'Dark')}</span>
+              {isLight ? <Moon className="w-4 h-4 text-slate-600" /> : <Sun className="w-4 h-4 text-amber-400" />}
+              <span className="hidden sm:inline">{isLight ? 'Dark' : 'Light'}</span>
             </button>
           )}
         </div>
       </header>
+
+      {/* Tabs Row Below Header (Formatted like IQA-01) */}
+      <div className={`flex space-x-2 border-b pb-2 overflow-x-auto ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
+        <button
+          onClick={() => handleSwitchTab('extraction')}
+          className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border whitespace-nowrap ${
+            activeTab === 'extraction'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>{isTh ? '1. Data Extraction' : '1. Data Extraction'}</span>
+        </button>
+
+        <button
+          onClick={() => handleSwitchTab('history')}
+          className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border whitespace-nowrap ${
+            activeTab === 'history'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          <span>{isTh ? '2. ประวัติการบันทึกข้อมูล (Cloud Shared Hub)' : '2. History (Cloud Shared Hub)'}</span>
+          {savedRecords.length > 0 && (
+            <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+              activeTab === 'history'
+                ? isLight
+                  ? 'bg-white/20 text-white border-white/30'
+                  : 'bg-slate-950/20 text-slate-950 border-slate-950/30'
+                : isLight
+                  ? 'bg-blue-100 text-blue-800 border-blue-200'
+                  : 'bg-slate-950 text-cyan-300 border-cyan-800'
+            }`}>
+              {savedRecords.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => handleSwitchTab('dashboard')}
+          className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border whitespace-nowrap ${
+            activeTab === 'dashboard'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>{isTh ? '3. Dashboard' : '3. Dashboard'}</span>
+        </button>
+
+        <button
+          onClick={() => handleSwitchTab('settings')}
+          className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-2 border whitespace-nowrap ${
+            activeTab === 'settings'
+              ? isLight
+                ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-xs'
+                : 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold shadow-md shadow-cyan-500/20'
+              : isLight
+                ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+          }`}
+        >
+          <Settings className="w-4 h-4" />
+          <span>{isTh ? '4. Profile Spec Setting' : '4. Profile Spec Setting'}</span>
+        </button>
+      </div>
 
       {/* TAB 1: DATA EXTRACTION */}
       {activeTab === 'extraction' && (
