@@ -157,6 +157,28 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
   const activeSpec = selectedProfileId ? specs[selectedProfileId] || null : null;
 
+  // Derived Billet Grades & Suppliers linked directly from Billet Spec (`specs`)
+  const specEntries = React.useMemo(
+    () => (Object.entries(specs || {}) as [string, BilletCuttingSpec][]),
+    [specs]
+  );
+
+  const specBilletGrades = React.useMemo(() => {
+    const set = new Set<string>();
+    specEntries.forEach(([, s]) => {
+      if (s?.billetGrade?.trim()) set.add(s.billetGrade.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [specEntries]);
+
+  const specSuppliers = React.useMemo(() => {
+    const set = new Set<string>();
+    specEntries.forEach(([, s]) => {
+      if (s?.name?.trim()) set.add(s.name.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [specEntries]);
+
   // Form State: 1.1 Header (Blank by default for fresh key-in)
   const [header, setHeader] = useState<BilletCuttingHeader>({
     inspectorName: '',
@@ -165,11 +187,35 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
     lotNo: '',
     date: new Date().toISOString().slice(0, 10),
     machine: '',
-    specProfileId: ''
+    specProfileId: '',
+    billetGrade: '',
+    supplier: ''
   });
 
+  const matchingSpecSuppliers = React.useMemo(() => {
+    const grade = (header.billetGrade || '').trim().toLowerCase();
+    if (!grade) return specSuppliers;
+    const set = new Set<string>();
+    specEntries.forEach(([, s]) => {
+      if ((s?.billetGrade || '').trim().toLowerCase() === grade && s?.name?.trim()) {
+        set.add(s.name.trim());
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [header.billetGrade, specEntries, specSuppliers]);
+
+  const otherSpecSuppliers = React.useMemo(() => {
+    if (!header.billetGrade?.trim()) return [];
+    const matchedLower = new Set(matchingSpecSuppliers.map(s => s.toLowerCase()));
+    return specSuppliers.filter(s => !matchedLower.has(s.toLowerCase()));
+  }, [header.billetGrade, matchingSpecSuppliers, specSuppliers]);
+
   // Form State: 1.2 Cutting Measurement Items (Blank by default for fresh key-in)
-  const createDefaultItem = (grade = activeSpec?.billetGrade || '', len = header.cuttingLength): BilletCuttingMeasurementItem => {
+  const createDefaultItem = (
+    grade = activeSpec?.billetGrade || header.billetGrade || '',
+    len = header.cuttingLength,
+    sup = activeSpec?.name || header.supplier || ''
+  ): BilletCuttingMeasurementItem => {
     const nominalL = parseFloat(len) || 0;
     const calcBending = nominalL > 0 ? (nominalL * 0.0015).toFixed(2) : '0.00'; // Auto calculate length * 0.15%
 
@@ -177,7 +223,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
       id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       billetGrade: grade,
       heatNo: '',
-      supplier: '',
+      supplier: sup,
       qty: '',
       length: '',
       diameter: '',
@@ -193,39 +239,111 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
   };
 
   const [items, setItems] = useState<BilletCuttingMeasurementItem[]>([
-    createDefaultItem('', '')
+    createDefaultItem('', '', '')
   ]);
 
-  // Update cuttingLength when profile changes
-  const handleProfileChange = (profileKey: string) => {
+  // Apply selected Billet Spec to Header (1.1) and Measurement Rows (1.2)
+  const applySpecToForm = (profileKey: string, spec: BilletCuttingSpec) => {
     setSelectedProfileId(profileKey);
+    const newLen = spec.lengthNominal || header.cuttingLength;
+    const nextGrade = spec.billetGrade || '';
+    const nextSupplier = spec.name || '';
+
+    setHeader(prev => ({
+      ...prev,
+      specProfileId: profileKey,
+      billetGrade: nextGrade,
+      supplier: nextSupplier,
+      cuttingLength: newLen
+    }));
+
+    // Update default grade, supplier & bending limit on existing items
+    setItems(prev => prev.map(item => {
+      const itemLen = parseFloat(item.length) || parseFloat(newLen) || 0;
+      const newLimit = itemLen > 0 ? (itemLen * 0.0015).toFixed(2) : '0.00';
+      return {
+        ...item,
+        billetGrade: nextGrade || item.billetGrade,
+        supplier: nextSupplier || item.supplier,
+        bendingLimit: newLimit
+      };
+    }));
+  };
+
+  // Update cuttingLength, billetGrade, and supplier when spec profile changes
+  const handleProfileChange = (profileKey: string) => {
     if (!profileKey) {
+      setSelectedProfileId('');
       setHeader(prev => ({
         ...prev,
         specProfileId: '',
+        billetGrade: '',
+        supplier: '',
         cuttingLength: ''
       }));
       return;
     }
     const spec = specs[profileKey];
     if (spec) {
-      const newLen = spec.lengthNominal || header.cuttingLength;
+      applySpecToForm(profileKey, spec);
+    }
+  };
+
+  // Linked change when user selects Billet Grade in 1.1 from Billet Spec
+  const handleHeaderGradeChange = (selectedGrade: string) => {
+    const cleanGrade = selectedGrade.trim();
+    if (!cleanGrade) {
+      setSelectedProfileId('');
       setHeader(prev => ({
         ...prev,
-        specProfileId: profileKey,
-        cuttingLength: newLen
+        specProfileId: '',
+        billetGrade: '',
+        supplier: '',
+        cuttingLength: ''
       }));
+      return;
+    }
 
-      // Update default limits on existing items
-      setItems(prev => prev.map(item => {
-        const itemLen = parseFloat(item.length) || parseFloat(newLen) || 0;
-        const newLimit = itemLen > 0 ? (itemLen * 0.0015).toFixed(2) : '0.00';
-        return {
-          ...item,
-          billetGrade: spec.billetGrade || item.billetGrade,
-          bendingLimit: newLimit
-        };
+    const gradeMatches = specEntries.filter(
+      ([, s]) => (s?.billetGrade || '').trim().toLowerCase() === cleanGrade.toLowerCase()
+    );
+    const currentSupLower = (header.supplier || '').trim().toLowerCase();
+    const exactMatch =
+      gradeMatches.find(([, s]) => (s?.name || '').trim().toLowerCase() === currentSupLower) ||
+      gradeMatches[0];
+
+    if (exactMatch) {
+      applySpecToForm(exactMatch[0], exactMatch[1]);
+    } else {
+      setHeader(prev => ({ ...prev, billetGrade: cleanGrade }));
+    }
+  };
+
+  // Linked change when user selects Supplier in 1.1 from Billet Spec
+  const handleHeaderSupplierChange = (selectedSupplier: string) => {
+    const cleanSupplier = selectedSupplier.trim();
+    if (!cleanSupplier) {
+      setSelectedProfileId('');
+      setHeader(prev => ({
+        ...prev,
+        specProfileId: '',
+        supplier: ''
       }));
+      return;
+    }
+
+    const supplierMatches = specEntries.filter(
+      ([, s]) => (s?.name || '').trim().toLowerCase() === cleanSupplier.toLowerCase()
+    );
+    const currentGradeLower = (header.billetGrade || '').trim().toLowerCase();
+    const exactMatch =
+      supplierMatches.find(([, s]) => (s?.billetGrade || '').trim().toLowerCase() === currentGradeLower) ||
+      supplierMatches[0];
+
+    if (exactMatch) {
+      applySpecToForm(exactMatch[0], exactMatch[1]);
+    } else {
+      setHeader(prev => ({ ...prev, supplier: cleanSupplier }));
     }
   };
 
@@ -333,7 +451,14 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
 
   // Add Item Row
   const addItemRow = () => {
-    setItems(prev => [...prev, createDefaultItem(activeSpec?.billetGrade || '', header.cuttingLength)]);
+    setItems(prev => [
+      ...prev,
+      createDefaultItem(
+        activeSpec?.billetGrade || header.billetGrade || '',
+        header.cuttingLength,
+        activeSpec?.name || header.supplier || ''
+      )
+    ]);
   };
 
   // Reset / Clear Entry Table & Header
@@ -346,9 +471,11 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
       lotNo: '',
       date: new Date().toISOString().slice(0, 10),
       machine: '',
-      specProfileId: ''
+      specProfileId: '',
+      billetGrade: '',
+      supplier: ''
     });
-    setItems([createDefaultItem('', '')]);
+    setItems([createDefaultItem('', '', '')]);
     setToastMessage(isTh ? 'ล้างข้อมูลส่วนหัวและตารางเรียบร้อยแล้ว พร้อมสำหรับกรอกข้อมูลชุดใหม่' : 'Form cleared, ready for new entry');
     setTimeout(() => setToastMessage(null), 3000);
   };
@@ -367,7 +494,13 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
   // Remove Item Row
   const removeItemRow = (index: number) => {
     if (items.length <= 1) {
-      setItems([createDefaultItem(activeSpec?.billetGrade || '', header.cuttingLength)]);
+      setItems([
+        createDefaultItem(
+          activeSpec?.billetGrade || header.billetGrade || '',
+          header.cuttingLength,
+          activeSpec?.name || header.supplier || ''
+        )
+      ]);
       setToastMessage(isTh ? 'ล้างแถวเป็นค่าว่างเรียบร้อยแล้ว' : 'Row reset to blank');
       setTimeout(() => setToastMessage(null), 2500);
       return;
@@ -471,11 +604,13 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
       lotNo: '',
       date: new Date().toISOString().slice(0, 10),
       machine: '',
-      specProfileId: ''
+      specProfileId: '',
+      billetGrade: '',
+      supplier: ''
     });
 
     // Reset table to fresh blank row
-    setItems([createDefaultItem('', '')]);
+    setItems([createDefaultItem('', '', '')]);
 
     // Switch to history tab
     setActiveTab('HISTORY');
@@ -751,8 +886,101 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                 </div>
               </div>
 
-              {/* Header Input Fields: Inspector name, Shift, Cutting length, Lot no. */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+              {/* Header Input Fields: Billet Grade (Linked), Supplier (Linked), Lot no., Inspector name, Shift, Cutting length */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                <div>
+                  <label className={`text-[11px] font-black uppercase tracking-wider flex items-center justify-between gap-2 mb-1 ${
+                    isLight ? 'text-black' : 'text-slate-400'
+                  }`}>
+                    <span>{isTh ? 'Billet Grade (Link จาก Billet Spec) *' : 'Billet Grade (From Billet Spec) *'}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono border ${
+                      isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-950/80 text-indigo-300 border-indigo-800'
+                    }`}>
+                      {specBilletGrades.length} Specs
+                    </span>
+                  </label>
+                  <select
+                    value={header.billetGrade || ''}
+                    onChange={(e) => handleHeaderGradeChange(e.target.value)}
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-mono font-black focus:outline-none border-2 ${
+                      isLight
+                        ? 'bg-white border-blue-600 text-black focus:bg-white focus:border-blue-700 shadow-xs'
+                        : 'bg-slate-950 border-slate-800 text-indigo-300 focus:border-indigo-500'
+                    }`}
+                    required
+                  >
+                    <option value="">{isTh ? '-- เลือก Billet Grade จาก Billet Spec --' : '-- Select Billet Grade --'}</option>
+                    {specBilletGrades.map(grade => (
+                      <option key={grade} value={grade}>{grade}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`text-[11px] font-black uppercase tracking-wider flex items-center justify-between gap-2 mb-1 ${
+                    isLight ? 'text-black' : 'text-slate-400'
+                  }`}>
+                    <span>{isTh ? 'Supplier (Link จาก Billet Spec) *' : 'Supplier (From Billet Spec) *'}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono border ${
+                      isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-950/80 text-indigo-300 border-indigo-800'
+                    }`}>
+                      {matchingSpecSuppliers.length} / {specSuppliers.length}
+                    </span>
+                  </label>
+                  <select
+                    value={header.supplier || ''}
+                    onChange={(e) => handleHeaderSupplierChange(e.target.value)}
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none border-2 ${
+                      isLight
+                        ? 'bg-white border-blue-600 text-black focus:bg-white focus:border-blue-700 shadow-xs'
+                        : 'bg-slate-950 border-slate-800 text-cyan-300 focus:border-indigo-500'
+                    }`}
+                    required
+                  >
+                    <option value="">{isTh ? '-- เลือก Supplier จาก Billet Spec --' : '-- Select Supplier --'}</option>
+                    {header.billetGrade ? (
+                      <>
+                        <optgroup label={isTh ? `Supplier สำหรับ Grade ${header.billetGrade}` : `Suppliers for ${header.billetGrade}`}>
+                          {matchingSpecSuppliers.map(sup => (
+                            <option key={`match-${sup}`} value={sup}>{sup}</option>
+                          ))}
+                        </optgroup>
+                        {otherSpecSuppliers.length > 0 && (
+                          <optgroup label={isTh ? 'Supplier อื่นใน Billet Spec' : 'Other Suppliers in Billet Spec'}>
+                            {otherSpecSuppliers.map(sup => (
+                              <option key={`other-${sup}`} value={sup}>{sup}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </>
+                    ) : (
+                      specSuppliers.map(sup => (
+                        <option key={sup} value={sup}>{sup}</option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`text-[11px] font-black uppercase tracking-wider block mb-1 ${
+                    isLight ? 'text-black' : 'text-slate-400'
+                  }`}>
+                    {isTh ? 'หมายเลขลอต (Lot No.) *' : 'Lot No. *'}
+                  </label>
+                  <input
+                    type="text"
+                    value={header.lotNo}
+                    onChange={(e) => setHeader({ ...header, lotNo: e.target.value })}
+                    placeholder={isTh ? 'ระบุหมายเลข Lot No.' : 'e.g. LOT-BC-260831-01'}
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-black font-mono focus:outline-none border-2 ${
+                      isLight 
+                        ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700 shadow-xs' 
+                        : 'bg-slate-950 border-slate-800 text-amber-300 placeholder:text-slate-600 focus:border-amber-500'
+                    }`}
+                    required
+                  />
+                </div>
+
                 <div>
                   <label className={`text-[11px] font-black uppercase tracking-wider block mb-1 ${
                     isLight ? 'text-black' : 'text-slate-400'
@@ -822,26 +1050,6 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                       isLight 
                         ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700 shadow-xs' 
                         : 'bg-slate-950 border-slate-800 text-pink-300 placeholder:text-slate-600 focus:border-pink-500'
-                    }`}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className={`text-[11px] font-black uppercase tracking-wider block mb-1 ${
-                    isLight ? 'text-black' : 'text-slate-400'
-                  }`}>
-                    {isTh ? 'หมายเลขลอต (Lot No.) *' : 'Lot No. *'}
-                  </label>
-                  <input
-                    type="text"
-                    value={header.lotNo}
-                    onChange={(e) => setHeader({ ...header, lotNo: e.target.value })}
-                    placeholder={isTh ? 'ระบุหมายเลข Lot No.' : 'e.g. LOT-BC-260831-01'}
-                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-black font-mono focus:outline-none border-2 ${
-                      isLight 
-                        ? 'bg-white border-blue-600 text-black placeholder:text-slate-500 focus:bg-white focus:border-blue-700 shadow-xs' 
-                        : 'bg-slate-950 border-slate-800 text-amber-300 placeholder:text-slate-600 focus:border-amber-500'
                     }`}
                     required
                   />
@@ -1239,18 +1447,6 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
                 </table>
               </div>
 
-              {/* Datalist for Billet Grade Autocomplete / Presets */}
-              <datalist id="billet-cutting-grade-list">
-                <option value="6063">6063 (Standard)</option>
-                <option value="6061">6061 (Structural)</option>
-                <option value="6082">6082 (High Strength)</option>
-                <option value="6005A">6005A (Medium Strength)</option>
-                <option value="6060">6060 (Architectural)</option>
-                <option value="1050">1050 (Pure Al)</option>
-                <option value="3003">3003 (Al-Mn)</option>
-                <option value="7075">7075 (Aerospace)</option>
-              </datalist>
-
               {/* Bottom Summary Bar & Save Button */}
               <div className={`p-4 rounded-2xl border-2 flex flex-col sm:flex-row items-center justify-between gap-4 ${
                 isLight ? 'bg-blue-50/70 border-blue-300' : 'bg-slate-950 border-slate-800'
@@ -1330,7 +1526,7 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
         theme={theme}
       />
 
-      {/* Datalists for Auto-completion from IQA-01 */}
+      {/* Datalists linked from Billet Spec & IQA-01 */}
       <datalist id="billet-cutting-heat-list">
         {Object.keys(iqaHeatMap).slice(0, 80).map(heat => (
           <option key={heat} value={heat}>
@@ -1340,20 +1536,15 @@ export const BilletCuttingApp: React.FC<BilletCuttingAppProps> = ({
       </datalist>
 
       <datalist id="billet-cutting-supplier-list">
-        {iqaSuppliers.map(sup => (
+        {Array.from(new Set([...specSuppliers, ...iqaSuppliers])).map(sup => (
           <option key={sup} value={sup} />
         ))}
       </datalist>
 
       <datalist id="billet-cutting-grade-list">
-        {iqaGrades.map(grade => (
+        {Array.from(new Set([...specBilletGrades, ...iqaGrades, '6063', '6061', '6082', '6005A', '6060', '1050', '3003', '7075'])).map(grade => (
           <option key={grade} value={grade} />
         ))}
-        <option value="6005A">6005A</option>
-        <option value="6060">6060</option>
-        <option value="1050">1050</option>
-        <option value="3003">3003</option>
-        <option value="7075">7075</option>
       </datalist>
     </div>
   );

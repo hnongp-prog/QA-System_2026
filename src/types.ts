@@ -1295,6 +1295,8 @@ export interface BilletCuttingHeader {
   date: string;
   machine?: string;
   specProfileId?: string;
+  billetGrade?: string;
+  supplier?: string;
 }
 
 export interface BilletCuttingRecord {
